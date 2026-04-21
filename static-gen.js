@@ -11,8 +11,10 @@
  * The browser-side layout.js still runs and overwrites the static content on
  * load, so the two paths produce identical results.
  *
- * Usage:  node colvmn/static-gen.js
- * Run from the site root (the directory that contains the colvmn submodule).
+ * Usage:
+ *   node colvmn/static-gen.js          # site root = parent of colvmn/ (submodule mode)
+ *   node colvmn/static-gen.js <dir>    # site root = <dir> (explicit)
+ *   node static-gen.js .               # self-host: colvmn is its own site root
  */
 
 import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
@@ -49,8 +51,9 @@ ContentBase.typeMap = {
 };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-// colvmn lives at <siteRoot>/colvmn/ as a submodule.
-const siteRoot = resolve(__dirname, "..");
+// Default: colvmn lives at <siteRoot>/colvmn/ as a submodule.
+// Override with argv[2] (e.g. "." to self-host colvmn's own pages).
+const siteRoot = resolve(process.argv[2] || join(__dirname, ".."));
 
 const skipDirs = new Set([
     "node_modules", "external-libs", "source", "build",
