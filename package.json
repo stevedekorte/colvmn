@@ -1,0 +1,11 @@
+{
+  "name": "colvmn",
+  "version": "0.1.0",
+  "description": "Minimal static-site layout engine.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stevedekorte/colvmn.git"
+  }
+}
