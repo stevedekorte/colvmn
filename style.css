@@ -142,16 +142,16 @@ pre {
   line-height: 1.6;
 }
 
-code {
+code, tt {
   font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
-  font-size: 12px;
+  font-size: 11px;
 }
 
-p code, li code {
+p code, li code, p tt, li tt {
   background: #f5f5f3;
   padding: 2px 5px;
   border-radius: 3px;
-  font-size: 0.92em;
+  font-size: 0.85em;
 }
 
 /* Content blocks */
@@ -677,7 +677,7 @@ p code, li code {
   background-repeat: no-repeat;
   background-position: right center;
   background-size: contain;
-  min-height: 320px;
+  min-height: clamp(180px, 34vw, 320px);
   padding: 60px 0 80px;
   margin: 20px 0 60px;
   display: flex;
@@ -699,7 +699,7 @@ p code, li code {
 }
 
 .hero-title {
-  font-size: 64px;
+  font-size: clamp(40px, 7vw, 64px);
   font-weight: 400;
   letter-spacing: -1.5px;
   color: #1a1a1a;
@@ -736,30 +736,7 @@ p code, li code {
   font-weight: 500;
   color: #2a2a2a;
   letter-spacing: 0.2px;
-  cursor: pointer;
-  list-style: none;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
 }
-
-.faq-q::-webkit-details-marker { display: none; }
-
-.faq-q::after {
-  content: "+";
-  font-size: 18px;
-  font-weight: 300;
-  color: #999;
-  transition: transform 0.2s;
-  line-height: 1;
-}
-
-.faq-item[open] .faq-q::after {
-  content: "\2212";
-}
-
-.faq-q:hover { color: #000; }
 
 .faq-a {
   padding: 12px 0 4px;
@@ -865,16 +842,13 @@ p code, li code {
   .scroll-hint { display: none; }
   /* End spacer from desktop is unnecessary in list mode. */
   .timeline-track > div[style*="width: 120px"] { display: none; }
-  /* Mobile: stack image above title so neither is clipped. The image
-     is a background on .hero; reserve space for it with padding-top
-     (~square aspect, fits the 1:1 to 4:3 chapter images), then the
-     .hero-title sits below. hero-wide already scales via aspect-ratio. */
-  .hero {
+  /* Mobile: hide the hero background image and show the title as a
+     normal page heading. hero-wide (full-width banners) still show. */
+  .hero:not(.hero-wide) {
     min-height: 0;
-    padding: 70% 0 0;
+    padding: 0;
     margin: 10px 0 28px;
-    background-size: contain;
-    background-position: top center;
+    background-image: none !important;
     display: block;
   }
   .hero.hero-wide {
@@ -885,7 +859,7 @@ p code, li code {
   .hero-title {
     font-size: 40px;
     max-width: none;
-    margin-top: 16px;
+    margin-top: 0;
   }
 }
 
@@ -905,3 +879,151 @@ p code, li code {
   .card-grid { break-inside: avoid; }
   .back-link { display: none; }
 }
+
+/* ClassDoc — language-agnostic class/proto/struct documentation */
+nav.classdoc-toc {
+  margin-bottom: 40px;
+}
+
+nav.classdoc-toc ul {
+  list-style: none !important;
+  padding: 0;
+  margin: 0;
+}
+
+nav.classdoc-toc ul.classdoc-toc-members {
+  columns: 2;
+  column-gap: 30px;
+}
+
+nav.classdoc-toc ul ul {
+  padding-left: 14px;
+  margin-top: 4px;
+}
+
+nav.classdoc-toc li {
+  font-size: 13px;
+  line-height: 1.8;
+  break-inside: avoid;
+  margin: 0;
+  padding: 0;
+  list-style: none !important;
+}
+
+nav.classdoc-toc > ul > li {
+  break-inside: avoid-column;
+  margin-bottom: 10px;
+}
+
+nav.classdoc-toc > ul > li > a {
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #2a2a2a;
+}
+
+nav.classdoc-toc ul ul > li > a {
+  font-weight: 400;
+  color: #555;
+}
+
+nav.classdoc-toc ul.classdoc-toc-members > li > a {
+  font-weight: 400;
+  font-size: 13px;
+  letter-spacing: normal;
+  text-transform: none;
+  color: #555;
+}
+
+nav.classdoc-toc ul.classdoc-toc-members > li {
+  margin-bottom: 0;
+  line-height: 1.6;
+}
+
+nav.classdoc-toc a {
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+nav.classdoc-toc a:hover { color: #2a2a2a; }
+
+.classdoc h2.classdoc-section {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #2a2a2a;
+  border-top: 1px solid #ddd;
+  padding-top: 24px;
+  margin-top: 40px;
+  margin-bottom: 0;
+}
+
+.classdoc h3.classdoc-category {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #999;
+  margin-top: 24px;
+  margin-bottom: 6px;
+}
+
+.classdoc-member {
+  border-top: 1px solid #eee;
+  padding: 18px 0;
+  scroll-margin-top: 16px;
+}
+
+.classdoc-member:first-of-type {
+  border-top: none;
+}
+
+.classdoc-member-head {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.classdoc-member-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2a2a2a;
+}
+
+.classdoc-member-sig {
+  font-size: 14px;
+  font-weight: 400;
+  color: #888;
+}
+
+.classdoc-member-body {
+  font-size: 13px;
+  line-height: 1.75;
+  color: #555;
+  padding-left: 0;
+}
+
+.classdoc-member-body p { margin-bottom: 10px; }
+.classdoc-member-body p:last-child { margin-bottom: 0; }
+.classdoc-member-body code,
+.classdoc-member-body tt {
+  background: #f5f5f3;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+}
+.classdoc-member-body pre {
+  background: #f5f5f3;
+  border: 1px solid #e0e0e0;
+  border-radius: 3px;
+  padding: 12px 16px;
+  margin: 8px 0;
+  overflow-x: auto;
+  font-size: 12px;
+}
+

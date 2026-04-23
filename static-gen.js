@@ -33,6 +33,7 @@ import { ContentImage } from "./layout/ContentImage.js";
 import { ContentTimeline } from "./layout/ContentTimeline.js";
 import { ContentToc } from "./layout/ContentToc.js";
 import { ContentFAQ } from "./layout/ContentFAQ.js";
+import { ContentClassDoc } from "./layout/ContentClassDoc.js";
 import { PageIndex } from "./layout/PageIndex.js";
 import { parseMarkdown } from "./layout/MarkdownParser.js";
 
@@ -48,6 +49,7 @@ ContentBase.typeMap = {
     ContentTimeline,
     ContentToc,
     ContentFAQ,
+    ContentClassDoc,
 };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

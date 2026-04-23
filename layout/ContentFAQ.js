@@ -14,10 +14,10 @@ export class ContentFAQ extends ContentBase {
         for (const item of items) {
             const q = item.q || "";
             const a = item.a || "";
-            html += "<details class=\"faq-item\">";
-            html += `<summary class="faq-q">${q}</summary>`;
+            html += "<div class=\"faq-item\">";
+            html += `<div class="faq-q">${q}</div>`;
             html += `<div class="faq-a">${a}</div>`;
-            html += "</details>";
+            html += "</div>";
         }
         html += "</div>";
         html += "</div></div>";

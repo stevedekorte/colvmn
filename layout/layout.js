@@ -9,6 +9,7 @@ import { ContentImage } from "./ContentImage.js";
 import { ContentTimeline } from "./ContentTimeline.js";
 import { ContentToc } from "./ContentToc.js";
 import { ContentFAQ } from "./ContentFAQ.js";
+import { ContentClassDoc } from "./ContentClassDoc.js";
 import { PageIndex } from "./PageIndex.js";
 
 ContentBase.typeMap = {
@@ -22,6 +23,7 @@ ContentBase.typeMap = {
     ContentTimeline,
     ContentToc,
     ContentFAQ,
+    ContentClassDoc,
 };
 
 document.addEventListener("DOMContentLoaded", () => {
