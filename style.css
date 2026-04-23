@@ -439,8 +439,7 @@ p code, li code, p tt, li tt {
   max-width: none;
   margin: 0;
   padding: 0;
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   box-shadow: none;
@@ -507,7 +506,7 @@ p code, li code, p tt, li tt {
 .timeline-wrap {
   flex: 1;
   min-height: 480px;
-  overflow-x: scroll;
+  overflow-x: auto;
   overflow-y: hidden;
   background: #f9f8f6;
 }

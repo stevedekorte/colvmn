@@ -66,11 +66,14 @@ export class ContentTimeline extends ContentBase {
             }
             prevMonthIndex = col.monthIndex;
 
-            // Above/below placement
+            // Above/below placement. For multi-event columns, split evenly
+            // so the axis stays near center rather than being pushed far
+            // below by a tall one-sided stack.
             let aboveEvents, belowEvents;
             if (col.events.length > 1) {
-                aboveEvents = [col.events[0]];
-                belowEvents = col.events.slice(1);
+                const half = Math.ceil(col.events.length / 2);
+                aboveEvents = col.events.slice(0, half);
+                belowEvents = col.events.slice(half);
                 nextAbove = true;
             } else {
                 if (nextAbove) {
@@ -168,6 +171,24 @@ export class ContentTimeline extends ContentBase {
         const minusBtn = page.querySelector(".zoom-btn-minus");
         const plusBtn = page.querySelector(".zoom-btn-plus");
         const detailsBtn = page.querySelector(".details-toggle");
+
+        // Ensure the wrap is tall enough that each column's above/below
+        // content fits in its half without being clipped by the axis at 50%.
+        // Otherwise a short viewport + a tall stack (e.g. 2 events on the
+        // same date) squeezes events past the axis line.
+        function measureLayout () {
+            const cols = track.querySelectorAll(".tl-col");
+            let maxHalf = 0;
+            cols.forEach((col) => {
+                const above = col.querySelector(".tl-above");
+                const below = col.querySelector(".tl-below");
+                if (above) maxHalf = Math.max(maxHalf, above.scrollHeight);
+                if (below) maxHalf = Math.max(maxHalf, below.scrollHeight);
+            });
+            const needed = maxHalf * 2 + 80; // 40px top + 40px bottom track padding
+            wrap.style.minHeight = Math.max(480, needed) + "px";
+        }
+        measureLayout();
 
         // Capture natural width at zoom=1
         const naturalWidth = track.scrollWidth;
@@ -279,6 +300,7 @@ export class ContentTimeline extends ContentBase {
             page.classList.toggle("hide-details");
             detailsBtn.textContent = page.classList.contains("hide-details")
                 ? "Show Details" : "Hide Details";
+            measureLayout();
         });
     }
 }
