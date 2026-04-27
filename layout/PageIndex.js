@@ -152,7 +152,7 @@ export class PageIndex {
             if (this.pageTitle) headerHtml += `<h1>${this.pageTitle}</h1>`;
             headerHtml += `<div class="brand">${this.topTitle}</div>`;
         } else {
-            const backHref = this.backUrl || "../index.html";
+            const backHref = this.backUrl || "../";
             const backLabel = this.backTitle || this.parentTitle;
             headerHtml += "<div>";
             if (!heroImage) headerHtml += `<h1>${this.pageTitle}</h1>`;
