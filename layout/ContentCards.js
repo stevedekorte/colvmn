@@ -46,11 +46,11 @@ export class ContentCards extends ContentBase {
                 } catch (e) {
                     /* fall back to folder name */
                 }
-                let href = `${encoded}/`;
+                let href = `${encoded}/index.html`;
                 // If folder has path separators, add back link to current page
                 if (folder.includes("/")) {
                     const depth = folder.split("/").length;
-                    const backPath = "../".repeat(depth);
+                    const backPath = "../".repeat(depth) + "index.html";
                     href += `?back=${encodeURIComponent(backPath)}`;
                 }
                 return {
@@ -71,7 +71,7 @@ export class ContentCards extends ContentBase {
             } else if (item.href) {
                 resolved.link = true;
             } else if (item.folder) {
-                resolved.href = `${ContentCards.encodePath(item.folder)}/`;
+                resolved.href = `${ContentCards.encodePath(item.folder)}/index.html`;
                 resolved.link = true;
             } else {
                 resolved.link = false;
