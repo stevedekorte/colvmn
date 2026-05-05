@@ -116,6 +116,42 @@ function findLayoutPages (dir) {
 }
 
 // ---------------------------------------------------------------------------
+// Rewrite <link href> / <script src> targets that resolve to files inside
+// the colvmn engine folder so they use a path relative to the page. This
+// keeps the generated docs readable via file:// without a web server.
+// ---------------------------------------------------------------------------
+
+function rewriteEngineLinks (html, pageDir) {
+    return html.replace(
+        /(<(?:link|script)\b[^>]*\b(?:href|src)\s*=\s*)"([^"]+)"/gi,
+        (match, prefix, urlValue) => {
+            // Skip cross-origin URLs and protocol-relative URLs.
+            if (/^[a-z][a-z0-9+.-]*:/i.test(urlValue) || urlValue.startsWith("//")) {
+                return match;
+            }
+            // Skip fragment-only and query-only references.
+            if (urlValue.startsWith("#") || urlValue.startsWith("?")) return match;
+
+            // Resolve against siteRoot (server-absolute) or pageDir (relative).
+            const absPath = urlValue.startsWith("/")
+                ? resolve(siteRoot, urlValue.slice(1))
+                : resolve(pageDir, urlValue);
+
+            // Only rewrite assets that live inside the colvmn folder.
+            const inColvmn = absPath === __dirname || absPath.startsWith(__dirname + sep);
+            if (!inColvmn) return match;
+
+            let relPath = relative(pageDir, absPath);
+            if (!relPath) relPath = ".";
+            relPath = relPath.split(sep).join("/");
+            // Page-relative URLs that don't start with "../" need a "./" prefix.
+            if (!relPath.startsWith(".")) relPath = "./" + relPath;
+            return `${prefix}"${relPath}"`;
+        }
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Generate static HTML for a single page
 // ---------------------------------------------------------------------------
 
@@ -175,9 +211,12 @@ async function generatePage (pageDir, siteUrl) {
     }
 
     // Inject a <link rel="alternate"> pointing to /llms.txt so LLM agents
-    // can discover the machine-readable index from any page.
+    // can discover the machine-readable index from any page. The href is
+    // server-absolute here; rewriteEngineLinks() converts it to a page-
+    // relative path below. The dedup check matches either form so repeated
+    // builds don't accumulate duplicates.
     const llmsLinkTag = '<link rel="alternate" type="text/plain" title="llms.txt" href="/llms.txt">';
-    if (!html.includes('href="/llms.txt"') && /<\/head>/i.test(html)) {
+    if (!/<link\b[^>]*href="[^"]*\/?llms\.txt"/i.test(html) && /<\/head>/i.test(html)) {
         html = html.replace(/<\/head>/i, `  ${llmsLinkTag}\n</head>`);
     }
 
@@ -207,6 +246,11 @@ async function generatePage (pageDir, siteUrl) {
             html = html.replace(/<\/head>/i, `  ${descTag}\n</head>`);
         }
     }
+
+    // Rewrite engine asset URLs (style.css, layout.js, llms.txt, etc.) to
+    // page-relative paths so the docs render correctly from file:// without
+    // a web server. Done last so it also catches links injected above.
+    html = rewriteEngineLinks(html, pageDir);
 
     writeFileSync(htmlPath, html);
     console.log(`  generated: ${relPath}`);
