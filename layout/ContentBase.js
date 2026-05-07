@@ -43,14 +43,56 @@ export class ContentBase {
     static typeMap = {};
 
     static _fetchFn = null;
+    static _prefetchCache = null;
 
     static setFetchFn (fn) {
         ContentBase._fetchFn = fn;
     }
 
+    /**
+     * Browser-side: load the inline prefetch cache (if any) injected by
+     * static-gen into <script id="colvmn-prefetch">. Returned object maps
+     * URL → { ok, status, content }. Memoised after first read.
+     */
+    static _loadPrefetchCache () {
+        if (ContentBase._prefetchCache !== null) return ContentBase._prefetchCache;
+        if (typeof document === "undefined") {
+            ContentBase._prefetchCache = {};
+            return ContentBase._prefetchCache;
+        }
+        const el = document.getElementById("colvmn-prefetch");
+        if (el && el.textContent.trim()) {
+            try {
+                ContentBase._prefetchCache = JSON.parse(el.textContent);
+            } catch (e) {
+                ContentBase._prefetchCache = {};
+            }
+        } else {
+            ContentBase._prefetchCache = {};
+        }
+        return ContentBase._prefetchCache;
+    }
+
     static asyncFetch (url) {
         if (ContentBase._fetchFn) {
             return ContentBase._fetchFn(url);
+        }
+        const cache = ContentBase._loadPrefetchCache();
+        if (url in cache) {
+            const entry = cache[url];
+            if (entry.ok) {
+                const text = entry.content;
+                return Promise.resolve({
+                    ok: true,
+                    status: entry.status || 200,
+                    json: async () => JSON.parse(text),
+                    text: async () => text,
+                });
+            }
+            return Promise.resolve({
+                ok: false,
+                status: entry.status || 404,
+            });
         }
         return fetch(url, { cache: "no-store" });
     }

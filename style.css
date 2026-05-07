@@ -1026,3 +1026,213 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
   font-size: 12px;
 }
 
+/* ContentCompetitorTable */
+.comp-table {
+  margin: 0 0 40px;
+}
+
+.comp-section-head {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: #2a2a2a;
+  margin: 28px 0 16px;
+}
+
+.comp-section-head-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin: 28px 0 16px;
+}
+
+.comp-section-head-row .comp-section-head {
+  margin: 0;
+}
+
+.comp-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 12px;
+}
+
+.comp-info-table,
+.comp-feature-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: fixed;
+  margin: 0;
+}
+
+.comp-info-table thead th,
+.comp-feature-table thead th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 12px 16px 12px 0;
+  border-top: 1px solid #ccc;
+  border-bottom: 1px solid #ccc;
+  letter-spacing: 0.3px;
+  color: #555;
+}
+
+.comp-info-table thead th:first-child,
+.comp-feature-table thead th:first-child {
+  width: 200px;
+}
+
+.comp-info-table tbody td,
+.comp-feature-table tbody td {
+  padding: 10px 16px 10px 0;
+  border-bottom: 1px solid #eee;
+  color: #555;
+  vertical-align: top;
+  text-align: left;
+}
+
+.comp-info-table tbody td:first-child,
+.comp-feature-table tbody td:first-child {
+  color: #555;
+  font-weight: 400;
+}
+
+.comp-info-table tbody tr:last-child td,
+.comp-feature-table tbody tr:last-child td {
+  border-bottom: 1px solid #ccc;
+}
+
+.comp-info-table tbody a {
+  color: #2a2a2a;
+  text-decoration: none;
+  border-bottom: 1px solid #ccc;
+}
+
+.comp-info-table tbody a:hover {
+  border-bottom-color: #2a2a2a;
+}
+
+/* Dot indicators */
+.comp-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.comp-dot-yes {
+  background: #2a2a2a;
+}
+
+.comp-dot-no {
+  background: transparent;
+  border: 1.5px solid #ccc;
+}
+
+.comp-dot-partial {
+  background: linear-gradient(to right, #2a2a2a 50%, transparent 50%);
+  border: 1.5px solid #2a2a2a;
+}
+
+.comp-dot-unclear {
+  background: linear-gradient(to right, #aaa 50%, transparent 50%);
+  border: 1.5px solid #aaa;
+}
+
+.comp-summary {
+  font-size: 11px;
+  color: #888;
+  cursor: pointer;
+  border-bottom: 1px dotted #ccc;
+}
+
+.comp-summary:hover {
+  color: #555;
+}
+
+.comp-notes {
+  font-size: 10px;
+  color: #aaa;
+  line-height: 1.5;
+  margin-top: 4px;
+  display: none;
+}
+
+.comp-notes.open {
+  display: block;
+}
+
+.comp-detail {
+  font-size: 11px;
+  color: #888;
+}
+
+.comp-universal-note {
+  margin-top: 18px;
+  font-size: 12px;
+  color: #888;
+  line-height: 1.7;
+  max-width: 700px;
+}
+
+/* Details toggle (scoped to .comp-table so it doesn't conflict with timeline) */
+.comp-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.comp-toggle input { display: none; }
+
+.comp-toggle-slider {
+  width: 32px;
+  height: 18px;
+  background: #ccc;
+  border-radius: 9px;
+  position: relative;
+  transition: background 0.2s;
+}
+
+.comp-toggle-slider::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s;
+}
+
+.comp-toggle input:checked + .comp-toggle-slider {
+  background: #2a2a2a;
+}
+
+.comp-toggle input:checked + .comp-toggle-slider::after {
+  transform: translateX(14px);
+}
+
+.comp-toggle-label {
+  font-size: 12px;
+  color: #888;
+  letter-spacing: 0.3px;
+}
+
+/* Hide summaries / notes / details when toggle is off */
+.comp-table.hide-details .comp-summary,
+.comp-table.hide-details .comp-notes,
+.comp-table.hide-details .comp-detail {
+  display: none !important;
+}
+
+@media (max-width: 600px) {
+  .comp-info-table thead th:first-child,
+  .comp-feature-table thead th:first-child { width: 110px; }
+  .comp-info-table, .comp-feature-table { font-size: 12px; }
+}
+

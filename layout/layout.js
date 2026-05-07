@@ -10,6 +10,7 @@ import { ContentTimeline } from "./ContentTimeline.js";
 import { ContentToc } from "./ContentToc.js";
 import { ContentFAQ } from "./ContentFAQ.js";
 import { ContentClassDoc } from "./ContentClassDoc.js";
+import { ContentCompetitorTable } from "./ContentCompetitorTable.js";
 import { PageIndex } from "./PageIndex.js";
 
 ContentBase.typeMap = {
@@ -24,6 +25,7 @@ ContentBase.typeMap = {
     ContentToc,
     ContentFAQ,
     ContentClassDoc,
+    ContentCompetitorTable,
 };
 
 document.addEventListener("DOMContentLoaded", () => {
