@@ -65,6 +65,22 @@ Then generate static HTML:
 node colvmn/static-gen.js
 ```
 
+### Sequential navigation — `nextSectionLink`
+
+Opt a page into a bottom-of-page footer link by setting `nextSectionLink: true` in its `_index.md` frontmatter (or `"nextSectionLink": true` in `_index.json`):
+
+```markdown
+---
+nextSectionLink: true
+---
+
+# My Page
+```
+
+The footer renders a link to the next sibling page, taken from the next entry after this page in the parent's `ContentCards` items list. The link text uses the sibling's `title` (either the parent's per-item override, or the sibling's own `_index.json` / `_index.md` title). If this page is the last sibling, the footer falls back to an up-link to the parent.
+
+The flag is opt-in per page — pages without it render no footer.
+
 ### Optional site config — `llms-config.json`
 
 At the site root:

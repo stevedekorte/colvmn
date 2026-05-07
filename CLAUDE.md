@@ -28,4 +28,13 @@ The markdown parser supports:
 - Standard markdown (headings, bold, italic, links, images, code blocks, lists)
 - Tables (standard `| col | col |` pipe syntax)
 - Raw HTML blocks (passed through as-is)
-- YAML frontmatter for page metadata
+- YAML frontmatter for page metadata (string values, plus `true`/`false` coerced to booleans)
+
+## Page Metadata
+
+Top-level keys in `_index.json` (or `_index.md` frontmatter) recognised by the engine:
+
+- `title`, `subtitle`, `topTitle`, `cardSubtitle` — header / intro / parent-card text
+- `pageLayout` — adds a `page-{value}` class to the `.page` div for layout variants
+- `heroImage`, `heroLayout`, `heroAspect` — hero block configuration
+- `nextSectionLink: true` — render a footer link at the bottom of the page pointing to the next sibling (taken from the parent's `ContentCards` items list). Falls back to an up-link to the parent if this page is the last sibling. Opt-in per page; absent flag = no footer.
