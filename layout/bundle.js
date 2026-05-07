@@ -202,6 +202,10 @@ function parseFrontmatter (lines) {
             if ((value.startsWith('"') && value.endsWith('"')) ||
                 (value.startsWith("'") && value.endsWith("'"))) {
                 value = value.slice(1, -1);
+            } else if (value === "true") {
+                value = true;
+            } else if (value === "false") {
+                value = false;
             }
             meta[m[1]] = value;
         }
@@ -1493,6 +1497,27 @@ class ContentCompetitorTable extends ContentBase {
 // ===== PageIndex.js =====
 
 
+function collectCardItems (content) {
+    if (!Array.isArray(content)) return [];
+    const out = [];
+    for (const entry of content) {
+        if (entry && entry.type === "ContentCards" && Array.isArray(entry.items)) {
+            for (const item of entry.items) out.push(item);
+        }
+    }
+    return out;
+}
+
+function itemFolder (item) {
+    if (typeof item === "string") return item;
+    if (item && typeof item === "object") return item.folder || null;
+    return null;
+}
+
+function encodePath (folder) {
+    return folder.split("/").map(s => encodeURIComponent(s)).join("/");
+}
+
 class PageIndex {
     constructor () {
         this.json = null;
@@ -1553,8 +1578,8 @@ class PageIndex {
         this.backTitle = null;
 
         // Fetch parent metadata for back-link and inherited topTitle
+        let parentJson = null;
         if (!this.isRoot) {
-            let parentJson = null;
 
             // If back URL is provided, fetch its metadata for the title
             if (this.backUrl) {
@@ -1626,6 +1651,15 @@ class PageIndex {
             }
         }
 
+        // Resolve "next section" link if requested by the page metadata.
+        // Walks the parent's ContentCards items, finds this page, and uses
+        // the next sibling's title and href. Falls back to an up-link to
+        // the parent if this page is the last sibling.
+        this.nextLink = null;
+        if (!this.isRoot && this.json.nextSectionLink && parentJson) {
+            this.nextLink = await this.resolveNextLink(parentJson, pathSegments);
+        }
+
         // Create content children
         if (Array.isArray(this.json.content)) {
             this.children = this.json.content.map(c => ContentBase.fromJson(c, 0));
@@ -1633,6 +1667,59 @@ class PageIndex {
 
         // Resolve (async fetches)
         await Promise.all(this.children.map(c => c.resolve()));
+    }
+
+    async resolveNextLink (parentJson, pathSegments) {
+        const folderName = pathSegments.length > 0
+            ? decodeURIComponent(pathSegments[pathSegments.length - 1])
+            : "";
+
+        const upLink = {
+            kind: "up",
+            title: this.parentTitle || "Up",
+            href: "../index.html",
+        };
+
+        const items = collectCardItems(parentJson.content);
+        const idx = items.findIndex(it => itemFolder(it) === folderName);
+        if (idx === -1 || idx >= items.length - 1) return upLink;
+
+        const next = items[idx + 1];
+
+        // Object item with explicit href + title: use directly.
+        if (next && typeof next === "object" && next.href && next.title) {
+            return { kind: "next", title: next.title, href: next.href };
+        }
+
+        const nextFolder = itemFolder(next);
+        if (!nextFolder) return upLink;
+
+        let nextTitle = (next && typeof next === "object" && next.title) || null;
+        const encoded = encodePath(nextFolder);
+
+        if (!nextTitle) {
+            try {
+                const resp = await ContentBase.asyncFetch(`../${encoded}/_index.json`);
+                if (resp.ok) {
+                    const meta = await resp.json();
+                    nextTitle = meta.title;
+                } else {
+                    const mdResp = await ContentBase.asyncFetch(`../${encoded}/_index.md`);
+                    if (mdResp.ok) {
+                        const meta = parseMarkdown(await mdResp.text());
+                        nextTitle = meta.title;
+                    }
+                }
+            } catch (e) { /* fall back to folder name */ }
+        }
+
+        if (!nextTitle) nextTitle = nextFolder.split("/").pop();
+
+        return {
+            kind: "next",
+            title: nextTitle,
+            href: `../${encoded}/index.html`,
+        };
     }
 
     computePageHtml () {
@@ -1675,7 +1762,17 @@ class PageIndex {
         // Content
         const contentHtml = this.children.map(c => c.computeHtml()).join("");
 
-        return headerHtml + heroHtml + introHtml + contentHtml;
+        // Optional next-section footer link (opt-in via "nextSectionLink": true)
+        let footerHtml = "";
+        if (this.nextLink) {
+            const { kind, title, href } = this.nextLink;
+            const label = kind === "up"
+                ? `&uarr; ${title}`
+                : `${title} &rarr;`;
+            footerHtml = `<div class="page-footer"><a class="next-link" href="${href}">${label}</a></div>`;
+        }
+
+        return headerHtml + heroHtml + introHtml + contentHtml + footerHtml;
     }
 
     computeDocumentTitle () {

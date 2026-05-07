@@ -196,6 +196,10 @@ function parseFrontmatter (lines) {
             if ((value.startsWith('"') && value.endsWith('"')) ||
                 (value.startsWith("'") && value.endsWith("'"))) {
                 value = value.slice(1, -1);
+            } else if (value === "true") {
+                value = true;
+            } else if (value === "false") {
+                value = false;
             }
             meta[m[1]] = value;
         }
