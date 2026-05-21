@@ -89,6 +89,15 @@ const BUNDLE_FILES = [
     "layout.js",
 ];
 
+// Escape `$` so a string can be safely used as the replacement argument
+// to String.prototype.replace, where `$&`, `$<…>`, `$1`, etc. would
+// otherwise be interpreted as backreferences. Rendered HTML can contain
+// these sequences (e.g. a `$<` inside a code block becomes `$&lt;` after
+// HTML-escaping, which expands to `[entire match]lt;` on replace).
+function escapeReplacement (s) {
+    return s.replace(/\$/g, "$$$$");
+}
+
 function transformBundleSource (src) {
     // Strip ES module import statements (single-line only — that's all colvmn uses).
     src = src.replace(/^[ \t]*import\b[^;\n]*;?\s*$/gm, "");
@@ -246,8 +255,11 @@ async function generatePage (pageDir, siteUrl) {
     const htmlPath = join(pageDir, "index.html");
     let html = readFileSync(htmlPath, "utf-8");
 
-    // Replace the .page div contents, or insert one if missing
-    const pageDiv = `<div class="${pageClasses.join(" ")}">${pageHtml}</div>`;
+    // Replace the .page div contents, or insert one if missing.
+    // pageHtml is escaped because rendered content may contain `$&`/`$<…>`
+    // sequences (e.g. `$<` in a Makefile code block escaped to `$&lt;`),
+    // which String.prototype.replace would otherwise expand.
+    const pageDiv = `<div class="${pageClasses.join(" ")}">${escapeReplacement(pageHtml)}</div>`;
     if (/(<body>\s*)<div class="page[^"]*"[^>]*>[\s\S]*<\/div>(\s*<script)/.test(html)) {
         html = html.replace(
             /(<body>\s*)<div class="page[^"]*"[^>]*>[\s\S]*<\/div>(\s*<script)/,
@@ -296,7 +308,7 @@ async function generatePage (pageDir, siteUrl) {
     const descriptionText = extractDescription(page.json);
     if (descriptionText) {
         const escapedDesc = descriptionText.replace(/"/g, "&quot;");
-        const descTag = `<meta name="description" content="${escapedDesc}">`;
+        const descTag = escapeReplacement(`<meta name="description" content="${escapedDesc}">`);
         if (/<meta name="description"/.test(html)) {
             html = html.replace(/<meta name="description"[^>]*>/, descTag);
         } else {
@@ -327,7 +339,7 @@ async function generatePage (pageDir, siteUrl) {
     // where fetch() of local files is blocked. Escape "<" so embedded JSON
     // can't terminate the script tag.
     const cacheJson = JSON.stringify(fetchFn.cache).replace(/</g, "\\u003c");
-    const cacheTag = `<script type="application/json" id="colvmn-prefetch">${cacheJson}</script>`;
+    const cacheTag = escapeReplacement(`<script type="application/json" id="colvmn-prefetch">${cacheJson}</script>`);
     if (/<script\b[^>]*\bid="colvmn-prefetch"[^>]*>[\s\S]*?<\/script>/.test(html)) {
         html = html.replace(/<script\b[^>]*\bid="colvmn-prefetch"[^>]*>[\s\S]*?<\/script>/, cacheTag);
     } else if (/<\/body>/i.test(html)) {
