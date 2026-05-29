@@ -307,10 +307,24 @@ async function generatePage (pageDir, siteUrl) {
     // Meta description — use subtitle/intro text if available.
     const descriptionText = extractDescription(page.json);
     if (descriptionText) {
-        const escapedDesc = descriptionText.replace(/"/g, "&quot;");
+        // Escape for an HTML attribute value. Order matters: '&' first so we
+        // don't double-escape the entities we introduce. Escaping '<' and '>'
+        // (not just '"') is essential: static-gen reads its own prior output
+        // as the page template, so an unescaped '>' in the description would
+        // close the tag early and the leftover text would be re-emitted — and
+        // accumulate — on every regen.
+        const escapedDesc = descriptionText
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+        // escapeReplacement: descTag is used as a String.replace replacement
+        // arg below, where any literal '$' would be read as a backreference.
         const descTag = escapeReplacement(`<meta name="description" content="${escapedDesc}">`);
         if (/<meta name="description"/.test(html)) {
-            html = html.replace(/<meta name="description"[^>]*>/, descTag);
+            // Match the tag AND any trailing same-line junk (tags are emitted
+            // one per line) so a previously-corrupted file self-heals on regen.
+            html = html.replace(/<meta name="description"[^\n]*>/, descTag);
         } else {
             html = html.replace(/<\/head>/i, `  ${descTag}\n</head>`);
         }
