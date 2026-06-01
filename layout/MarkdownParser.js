@@ -10,9 +10,39 @@ export function slugify (text) {
         .replace(/^-+|-+$/g, "");
 }
 
+// Parse an optional Pandoc-style attribute list that may follow a markdown image,
+// e.g. ![alt](src){.colvmn-zoomable-image #id width=480}. Supports .class, #id, and
+// key=value (value may be quoted). Returns a string of HTML attributes with a
+// leading space, or "" when there is nothing to add.
+function imageAttrs (attrs) {
+    if (!attrs) return "";
+    const classes = [];
+    let id = null;
+    const pairs = [];
+    for (const tok of attrs.trim().split(/\s+/)) {
+        if (!tok) continue;
+        if (tok[0] === ".") classes.push(tok.slice(1));
+        else if (tok[0] === "#") id = tok.slice(1);
+        else {
+            const eq = tok.indexOf("=");
+            if (eq > 0) {
+                const key = tok.slice(0, eq);
+                const val = tok.slice(eq + 1).replace(/^["']|["']$/g, "");
+                pairs.push(`${key}="${val}"`);
+            }
+        }
+    }
+    let out = "";
+    if (id) out += ` id="${id}"`;
+    if (classes.length) out += ` class="${classes.join(" ")}"`;
+    for (const p of pairs) out += ` ${p}`;
+    return out;
+}
+
 function inlineMarkdown (text) {
     return text
-        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">')
+        .replace(/!\[([^\]]*)\]\(([^)]+)\)(?:\{([^}]*)\})?/g,
+            (m, alt, src, attrs) => `<img src="${src}" alt="${alt}"${imageAttrs(attrs)}>`)
         .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
         .replace(/(^|[^"=])(https?:\/\/[^\s<>"]+)/g, '$1<a href="$2">$2</a>')
         .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")

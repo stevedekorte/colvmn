@@ -12,6 +12,7 @@ import { ContentFAQ } from "./ContentFAQ.js";
 import { ContentClassDoc } from "./ContentClassDoc.js";
 import { ContentCompetitorTable } from "./ContentCompetitorTable.js";
 import { PageIndex } from "./PageIndex.js";
+import { initLightbox } from "./Lightbox.js";
 
 ContentBase.typeMap = {
     ContentText,
@@ -28,6 +29,12 @@ ContentBase.typeMap = {
     ContentCompetitorTable,
 };
 
+// Browser bootstrap. PageIndex.init() runs the runtime pass (loadPage + render);
+// on built pages render() only attaches behavior, it does not rebuild the HTML —
+// see PageIndex and colvmn/CLAUDE.md ("Rendering model"). Page-global runtime
+// behavior that isn't tied to a single content block (e.g. a delegated lightbox
+// handler) belongs here, alongside the init() call.
 document.addEventListener("DOMContentLoaded", () => {
     new PageIndex().init();
+    initLightbox();
 });

@@ -86,6 +86,7 @@ const BUNDLE_FILES = [
     "ContentClassDoc.js",
     "ContentCompetitorTable.js",
     "PageIndex.js",
+    "Lightbox.js",
     "layout.js",
 ];
 
@@ -246,6 +247,10 @@ async function generatePage (pageDir, siteUrl) {
     const pageHtml = page.computePageHtml();
     const docTitle = page.computeDocumentTitle();
 
+    // The "loaded" class is the contract with the browser runtime: PageIndex.render
+    // skips HTML generation when it sees it, so the markup written here is the single
+    // source of truth and the browser only runs the postRender behavior pass on top.
+    // See colvmn/CLAUDE.md ("Rendering model").
     const pageClasses = ["page", "loaded"];
     if (page.json.pageLayout) {
         pageClasses.push(`page-${page.json.pageLayout}`);

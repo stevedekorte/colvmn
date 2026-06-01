@@ -117,10 +117,16 @@ export class ContentBase {
         }
     }
 
+    // Build-time markup. This is what actually ships: static-gen calls it under
+    // Node and writes the result into index.html. Override to emit a block's HTML.
     computeHtml () {
         return this.children.map(c => c.computeHtml()).join("");
     }
 
+    // Runtime behavior hook. Runs in the browser after the (already-built) HTML is
+    // present — see PageIndex.render and colvmn/CLAUDE.md ("Rendering model").
+    // Override to attach event listeners / interactivity for a block. Default is a
+    // no-op pass-through to children.
     postRender (page) {
         this.children.forEach(c => c.postRender(page));
     }

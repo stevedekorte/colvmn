@@ -81,6 +81,20 @@ The footer renders a link to the next sibling page, taken from the next entry af
 
 The flag is opt-in per page — pages without it render no footer.
 
+### Zoomable images — `colvmn-zoomable-image`
+
+Give any image the class `colvmn-zoomable-image` to make it click-to-enlarge. Clicking the image (or focusing it and pressing Enter) opens a full-viewport overlay; clicking the overlay or pressing Escape closes it.
+
+In markdown, use a Pandoc-style attribute list after the image:
+
+```markdown
+![Architecture diagram](images/arch.svg){.colvmn-zoomable-image}
+```
+
+The attribute list also accepts `#id` and `key=value` pairs, e.g. `{.colvmn-zoomable-image width=480}`. In raw HTML (or a `ContentText` body) just add the class: `<img class="colvmn-zoomable-image" src="…" alt="…">`.
+
+It's progressive enhancement — the image renders normally without JavaScript, and `layout/Lightbox.js` attaches the zoom behavior at runtime.
+
 ### Optional site config — `llms-config.json`
 
 At the site root:

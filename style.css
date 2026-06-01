@@ -1261,3 +1261,40 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
   .comp-info-table, .comp-feature-table { font-size: 12px; }
 }
 
+/* Zoomable images (lightbox) — behavior in layout/Lightbox.js */
+img.colvmn-zoomable-image {
+  cursor: zoom-in;
+}
+
+.colvmn-lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.85);
+  cursor: zoom-out;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.18s ease, visibility 0.18s ease;
+}
+
+.colvmn-lightbox-overlay.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.colvmn-lightbox-overlay img {
+  max-width: 95vw;
+  max-height: 95vh;
+  object-fit: contain;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* Prevent background scroll while the overlay is open */
+body.colvmn-lightbox-active {
+  overflow: hidden;
+}
+

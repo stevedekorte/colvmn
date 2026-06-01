@@ -30,6 +30,11 @@ export class PageIndex {
         this.children = [];
     }
 
+    // Browser entry point. Always runs loadPage() + render() on DOMContentLoaded.
+    // NOTE: on shipped pages this does NOT rebuild the visible HTML — static-gen
+    // already wrote it and marked the container "loaded", so render() skips HTML
+    // generation and only runs the postRender() behavior pass. See render() and
+    // colvmn/CLAUDE.md ("Rendering model").
     async init () {
         await this.loadPage({
             isRoot: () => {
@@ -290,7 +295,11 @@ export class PageIndex {
         const page = document.querySelector(".page");
         if (!page) return;
 
-        // Skip HTML generation if static content was already inlined by the build
+        // Skip HTML generation if static content was already inlined by the build.
+        // static-gen emits <div class="page loaded">, so on shipped pages this
+        // branch never runs and computePageHtml() is effectively dead code in the
+        // browser — the build is the single source of the markup. The live path
+        // below (postRender) is the only runtime work that matters for such pages.
         if (!page.classList.contains("loaded")) {
             page.innerHTML = this.computePageHtml();
         }
@@ -300,7 +309,10 @@ export class PageIndex {
         }
         page.classList.add("loaded");
 
-        // Post-render hooks
+        // Post-render hooks. This is the runtime behavior pass — it runs on every
+        // page load (built or not) and is where interactive blocks attach their
+        // listeners (Timeline zoom/drag, CompetitorTable toggles, etc.). Page-global
+        // behavior not tied to a block belongs in layout.js instead.
         this.children.forEach(c => c.postRender(page));
 
         // Document title

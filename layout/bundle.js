@@ -16,9 +16,39 @@ function slugify (text) {
         .replace(/^-+|-+$/g, "");
 }
 
+// Parse an optional Pandoc-style attribute list that may follow a markdown image,
+// e.g. ![alt](src){.colvmn-zoomable-image #id width=480}. Supports .class, #id, and
+// key=value (value may be quoted). Returns a string of HTML attributes with a
+// leading space, or "" when there is nothing to add.
+function imageAttrs (attrs) {
+    if (!attrs) return "";
+    const classes = [];
+    let id = null;
+    const pairs = [];
+    for (const tok of attrs.trim().split(/\s+/)) {
+        if (!tok) continue;
+        if (tok[0] === ".") classes.push(tok.slice(1));
+        else if (tok[0] === "#") id = tok.slice(1);
+        else {
+            const eq = tok.indexOf("=");
+            if (eq > 0) {
+                const key = tok.slice(0, eq);
+                const val = tok.slice(eq + 1).replace(/^["']|["']$/g, "");
+                pairs.push(`${key}="${val}"`);
+            }
+        }
+    }
+    let out = "";
+    if (id) out += ` id="${id}"`;
+    if (classes.length) out += ` class="${classes.join(" ")}"`;
+    for (const p of pairs) out += ` ${p}`;
+    return out;
+}
+
 function inlineMarkdown (text) {
     return text
-        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">')
+        .replace(/!\[([^\]]*)\]\(([^)]+)\)(?:\{([^}]*)\})?/g,
+            (m, alt, src, attrs) => `<img src="${src}" alt="${alt}"${imageAttrs(attrs)}>`)
         .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
         .replace(/(^|[^"=])(https?:\/\/[^\s<>"]+)/g, '$1<a href="$2">$2</a>')
         .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
@@ -412,10 +442,16 @@ class ContentBase {
         }
     }
 
+    // Build-time markup. This is what actually ships: static-gen calls it under
+    // Node and writes the result into index.html. Override to emit a block's HTML.
     computeHtml () {
         return this.children.map(c => c.computeHtml()).join("");
     }
 
+    // Runtime behavior hook. Runs in the browser after the (already-built) HTML is
+    // present — see PageIndex.render and colvmn/CLAUDE.md ("Rendering model").
+    // Override to attach event listeners / interactivity for a block. Default is a
+    // no-op pass-through to children.
     postRender (page) {
         this.children.forEach(c => c.postRender(page));
     }
@@ -1526,6 +1562,11 @@ class PageIndex {
         this.children = [];
     }
 
+    // Browser entry point. Always runs loadPage() + render() on DOMContentLoaded.
+    // NOTE: on shipped pages this does NOT rebuild the visible HTML — static-gen
+    // already wrote it and marked the container "loaded", so render() skips HTML
+    // generation and only runs the postRender() behavior pass. See render() and
+    // colvmn/CLAUDE.md ("Rendering model").
     async init () {
         await this.loadPage({
             isRoot: () => {
@@ -1786,7 +1827,11 @@ class PageIndex {
         const page = document.querySelector(".page");
         if (!page) return;
 
-        // Skip HTML generation if static content was already inlined by the build
+        // Skip HTML generation if static content was already inlined by the build.
+        // static-gen emits <div class="page loaded">, so on shipped pages this
+        // branch never runs and computePageHtml() is effectively dead code in the
+        // browser — the build is the single source of the markup. The live path
+        // below (postRender) is the only runtime work that matters for such pages.
         if (!page.classList.contains("loaded")) {
             page.innerHTML = this.computePageHtml();
         }
@@ -1796,7 +1841,10 @@ class PageIndex {
         }
         page.classList.add("loaded");
 
-        // Post-render hooks
+        // Post-render hooks. This is the runtime behavior pass — it runs on every
+        // page load (built or not) and is where interactive blocks attach their
+        // listeners (Timeline zoom/drag, CompetitorTable toggles, etc.). Page-global
+        // behavior not tied to a block belongs in layout.js instead.
         this.children.forEach(c => c.postRender(page));
 
         // Document title
@@ -1805,7 +1853,95 @@ class PageIndex {
 }
 
 
+// ===== Lightbox.js =====
+// Page-global click-to-zoom (lightbox) behavior.
+//
+// Any <img class="colvmn-zoomable-image"> becomes click-to-enlarge: clicking it
+// opens a full-viewport overlay showing the image; clicking the overlay or
+// pressing Escape returns to normal. This is a runtime behavior pass (see
+// colvmn/CLAUDE.md, "Rendering model"): the markup ships from the build, this
+// only attaches interactivity on top.
+//
+// It is registered from layout.js rather than a content block because zooming is
+// page-global and not tied to any one block type. Event delegation means it works
+// for images from any source — markdown {.colvmn-zoomable-image}, raw HTML in a
+// ContentText body, etc. — regardless of which blocks are present. With no JS the
+// image still renders normally; this is pure progressive enhancement.
+
+const ZOOM_SELECTOR = "img.colvmn-zoomable-image";
+
+function initLightbox (doc = document) {
+    if (typeof doc === "undefined" || !doc.body) return;
+
+    let overlay = null;
+
+    const ensureOverlay = () => {
+        if (overlay) return overlay;
+        overlay = doc.createElement("div");
+        overlay.className = "colvmn-lightbox-overlay";
+        overlay.setAttribute("role", "dialog");
+        overlay.setAttribute("aria-modal", "true");
+        overlay.addEventListener("click", close);
+        doc.body.appendChild(overlay);
+        return overlay;
+    };
+
+    const open = (img) => {
+        const o = ensureOverlay();
+        const full = doc.createElement("img");
+        full.src = img.currentSrc || img.src;
+        full.alt = img.alt || "";
+        o.replaceChildren(full);
+        o.classList.add("open");
+        doc.body.classList.add("colvmn-lightbox-active");
+    };
+
+    function close () {
+        if (overlay) {
+            overlay.classList.remove("open");
+            overlay.replaceChildren();
+        }
+        doc.body.classList.remove("colvmn-lightbox-active");
+    }
+
+    const targetImage = (e) => {
+        const el = e.target;
+        if (!el || !el.closest) return null;
+        const img = el.closest(ZOOM_SELECTOR);
+        // Leave images that are themselves links alone — the link wins.
+        if (!img || img.closest("a")) return null;
+        return img;
+    };
+
+    doc.addEventListener("click", (e) => {
+        const img = targetImage(e);
+        if (!img) return;
+        e.preventDefault();
+        open(img);
+    });
+
+    doc.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") { close(); return; }
+        if (e.key === "Enter" || e.key === " ") {
+            const img = targetImage(e);
+            if (img) { e.preventDefault(); open(img); }
+        }
+    });
+
+    // Make zoomable images keyboard-focusable and announce them to assistive tech.
+    doc.querySelectorAll(ZOOM_SELECTOR).forEach((img) => {
+        if (img.closest("a")) return;
+        if (!img.hasAttribute("tabindex")) img.setAttribute("tabindex", "0");
+        img.setAttribute("role", "button");
+        if (!img.hasAttribute("aria-label")) {
+            img.setAttribute("aria-label", (img.alt ? img.alt + " — " : "") + "enlarge image");
+        }
+    });
+}
+
+
 // ===== layout.js =====
+
 
 
 
@@ -1835,8 +1971,14 @@ ContentBase.typeMap = {
     ContentCompetitorTable,
 };
 
+// Browser bootstrap. PageIndex.init() runs the runtime pass (loadPage + render);
+// on built pages render() only attaches behavior, it does not rebuild the HTML —
+// see PageIndex and colvmn/CLAUDE.md ("Rendering model"). Page-global runtime
+// behavior that isn't tied to a single content block (e.g. a delegated lightbox
+// handler) belongs here, alongside the init() call.
 document.addEventListener("DOMContentLoaded", () => {
     new PageIndex().init();
+    initLightbox();
 });
 
 })();
