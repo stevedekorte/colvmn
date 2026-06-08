@@ -182,6 +182,13 @@ p code, li code, p tt, li tt {
   margin-bottom: 0;
 }
 
+/* Inline diagrams scale down to fit the page width; viewBox preserves aspect ratio */
+.section-body svg,
+.section-body img {
+  max-width: 100%;
+  height: auto;
+}
+
 .section-body ul, .section-body ol {
   margin: 8px 0;
   padding-left: 18px;
