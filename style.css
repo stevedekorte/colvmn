@@ -1268,8 +1268,9 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
   .comp-info-table, .comp-feature-table { font-size: 12px; }
 }
 
-/* Zoomable images (lightbox) — behavior in layout/Lightbox.js */
-img.colvmn-zoomable-image {
+/* Zoomable images and diagrams (lightbox) — behavior in layout/Lightbox.js */
+img.colvmn-zoomable-image,
+.section-body svg {
   cursor: zoom-in;
 }
 
@@ -1293,11 +1294,24 @@ img.colvmn-zoomable-image {
   visibility: visible;
 }
 
-.colvmn-lightbox-overlay img {
+.colvmn-lightbox-overlay img,
+.colvmn-lightbox-overlay svg {
   max-width: 95vw;
   max-height: 95vh;
   object-fit: contain;
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* Enlarged diagrams render on a light surface so the dark-on-light SVGs read,
+   and scale up (vector) to fill the viewport while the viewBox keeps the ratio. */
+.colvmn-lightbox-overlay svg {
+  box-sizing: border-box;
+  width: 95vw;
+  height: auto;
+  max-height: 95vh;
+  background: #fff;
+  padding: 24px;
+  border-radius: 4px;
 }
 
 /* Prevent background scroll while the overlay is open */
