@@ -55,6 +55,20 @@ body {
   margin-bottom: 60px;
 }
 
+.intro p {
+  margin: 0 0 14px;
+}
+
+.intro p:last-child {
+  margin-bottom: 0;
+}
+
+/* On classdoc pages the intro is the class docstring — render it at the
+   same size as the slot description bodies. */
+.page:has(.classdoc) .intro {
+  font-size: 13px;
+}
+
 /* Links */
 a {
   color: #888;

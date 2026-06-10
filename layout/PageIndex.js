@@ -262,10 +262,13 @@ export class PageIndex {
             heroHtml += "</div>";
         }
 
-        // Intro
+        // Intro — a <div>, not a <p>: subtitles can carry multi-paragraph
+        // HTML (e.g. class docstrings), and a <p> inside a <p> makes the
+        // browser close the intro early, dropping the rest of the text out
+        // of the .intro styling.
         let introHtml = "";
         if (this.json.subtitle) {
-            introHtml = `<p class="intro">${this.json.subtitle}</p>`;
+            introHtml = `<div class="intro"><p>${this.json.subtitle}</p></div>`;
         }
 
         // Content
