@@ -289,7 +289,12 @@ export function parseMarkdown (text) {
     let subtitle = "";
     if (content.length > 0 && !content[0].title && content[0].body) {
         const body = content[0].body;
-        const isSingleParagraph = body.startsWith("<p>") && body.endsWith("</p>") && !body.includes("</p><");
+        // A paragraph carrying embedded media must not be promoted to the
+        // subtitle: stripping tags below measures only text length, so an
+        // image-only paragraph reads as "short" (0 chars) and would be
+        // silently swallowed, dropping the image from the page body.
+        const hasEmbeddedMedia = /<(?:img|video|iframe|picture|svg)\b/i.test(body);
+        const isSingleParagraph = body.startsWith("<p>") && body.endsWith("</p>") && !body.includes("</p><") && !hasEmbeddedMedia;
         if (isSingleParagraph) {
             const bodyText = body.replace(/<[^>]+>/g, "");
             if (bodyText.length < 200) {
