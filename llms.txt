@@ -2,3 +2,15 @@
 
 > A minimal static-site layout engine.
 
+## Authoring
+
+- [Authoring](/authoring/)
+
+## How It Works
+
+- [How It Works](/how-it-works/)
+
+## Quick Start
+
+- [Quick Start](/quick-start/)
+
