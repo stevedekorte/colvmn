@@ -181,6 +181,19 @@ function parseBlocks (lines) {
             continue;
         }
 
+        // Blockquote — collect consecutive ">"-prefixed lines, strip the marker,
+        // and parse the inner content recursively so nested markdown still works.
+        if (line.match(/^>\s?/)) {
+            const quoteLines = [];
+            while (i < lines.length && lines[i].match(/^>\s?/)) {
+                quoteLines.push(lines[i].replace(/^>\s?/, ""));
+                i++;
+            }
+            const inner = blocksToHtml(parseBlocks(quoteLines));
+            blocks.push({ type: "html", html: `<blockquote>${inner}</blockquote>` });
+            continue;
+        }
+
         // Paragraph
         const paraLines = [];
         while (i < lines.length && lines[i].trim() !== "" &&
@@ -188,6 +201,7 @@ function parseBlocks (lines) {
            !lines[i].match(/^\s*[-*+]\s/) &&
            !lines[i].match(/^\s*\d+[.)]\s/) &&
            !lines[i].trim().startsWith("```") &&
+           !lines[i].match(/^>\s?/) &&
            !lines[i].match(/^---+\s*$/) &&
            !lines[i].match(/^\*\*\*+\s*$/) &&
            !lines[i].match(/^___+\s*$/)) {
