@@ -1097,6 +1097,11 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
   margin: 0;
 }
 
+/* Toolbar row with no heading — keep the Details toggle at the right edge */
+.comp-toolbar {
+  justify-content: flex-end;
+}
+
 .comp-table-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -1129,6 +1134,47 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
   width: 200px;
 }
 
+/* Feature table is transposed (competitors are rows, features are columns):
+   let columns size to content and scroll horizontally rather than squish. */
+.comp-feature-table {
+  table-layout: auto;
+  width: auto;
+  min-width: 100%;
+}
+
+.comp-feature-table thead th,
+.comp-feature-table tbody td {
+  padding-right: 24px;
+  min-width: 84px;
+}
+
+.comp-feature-table thead th:first-child,
+.comp-feature-table tbody td:first-child {
+  width: auto;
+  min-width: 160px;
+  white-space: nowrap;
+}
+
+/* Freeze the first column (entity names) during horizontal scroll. Needs an
+   opaque background so scrolled cells don't show through underneath. */
+.comp-feature-table thead th:first-child,
+.comp-feature-table tbody td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #faf9f6;
+}
+
+.comp-feature-table tbody tr.comp-row-selected td:first-child {
+  background: #ebebe8;
+}
+
+/* Breathing room between the frozen name column and the first data column */
+.comp-feature-table thead th:nth-child(2),
+.comp-feature-table tbody td:nth-child(2) {
+  padding-left: 24px;
+}
+
 .comp-info-table tbody td,
 .comp-feature-table tbody td {
   padding: 10px 16px 10px 0;
@@ -1149,14 +1195,39 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
   border-bottom: 1px solid #ccc;
 }
 
-.comp-info-table tbody a {
-  color: #2a2a2a;
-  text-decoration: none;
-  border-bottom: 1px solid #ccc;
+/* Click/tap a row to toggle a selection highlight */
+.comp-info-table tbody tr,
+.comp-feature-table tbody tr {
+  cursor: pointer;
 }
 
-.comp-info-table tbody a:hover {
-  border-bottom-color: #2a2a2a;
+.comp-info-table tbody tr.comp-row-selected td,
+.comp-feature-table tbody tr.comp-row-selected td {
+  background: rgba(42, 42, 42, 0.07);
+}
+
+/* Website arrow link — mirrors the page's back link (gray, no underline) */
+.comp-info-table tbody a.comp-arrow {
+  color: #999;
+  text-decoration: none;
+  font-size: 15px;
+  transition: color 0.15s;
+}
+
+.comp-info-table tbody a.comp-arrow:hover {
+  color: #2a2a2a;
+}
+
+/* Columns clipped at the scroll edge hide their label/values but keep their
+   width and row (border) lines, so the horizontal rules stay continuous.
+   The extra class raises specificity above the thead/tbody color rules. */
+.comp-feature-table .comp-col-hidden,
+.comp-info-table .comp-col-hidden {
+  color: transparent;
+}
+
+.comp-col-hidden * {
+  visibility: hidden;
 }
 
 /* Dot indicators */
@@ -1211,6 +1282,7 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
 }
 
 .comp-detail {
+  display: block;
   font-size: 11px;
   color: #888;
 }
@@ -1222,6 +1294,7 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
   line-height: 1.7;
   max-width: 700px;
 }
+
 
 /* Details toggle (scoped to .comp-table so it doesn't conflict with timeline) */
 .comp-toggle {
@@ -1274,6 +1347,16 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
 .comp-table.hide-details .comp-notes,
 .comp-table.hide-details .comp-detail {
   display: none !important;
+}
+
+/* With details collapsed, clip any value that overruns its column to a single
+   line with an ellipsis. The full value stays available via the cell's title
+   tooltip and the Details toggle. The first column (entity name) is left whole.
+   Only applies to the fixed-layout info table; feature cells are dots here. */
+.comp-table.hide-details .comp-info-table tbody td:not(:first-child) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 600px) {

@@ -10,7 +10,7 @@ import { ContentTimeline } from "./ContentTimeline.js";
 import { ContentToc } from "./ContentToc.js";
 import { ContentFAQ } from "./ContentFAQ.js";
 import { ContentClassDoc } from "./ContentClassDoc.js";
-import { ContentCompetitorTable } from "./ContentCompetitorTable.js";
+import { ContentComparisonTable } from "./ContentComparisonTable.js";
 import { PageIndex } from "./PageIndex.js";
 import { initLightbox } from "./Lightbox.js";
 
@@ -26,7 +26,7 @@ ContentBase.typeMap = {
     ContentToc,
     ContentFAQ,
     ContentClassDoc,
-    ContentCompetitorTable,
+    ContentComparisonTable,
 };
 
 // Browser bootstrap. PageIndex.init() runs the runtime pass (loadPage + render);

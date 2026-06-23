@@ -1311,7 +1311,7 @@ function wrapParagraphs (text) {
 }
 
 
-// ===== ContentCompetitorTable.js =====
+// ===== ContentComparisonTable.js =====
 
 
 function statusFor (value) {
@@ -1327,20 +1327,28 @@ function statusFor (value) {
     return "no";
 }
 
-function shortUrl (url) {
-    return url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
-}
-
 function shortSource (src) {
     const lower = src.toLowerCase();
-    if (lower.startsWith("closed")) return "Closed source";
-    if (lower.startsWith("source-available")) return "Source-available";
-    if (lower.startsWith("open")) return "Open source";
+    if (lower.startsWith("closed")) return "closed";
+    if (lower.startsWith("source-available")) return "open*";
+    if (lower.startsWith("open")) return "open";
     return src.split("(")[0].trim();
 }
 
+// Map an open/closed-source string to a dot status: open -> yes (solid),
+// source-available -> partial (half), closed -> no (hollow).
+function sourceStatus (src) {
+    const lower = (src || "").toLowerCase();
+    if (lower.startsWith("source-available")) return "partial";
+    if (lower.startsWith("open")) return "yes";
+    return "no";
+}
+
 function shortDate (date) {
-    return date.split("(")[0].split(";")[0].trim();
+    // Founded column shows just the year.
+    const main = date.split("(")[0].split(";")[0];
+    const m = main.match(/\b(?:19|20)\d{2}\b/);
+    return m ? m[0] : main.trim();
 }
 
 function splitOnFirstParen (raw) {
@@ -1349,6 +1357,48 @@ function splitOnFirstParen (raw) {
     const cut = Math.min(p >= 0 ? p : Infinity, s >= 0 ? s : Infinity);
     if (cut === Infinity) return { main: raw, detail: "" };
     return { main: raw.slice(0, cut).trim(), detail: raw.slice(cut).trim() };
+}
+
+// Abbreviate large counts within free text: 1,000 -> 1K, 50,000 -> 50K,
+// 1500000 -> 1.5M. Comma-grouped numbers are always treated as counts;
+// bare 4-digit integers in the 1900-2099 range are left alone (years).
+function abbreviateCounts (s) {
+    return s.replace(/\d[\d,]*(?:\.\d+)?/g, m => {
+        const hasComma = m.indexOf(",") >= 0;
+        const n = parseFloat(m.replace(/,/g, ""));
+        if (!isFinite(n) || n < 1000) return m;
+        if (!hasComma && Number.isInteger(n) && n >= 1900 && n <= 2099) return m;
+        const units = [[1e9, "B"], [1e6, "M"], [1e3, "K"]];
+        for (const [base, suffix] of units) {
+            if (Math.abs(n) >= base) {
+                return (Math.round((n / base) * 10) / 10) + suffix;
+            }
+        }
+        return m;
+    });
+}
+
+// Parse a sortable numeric magnitude from a free-text count like
+// "~150K (...)" or "~3M installs" -> 150000 / 3000000. Non-numeric values
+// (e.g. "pre-launch") return 0.
+function parseCount (s) {
+    const main = (s || "").split("(")[0].split(";")[0];
+    const m = main.match(/([\d,.]+)\s*([KMB])?/i);
+    if (!m) return 0;
+    const n = parseFloat(m[1].replace(/,/g, ""));
+    if (!isFinite(n)) return 0;
+    const unit = (m[2] || "").toUpperCase();
+    return n * (unit === "B" ? 1e9 : unit === "M" ? 1e6 : unit === "K" ? 1e3 : 1);
+}
+
+// Render a "main (detail)" value, optionally transforming the text first.
+function renderMainDetail (raw, transform) {
+    const t = transform || (x => x);
+    const { main, detail } = splitOnFirstParen(raw);
+    const mainHtml = escapeHtml(t(main));
+    return detail
+        ? `${mainHtml}<span class="comp-detail">${escapeHtml(t(detail))}</span>`
+        : mainHtml;
 }
 
 let dotIdSeq = 0;
@@ -1364,17 +1414,17 @@ function escapeHtml (s) {
         .replace(/"/g, "&quot;");
 }
 
-class ContentCompetitorTable extends ContentBase {
+class ContentComparisonTable extends ContentBase {
     constructor () {
         super();
-        this.competitors = [];
+        this.entities = [];
     }
 
     async resolve () {
-        const items = this.json.competitors || this.json.items || [];
+        const items = this.json.items || this.json.competitors || [];
         const infoFile = this.json.infoFile || "_info.json";
 
-        this.competitors = await Promise.all(items.map(async (name) => {
+        this.entities = await Promise.all(items.map(async (name) => {
             const encoded = name.split("/").map(s => encodeURIComponent(s)).join("/");
             try {
                 const resp = await ContentBase.asyncFetch(`${encoded}/${infoFile}`);
@@ -1389,11 +1439,25 @@ class ContentCompetitorTable extends ContentBase {
             return { _name: name, features: {} };
         }));
 
+        // Optional sort of entities (rows). e.g.
+        //   "sort": { "field": "guestimatedUserBase", "as": "count", "direction": "desc" }
+        const sort = this.json.sort;
+        if (sort && sort.field) {
+            const dir = sort.direction === "asc" ? 1 : -1;
+            const val = c => sort.as === "count"
+                ? parseCount(c[sort.field])
+                : (c[sort.field] || "");
+            this.entities.sort((a, b) => {
+                const av = val(a), bv = val(b);
+                return av < bv ? -dir : av > bv ? dir : 0;
+            });
+        }
+
         await super.resolve();
     }
 
     isUniversal (key) {
-        return this.competitors.every(c => {
+        return this.entities.every(c => {
             const f = c.features && c.features[key];
             return f && f.value === true;
         });
@@ -1418,54 +1482,49 @@ class ContentCompetitorTable extends ContentBase {
 
     computeHtml () {
         const title = this.json.title || "";
-        const competitors = this.competitors;
+        const entities = this.entities;
         const featureRows = this.json.featureRows || [];
         const universalFeatures = this.json.universalFeatures || [];
-        const competitorsLabel = this.json.competitorsLabel || "Competitors";
-        const featuresLabel = this.json.featuresLabel || "Feature Comparison";
+        const entitiesLabel = this.json.itemsLabel || this.json.competitorsLabel || "Competitors";
 
-        if (!competitors.length) return "";
+        if (!entities.length) return "";
 
-        let head = "<tr><th></th>";
-        for (const c of competitors) head += `<th>${escapeHtml(c._name)}</th>`;
-        head += "</tr>";
+        // Per-cell value formatters, selectable per info column via `format`.
+        const formatters = {
+            link: v => `<a class="comp-arrow" href="${escapeHtml(v)}">&rarr;</a>`,
+            date: v => escapeHtml(shortDate(v)),
+            source: v => escapeHtml(shortSource(v)),
+            detail: v => renderMainDetail(v),
+            count: v => renderMainDetail(v, abbreviateCounts),
+            sourceDot: v => `<span class="comp-dot comp-dot-${sourceStatus(v)}"></span>`,
+            plain: v => escapeHtml(v)
+        };
 
-        // Info table rows
-        const infoRows = [];
-        infoRows.push({
-            label: "Website",
-            render: c => c.website
-                ? `<a href="${escapeHtml(c.website)}">${escapeHtml(shortUrl(c.website))}</a>`
-                : ""
-        });
-        infoRows.push({
-            label: "Founded",
-            render: c => c.creationDate ? escapeHtml(shortDate(c.creationDate)) : ""
-        });
-        infoRows.push({
-            label: "Users",
+        // Info table columns (one per attribute; entities are rows). Defaults
+        // preserve the product/competitor layout; any site can override via
+        // an `infoRows` array of { label, field, format } in the JSON.
+        const defaultInfoRows = [
+            { label: "Website", field: "website", format: "link" },
+            { label: "Founded", field: "creationDate", format: "date" },
+            { label: "Users", field: "guestimatedUserBase", format: "count" },
+            { label: "License", field: "openOrClosedSource", format: "source" }
+        ];
+        const infoRowDefs = this.json.infoRows || defaultInfoRows;
+        const infoRows = infoRowDefs.map(def => ({
+            label: def.label,
             render: c => {
-                if (!c.guestimatedUserBase) return "";
-                const { main, detail } = splitOnFirstParen(c.guestimatedUserBase);
-                if (detail) {
-                    return `${escapeHtml(main)}<br><span class="comp-detail">${escapeHtml(detail)}</span>`;
-                }
-                return escapeHtml(main);
+                const v = c[def.field];
+                if (v === undefined || v === null || v === "") return "";
+                return (formatters[def.format] || formatters.plain)(v);
+            },
+            // Full, untruncated value used as the cell's hover tooltip.
+            rawValue: c => {
+                const v = c[def.field];
+                return (v === undefined || v === null) ? "" : String(v);
             }
-        });
-        infoRows.push({
-            label: "License",
-            render: c => c.openOrClosedSource ? escapeHtml(shortSource(c.openOrClosedSource)) : ""
-        });
+        }));
 
-        let infoBody = "";
-        for (const r of infoRows) {
-            let row = `<tr><td>${r.label}</td>`;
-            for (const c of competitors) row += `<td>${r.render(c)}</td>`;
-            infoBody += row + "</tr>";
-        }
-
-        // Determine which features are universal across all competitors
+        // Determine which features are universal across all entities
         const universalLabels = [];
         const skipKeys = new Set();
         for (const f of [...universalFeatures, ...featureRows]) {
@@ -1475,24 +1534,35 @@ class ContentCompetitorTable extends ContentBase {
             }
         }
 
-        const displayRows = featureRows.filter(f => !skipKeys.has(f.key));
+        const displayFeatures = featureRows.filter(f => !skipKeys.has(f.key));
 
-        let featBody = "";
-        for (const f of displayRows) {
-            let row = `<tr><td>${escapeHtml(f.label)}</td>`;
-            for (const c of competitors) {
+        // Single merged table: info columns then feature columns; entities are rows.
+        let head = "<tr><th></th>";
+        for (const r of infoRows) head += `<th>${escapeHtml(r.label)}</th>`;
+        for (const f of displayFeatures) head += `<th>${escapeHtml(f.label)}</th>`;
+        head += "</tr>";
+
+        let body = "";
+        for (const c of entities) {
+            let row = `<tr><td>${escapeHtml(c._name)}</td>`;
+            for (const r of infoRows) {
+                const raw = r.rawValue(c);
+                const titleAttr = raw ? ` title="${escapeHtml(raw)}"` : "";
+                row += `<td${titleAttr}>${r.render(c)}</td>`;
+            }
+            for (const f of displayFeatures) {
                 const feat = c.features ? c.features[f.key] : null;
                 row += `<td>${this.cellHtml(feat)}</td>`;
             }
-            featBody += row + "</tr>";
+            body += row + "</tr>";
         }
 
         const universalNote = universalLabels.length
-            ? `<p class="comp-universal-note">All competitors also support ${universalLabels.map(escapeHtml).join(" and ")}.</p>`
+            ? `<p class="comp-universal-note">All ${escapeHtml(entitiesLabel.toLowerCase())} also support ${universalLabels.map(escapeHtml).join(" and ")}.</p>`
             : "";
 
-        // Build sectioned output. The whole content type is wrapped in a
-        // .comp-table container so the details toggle scope is local.
+        // The whole content type is wrapped in a .comp-table container so the
+        // details toggle scope is local.
         const titleHtml = title
             ? `<h2 id="${slugify(title)}">${title}</h2>`
             : "";
@@ -1500,13 +1570,8 @@ class ContentCompetitorTable extends ContentBase {
         let html = titleHtml;
         html += '<div class="comp-table hide-details">';
 
-        html += `<h3 class="comp-section-head">${escapeHtml(competitorsLabel)}</h3>`;
-        html += '<div class="comp-table-wrap">';
-        html += `<table class="comp-info-table"><thead>${head}</thead><tbody>${infoBody}</tbody></table>`;
-        html += "</div>";
-
-        html += '<div class="comp-section-head-row">';
-        html += `<h3 class="comp-section-head">${escapeHtml(featuresLabel)}</h3>`;
+        // Details toggle controls the whole table; sits in a toolbar row above it.
+        html += '<div class="comp-section-head-row comp-toolbar">';
         html += '<label class="comp-toggle">';
         html += '<input type="checkbox" class="comp-details-toggle">';
         html += '<span class="comp-toggle-slider"></span>';
@@ -1515,7 +1580,7 @@ class ContentCompetitorTable extends ContentBase {
         html += "</div>";
 
         html += '<div class="comp-table-wrap">';
-        html += `<table class="comp-feature-table"><thead>${head}</thead><tbody>${featBody}</tbody></table>`;
+        html += `<table class="comp-info-table comp-feature-table"><thead>${head}</thead><tbody>${body}</tbody></table>`;
         html += "</div>";
         html += universalNote;
         html += "</div>";
@@ -1542,6 +1607,52 @@ class ContentCompetitorTable extends ContentBase {
             toggle.addEventListener("change", () => {
                 root.classList.toggle("hide-details", !toggle.checked);
             });
+        }
+
+        // Click/tap a row to toggle its selection highlight. Clicks on a link
+        // or a note-summary keep their own behavior and don't toggle the row.
+        root.querySelectorAll(".comp-info-table tbody tr, .comp-feature-table tbody tr").forEach(tr => {
+            tr.addEventListener("click", (e) => {
+                if (e.target.closest("a, .comp-summary")) return;
+                tr.classList.toggle("comp-row-selected");
+            });
+        });
+
+        // Hide the label + content of any column that is only partially visible
+        // at the scroll edges (clipped by the wrap edge, or sliding under the
+        // sticky first column). The column keeps its width so layout is stable.
+        const wrap = root.querySelector(".comp-table-wrap");
+        const table = wrap && wrap.querySelector("table");
+        if (wrap && table && table.tHead && table.tBodies[0]) {
+            const headCells = Array.from(table.tHead.rows[0].cells);
+            const bodyRows = Array.from(table.tBodies[0].rows);
+            const eps = 1;
+            const updateObscured = () => {
+                const wrapRect = wrap.getBoundingClientRect();
+                const stickyW = headCells[0] ? headCells[0].getBoundingClientRect().width : 0;
+                const leftBound = wrapRect.left + stickyW;
+                headCells.forEach((th, i) => {
+                    if (i === 0) return; // sticky column is always visible
+                    const r = th.getBoundingClientRect();
+                    const obscured = r.left < leftBound - eps || r.right > wrapRect.right + eps;
+                    th.classList.toggle("comp-col-hidden", obscured);
+                    bodyRows.forEach(row => {
+                        const cell = row.cells[i];
+                        if (cell) cell.classList.toggle("comp-col-hidden", obscured);
+                    });
+                });
+            };
+            let scheduled = false;
+            const onScroll = () => {
+                if (scheduled) return;
+                scheduled = true;
+                requestAnimationFrame(() => { scheduled = false; updateObscured(); });
+            };
+            wrap.addEventListener("scroll", onScroll, { passive: true });
+            window.addEventListener("resize", onScroll);
+            if (toggle) toggle.addEventListener("change", onScroll);
+            updateObscured();
+            requestAnimationFrame(updateObscured);
         }
 
         super.postRender(page);
@@ -2011,7 +2122,7 @@ ContentBase.typeMap = {
     ContentToc,
     ContentFAQ,
     ContentClassDoc,
-    ContentCompetitorTable,
+    ContentComparisonTable,
 };
 
 // Browser bootstrap. PageIndex.init() runs the runtime pass (loadPage + render);

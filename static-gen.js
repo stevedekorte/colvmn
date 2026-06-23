@@ -34,7 +34,7 @@ import { ContentTimeline } from "./layout/ContentTimeline.js";
 import { ContentToc } from "./layout/ContentToc.js";
 import { ContentFAQ } from "./layout/ContentFAQ.js";
 import { ContentClassDoc } from "./layout/ContentClassDoc.js";
-import { ContentCompetitorTable } from "./layout/ContentCompetitorTable.js";
+import { ContentComparisonTable } from "./layout/ContentComparisonTable.js";
 import { PageIndex } from "./layout/PageIndex.js";
 import { parseMarkdown } from "./layout/MarkdownParser.js";
 
@@ -51,7 +51,7 @@ ContentBase.typeMap = {
     ContentToc,
     ContentFAQ,
     ContentClassDoc,
-    ContentCompetitorTable,
+    ContentComparisonTable,
 };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -84,7 +84,7 @@ const BUNDLE_FILES = [
     "ContentToc.js",
     "ContentFAQ.js",
     "ContentClassDoc.js",
-    "ContentCompetitorTable.js",
+    "ContentComparisonTable.js",
     "PageIndex.js",
     "Lightbox.js",
     "layout.js",
