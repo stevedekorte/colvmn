@@ -284,7 +284,9 @@ export class PageIndex {
             footerHtml = `<div class="page-footer"><a class="next-link" href="${href}">${label}</a></div>`;
         }
 
-        return headerHtml + heroHtml + introHtml + contentHtml + footerHtml;
+        const dotsHtml = ContentBase.completionDots(this.json.completion);
+
+        return headerHtml + heroHtml + dotsHtml + introHtml + contentHtml + footerHtml;
     }
 
     computeDocumentTitle () {

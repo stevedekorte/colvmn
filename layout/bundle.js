@@ -441,6 +441,19 @@ class ContentBase {
         return fetch(url, { cache: "no-store" });
     }
 
+    // A row of 5 completion dots (filled-of-5), shown under a card/page title.
+    // `completion` is 0-5; absent/invalid → "".
+    static completionDots (completion) {
+        if (completion === undefined || completion === null || completion === "") return "";
+        const n = Math.max(0, Math.min(5, Math.round(Number(completion))));
+        if (Number.isNaN(n)) return "";
+        let dots = "";
+        for (let i = 0; i < 5; i++) {
+            dots += `<span class="cd${i < n ? " on" : ""}"></span>`;
+        }
+        return `<div class="completion-dots" title="${n}/5 complete">${dots}</div>`;
+    }
+
     constructor () {
         this.json = null;
         this.children = [];
@@ -562,18 +575,21 @@ class ContentCards extends ContentBase {
                 const displayName = folder.split("/").pop();
                 let title = displayName;
                 let subtitle = "";
+                let completion;
                 try {
                     const resp = await ContentBase.asyncFetch(`${encoded}/_index.json`);
                     if (resp.ok) {
                         const meta = await resp.json();
                         title = meta.title || displayName;
                         subtitle = ContentCards.cardSubtitle(meta);
+                        completion = meta.completion;
                     } else {
                         const mdResp = await ContentBase.asyncFetch(`${encoded}/_index.md`);
                         if (mdResp.ok) {
                             const meta = parseMarkdown(await mdResp.text());
                             title = meta.title || displayName;
                             subtitle = ContentCards.cardSubtitle(meta);
+                            completion = meta.completion;
                         }
                     }
                 } catch (e) {
@@ -590,6 +606,7 @@ class ContentCards extends ContentBase {
                     folder,
                     title,
                     subtitle,
+                    completion,
                     href,
                     arrow: "View",
                     link: true,
@@ -639,6 +656,7 @@ class ContentCards extends ContentBase {
 
             html += `<${tag} class="card${spanClass}"${hrefAttr}>`;
             html += `<h3>${item.title}</h3>`;
+            html += ContentBase.completionDots(item.completion);
             if (item.date) {
                 html += `<div class="card-date">${item.date}</div>`;
             }
@@ -1946,7 +1964,9 @@ class PageIndex {
             footerHtml = `<div class="page-footer"><a class="next-link" href="${href}">${label}</a></div>`;
         }
 
-        return headerHtml + heroHtml + introHtml + contentHtml + footerHtml;
+        const dotsHtml = ContentBase.completionDots(this.json.completion);
+
+        return headerHtml + heroHtml + dotsHtml + introHtml + contentHtml + footerHtml;
     }
 
     computeDocumentTitle () {

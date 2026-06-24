@@ -1258,6 +1258,25 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
   border: 1.5px solid #aaa;
 }
 
+/* Completion: a row of 5 dots (filled-of-5), shown under a card/page title and
+   above the subtitle. Set per card/page via the `completion:` field (0-5). */
+.completion-dots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin: 6px 0 10px;
+  opacity: 0.7;
+}
+.completion-dots .cd {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+}
+.completion-dots .cd.on {
+  background: currentColor;
+}
+
 .comp-summary {
   font-size: 11px;
   color: #888;

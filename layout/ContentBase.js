@@ -97,6 +97,19 @@ export class ContentBase {
         return fetch(url, { cache: "no-store" });
     }
 
+    // A row of 5 completion dots (filled-of-5), shown under a card/page title.
+    // `completion` is 0-5; absent/invalid → "".
+    static completionDots (completion) {
+        if (completion === undefined || completion === null || completion === "") return "";
+        const n = Math.max(0, Math.min(5, Math.round(Number(completion))));
+        if (Number.isNaN(n)) return "";
+        let dots = "";
+        for (let i = 0; i < 5; i++) {
+            dots += `<span class="cd${i < n ? " on" : ""}"></span>`;
+        }
+        return `<div class="completion-dots" title="${n}/5 complete">${dots}</div>`;
+    }
+
     constructor () {
         this.json = null;
         this.children = [];

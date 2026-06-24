@@ -29,18 +29,21 @@ export class ContentCards extends ContentBase {
                 const displayName = folder.split("/").pop();
                 let title = displayName;
                 let subtitle = "";
+                let completion;
                 try {
                     const resp = await ContentBase.asyncFetch(`${encoded}/_index.json`);
                     if (resp.ok) {
                         const meta = await resp.json();
                         title = meta.title || displayName;
                         subtitle = ContentCards.cardSubtitle(meta);
+                        completion = meta.completion;
                     } else {
                         const mdResp = await ContentBase.asyncFetch(`${encoded}/_index.md`);
                         if (mdResp.ok) {
                             const meta = parseMarkdown(await mdResp.text());
                             title = meta.title || displayName;
                             subtitle = ContentCards.cardSubtitle(meta);
+                            completion = meta.completion;
                         }
                     }
                 } catch (e) {
@@ -57,6 +60,7 @@ export class ContentCards extends ContentBase {
                     folder,
                     title,
                     subtitle,
+                    completion,
                     href,
                     arrow: "View",
                     link: true,
@@ -106,6 +110,7 @@ export class ContentCards extends ContentBase {
 
             html += `<${tag} class="card${spanClass}"${hrefAttr}>`;
             html += `<h3>${item.title}</h3>`;
+            html += ContentBase.completionDots(item.completion);
             if (item.date) {
                 html += `<div class="card-date">${item.date}</div>`;
             }
