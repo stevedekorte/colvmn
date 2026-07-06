@@ -46,7 +46,16 @@ function imageAttrs (attrs) {
 }
 
 function inlineMarkdown (text) {
-    return text
+    // Code spans are extracted first so their content is HTML-escaped verbatim
+    // and never processed by the link/emphasis rules (a URL in backticks must
+    // not be autolinked, `<think>` must render as text, etc.).
+    const codeSpans = [];
+    const withoutCode = text.replace(/`([^`]+)`/g, (m, code) => {
+        const escaped = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        codeSpans.push(`<code>${escaped}</code>`);
+        return `\u0000${codeSpans.length - 1}\u0000`;
+    });
+    return withoutCode
         .replace(/!\[([^\]]*)\]\(([^)]+)\)(?:\{([^}]*)\})?/g,
             (m, alt, src, attrs) => `<img src="${src}" alt="${alt}"${imageAttrs(attrs)}>`)
         .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
@@ -55,12 +64,12 @@ function inlineMarkdown (text) {
         .replace(/__(.+?)__/g, "<strong>$1</strong>")
         .replace(/(?<!\w)\*(.+?)\*(?!\w)/g, "<em>$1</em>")
         .replace(/(?<!\w)_(.+?)_(?!\w)/g, "<em>$1</em>")
-        .replace(/`([^`]+)`/g, "<code>$1</code>")
         .replace(/&(?!#?\w+;)/g, "&amp;")
         .replace(/\u2014/g, "&mdash;")
         .replace(/\u2013/g, "&ndash;")
         .replace(/\u201c/g, "&ldquo;").replace(/\u201d/g, "&rdquo;")
-        .replace(/\u2018/g, "&lsquo;").replace(/\u2019/g, "&rsquo;");
+        .replace(/\u2018/g, "&lsquo;").replace(/\u2019/g, "&rsquo;")
+        .replace(/\u0000(\d+)\u0000/g, (m, i) => codeSpans[i]);
 }
 
 function parseBlocks (lines) {
