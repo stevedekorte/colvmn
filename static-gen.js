@@ -221,6 +221,27 @@ function rewriteEngineLinks (html, pageDir) {
 // Generate static HTML for a single page
 // ---------------------------------------------------------------------------
 
+// The minimal document that the injections in generatePage() can fill in.
+// Engine URLs are server-absolute here; rewriteEngineLinks() converts them
+// to page-relative paths.
+function defaultPageTemplate () {
+    return [
+        "<!DOCTYPE html>",
+        '<html lang="en">',
+        "<head>",
+        '  <meta charset="UTF-8">',
+        '  <meta name="viewport" content="width=device-width, initial-scale=1.0">',
+        '  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">',
+        '  <link rel="stylesheet" href="/colvmn/style.css">',
+        "</head>",
+        "<body>",
+        '  <script src="/colvmn/layout/bundle.js" defer></script>',
+        "</body>",
+        "</html>",
+        "",
+    ].join("\n");
+}
+
 async function generatePage (pageDir, siteUrl) {
     const relPath = relative(siteRoot, pageDir) || ".";
     const pathSegments = relPath === "."
@@ -259,6 +280,16 @@ async function generatePage (pageDir, siteUrl) {
     // Read existing HTML template
     const htmlPath = join(pageDir, "index.html");
     let html = readFileSync(htmlPath, "utf-8");
+
+    // A page directory only needs a placeholder index.html for findLayoutPages
+    // to see it, so what is there may not be a usable document. Every step
+    // below patches an existing template; with no <body> to patch they all
+    // silently no-op and the file is written back unchanged, shipping a blank
+    // page. Scaffold instead, which also makes "touch index.html beside the
+    // _index.* and regenerate" the way to add a page.
+    if (!/<body\b/i.test(html)) {
+        html = defaultPageTemplate();
+    }
 
     // Replace the .page div contents, or insert one if missing.
     // pageHtml is escaped because rendered content may contain `$&`/`$<…>`
@@ -725,13 +756,29 @@ async function main () {
     const config = loadConfig();
     const siteUrl = config.siteUrl || "/";
 
+    // The site root must itself be a page. A siteRoot resolved one level too
+    // high still finds every page below it, but none of them is ever isRoot,
+    // so the root page silently ships with the sub-page header: empty <h1>,
+    // a back-link to the parent directory, brand pushed right.
+    const rootMeta = readPageMeta(siteRoot);
+    if (!rootMeta) {
+        console.error(`Static gen: ${siteRoot} is not a site root - it has no _index.json or _index.md.`);
+        console.error("Pass the site root as the first argument, e.g. `node colvmn/static-gen.js .` from within it.");
+        process.exit(1);
+    }
+    const rootLabel = rootMeta.json.topTitle || rootMeta.json.title || "(untitled)";
+
     // Build the classic-script bundle first; pages reference it.
     const bundlePath = join(__dirname, "layout", "bundle.js");
     writeFileSync(bundlePath, buildBundle());
     console.log(`  generated: colvmn/layout/bundle.js`);
 
     const pages = findLayoutPages(siteRoot);
-    console.log(`Static gen: found ${pages.length} layout pages under ${siteRoot}`);
+    if (!pages.includes(siteRoot)) {
+        console.error(`Static gen: no root page at ${siteRoot} - its _index.* needs an index.html beside it.`);
+        process.exit(1);
+    }
+    console.log(`Static gen: found ${pages.length} layout pages under ${siteRoot} (root: "${rootLabel}")`);
 
     for (const pageDir of pages) {
         await generatePage(pageDir, siteUrl);
