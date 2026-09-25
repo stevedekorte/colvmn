@@ -45,16 +45,25 @@ function imageAttrs (attrs) {
     return out;
 }
 
-// Element names inline markdown passes through as markup. Any other <word> in
+// Element names inline markdown passes through as markup: every HTML element,
+// and every SVG element (pages embed inline diagrams). Any other <word> in
 // prose is text — a placeholder like "<stableId>", a token like <think> — and
 // is escaped, since a browser would otherwise open it as an unknown element,
 // hide it, and wrap the rest of the block in it.
 const htmlElementNames = new Set((
-    "a abbr audio b bdi bdo blockquote br button canvas caption cite code col colgroup data dd del " +
-    "details dfn div dl dt em figcaption figure footer form h1 h2 h3 h4 h5 h6 header hr i iframe img " +
-    "input ins kbd label li link main mark meta nav noscript ol option p picture pre q rp rt ruby s " +
-    "samp script section select small source span strong style sub summary sup svg table tbody td " +
-    "template textarea tfoot th thead time tr u ul var video wbr"
+    "a abbr address area article aside audio b base bdi bdo blockquote body br button canvas caption " +
+    "cite code col colgroup data datalist dd del details dfn dialog div dl dt em embed fieldset " +
+    "figcaption figure footer form h1 h2 h3 h4 h5 h6 head header hgroup hr html i iframe img input ins " +
+    "kbd label legend li link main map mark menu meta meter nav noscript object ol optgroup option " +
+    "output p param picture pre progress q rp rt ruby s samp script search section select slot small " +
+    "source span strong style sub summary sup table tbody td template textarea tfoot th thead time " +
+    "title tr track u ul var video wbr " +
+    "svg animate animatemotion animatetransform circle clippath defs desc ellipse feblend fecolormatrix " +
+    "fecomponenttransfer fecomposite feconvolvematrix fediffuselighting fedisplacementmap " +
+    "fedistantlight fedropshadow feflood fefunca fefuncb fefuncg fefuncr fegaussianblur feimage " +
+    "femerge femergenode femorphology feoffset fepointlight fespecularlighting fespotlight fetile " +
+    "feturbulence filter foreignobject g image line lineargradient marker mask metadata mpath path " +
+    "pattern polygon polyline radialgradient rect set stop switch symbol text textpath tspan use view"
 ).split(" "));
 
 function escapeNonHtmlTags (text) {
