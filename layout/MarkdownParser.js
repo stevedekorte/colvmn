@@ -39,6 +39,23 @@ function imageAttrs (attrs) {
     return out;
 }
 
+// Element names inline markdown passes through as markup. Any other <word> in
+// prose is text — a placeholder like "<stableId>", a token like <think> — and
+// is escaped, since a browser would otherwise open it as an unknown element,
+// hide it, and wrap the rest of the block in it.
+const htmlElementNames = new Set((
+    "a abbr audio b bdi bdo blockquote br button canvas caption cite code col colgroup data dd del " +
+    "details dfn div dl dt em figcaption figure footer form h1 h2 h3 h4 h5 h6 header hr i iframe img " +
+    "input ins kbd label li link main mark meta nav noscript ol option p picture pre q rp rt ruby s " +
+    "samp script section select small source span strong style sub summary sup svg table tbody td " +
+    "template textarea tfoot th thead time tr u ul var video wbr"
+).split(" "));
+
+function escapeNonHtmlTags (text) {
+    return text.replace(/<(\/?)([A-Za-z][\w:-]*)/g, (m, slash, name) =>
+        htmlElementNames.has(name.toLowerCase()) ? m : `&lt;${slash}${name}`);
+}
+
 function inlineMarkdown (text) {
     // Code spans are extracted first so their content is HTML-escaped verbatim
     // and never processed by the link/emphasis rules (a URL in backticks must
@@ -49,7 +66,7 @@ function inlineMarkdown (text) {
         codeSpans.push(`<code>${escaped}</code>`);
         return `\u0000${codeSpans.length - 1}\u0000`;
     });
-    return withoutCode
+    return escapeNonHtmlTags(withoutCode)
         .replace(/!\[([^\]]*)\]\(([^)]+)\)(?:\{([^}]*)\})?/g,
             (m, alt, src, attrs) => `<img src="${src}" alt="${alt}"${imageAttrs(attrs)}>`)
         .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
@@ -340,5 +357,8 @@ export function parseMarkdown (text) {
     for (const key of Object.keys(meta)) {
         result[key] = meta[key];
     }
+    // A subtitle is HTML wherever it lands (intro, cards), like one taken from
+    // the body above, so frontmatter markdown in it is rendered the same way.
+    if (typeof meta.subtitle === "string") result.subtitle = inlineMarkdown(meta.subtitle);
     return result;
 }
