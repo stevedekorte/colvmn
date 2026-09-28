@@ -182,8 +182,10 @@ function parseBlocks (lines) {
             continue;
         }
 
-        // Ordered list
+        // Ordered list — numbered from its first item's number (a plan's
+        // steps may start at 0), not always from 1
         if (line.match(/^\s*\d+[.)]\s/)) {
+            const start = parseInt(line.match(/^\s*(\d+)[.)]\s/)[1], 10);
             const items = [];
             while (i < lines.length) {
                 if (!lines[i].match(/^\s*\d+[.)]\s/)) break;
@@ -212,7 +214,7 @@ function parseBlocks (lines) {
                     break;
                 }
             }
-            blocks.push({ type: "ol", items });
+            blocks.push({ type: "ol", items, start });
             continue;
         }
 
@@ -262,7 +264,7 @@ function blocksToHtml (blocks) {
         switch (b.type) {
             case "paragraph": return `<p>${b.text}</p>`;
             case "ul": return "<ul>" + b.items.map(i => `<li>${i}</li>`).join("") + "</ul>";
-            case "ol": return "<ol>" + b.items.map(i => `<li>${i}</li>`).join("") + "</ol>";
+            case "ol": return (b.start === 1 ? "<ol>" : `<ol start="${b.start}">`) + b.items.map(i => `<li>${i}</li>`).join("") + "</ol>";
             case "html": return b.html;
             case "heading": return `<h${b.level} id="${slugify(b.text)}">${inlineMarkdown(b.text)}</h${b.level}>`;
             default: return "";
