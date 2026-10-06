@@ -28,7 +28,7 @@ const PROVIDERS = {
     cloudflare: {
         fields: { token: [ID, true] },
         placement: "body",
-        html: c => `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${c.token}"}'></script>`,
+        html: c => `<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${c.token}"}'></script>`,
     },
     googleAnalytics: {
         fields: { measurementId: [/^G-[A-Z0-9]+$/, true] },
