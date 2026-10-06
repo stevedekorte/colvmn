@@ -69,7 +69,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const siteRoot = resolve(process.argv[2] || join(__dirname, ".."));
 
 const skipDirs = new Set([
-    "node_modules", "external-libs", "source", "build",
+    "node_modules", "external-libs", "source", "build", "dist",
     "npm-pkg", "webserver", "resources", "colvmn",
 ]);
 
