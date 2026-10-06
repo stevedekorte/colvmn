@@ -15,9 +15,17 @@
  *   node colvmn/static-gen.js          # site root = parent of colvmn/ (submodule mode)
  *   node colvmn/static-gen.js <dir>    # site root = <dir> (explicit)
  *   node static-gen.js .               # self-host: colvmn is its own site root
+ *
+ * Nested sites: a folder below the root with its own colvmn/ engine (e.g. a
+ * submodule's docs) is a nested site. The root build renders its pages too,
+ * as their own site (own root page and header), but refuses to run if that
+ * engine's version differs from this one. Site config (siteUrl, analytics)
+ * comes from the nearest colvmn.json at or above each site's root, so a
+ * nested site built on its own produces the same output.
  */
 
 import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join, relative, dirname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -64,6 +72,50 @@ const skipDirs = new Set([
     "node_modules", "external-libs", "source", "build",
     "npm-pkg", "webserver", "resources", "colvmn",
 ]);
+
+// ---------------------------------------------------------------------------
+// Nested sites — folders with their own colvmn engine
+// ---------------------------------------------------------------------------
+
+function isNestedSiteRoot (dir) {
+    return dir !== siteRoot && existsSync(join(dir, "colvmn", "static-gen.js"));
+}
+
+// The site root a page belongs to: the nearest nested site root at or above
+// it, else siteRoot.
+function localRootFor (pageDir) {
+    let dir = pageDir;
+    while (dir !== siteRoot && dir.startsWith(siteRoot + sep)) {
+        if (isNestedSiteRoot(dir)) return dir;
+        dir = dirname(dir);
+    }
+    return siteRoot;
+}
+
+// The engine folder whose assets a site's pages load.
+function engineDirFor (localRoot) {
+    return localRoot === siteRoot ? __dirname : join(localRoot, "colvmn");
+}
+
+// Short hash of an engine's source files (not the generated bundle), used to
+// require nested sites to run the same colvmn as the root.
+function engineVersion (engineDir) {
+    const files = ["static-gen.js", "analytics.js", "style.css"];
+    const layoutDir = join(engineDir, "layout");
+    if (existsSync(layoutDir)) {
+        for (const f of readdirSync(layoutDir).sort()) {
+            if (f.endsWith(".js") && f !== "bundle.js") files.push(join("layout", f));
+        }
+    }
+    const hash = createHash("sha256");
+    for (const f of files) {
+        const path = join(engineDir, f);
+        hash.update(`${f}\0`);
+        hash.update(existsSync(path) ? readFileSync(path) : "(missing)");
+        hash.update("\0");
+    }
+    return hash.digest("hex").slice(0, 8);
+}
 
 // ---------------------------------------------------------------------------
 // Bundle generator — concatenates the ES-module sources into a single
@@ -188,7 +240,8 @@ function findLayoutPages (dir) {
 // keeps the generated docs readable via file:// without a web server.
 // ---------------------------------------------------------------------------
 
-function rewriteEngineLinks (html, pageDir) {
+function rewriteEngineLinks (html, pageDir, localRoot) {
+    const engineDir = engineDirFor(localRoot);
     return html.replace(
         /(<(?:link|script)\b[^>]*\b(?:href|src)\s*=\s*)"([^"]+)"/gi,
         (match, prefix, urlValue) => {
@@ -199,13 +252,13 @@ function rewriteEngineLinks (html, pageDir) {
             // Skip fragment-only and query-only references.
             if (urlValue.startsWith("#") || urlValue.startsWith("?")) return match;
 
-            // Resolve against siteRoot (server-absolute) or pageDir (relative).
+            // Resolve against the page's site root (server-absolute) or pageDir (relative).
             const absPath = urlValue.startsWith("/")
-                ? resolve(siteRoot, urlValue.slice(1))
+                ? resolve(localRoot, urlValue.slice(1))
                 : resolve(pageDir, urlValue);
 
-            // Only rewrite assets that live inside the colvmn folder.
-            const inColvmn = absPath === __dirname || absPath.startsWith(__dirname + sep);
+            // Only rewrite assets that live inside the site's colvmn folder.
+            const inColvmn = absPath === engineDir || absPath.startsWith(engineDir + sep);
             if (!inColvmn) return match;
 
             let relPath = relative(pageDir, absPath);
@@ -243,8 +296,12 @@ function defaultPageTemplate () {
     ].join("\n");
 }
 
-async function generatePage (pageDir, siteUrl, analyticsHtml) {
-    const relPath = relative(siteRoot, pageDir) || ".";
+async function generatePage (pageDir) {
+    // Pages render relative to their own site root, so a nested site's pages
+    // match what its own build produces.
+    const localRoot = localRootFor(pageDir);
+    const { siteUrl, analyticsHtml } = siteConfigFor(localRoot);
+    const relPath = relative(localRoot, pageDir) || ".";
     const pathSegments = relPath === "."
         ? []
         : relPath.split(sep).filter(s => s.length > 0);
@@ -253,7 +310,7 @@ async function generatePage (pageDir, siteUrl, analyticsHtml) {
     ContentBase.setFetchFn(fetchFn);
 
     const context = {
-        isRoot: () => pageDir === siteRoot,
+        isRoot: () => pageDir === localRoot,
         pathSegments: () => pathSegments,
         urlParam: () => null,
     };
@@ -370,7 +427,7 @@ async function generatePage (pageDir, siteUrl, analyticsHtml) {
     // Rewrite engine asset URLs (style.css, layout.js, llms.txt, etc.) to
     // page-relative paths so the docs render correctly from file:// without
     // a web server. Done last so it also catches links injected above.
-    html = rewriteEngineLinks(html, pageDir);
+    html = rewriteEngineLinks(html, pageDir, localRoot);
 
     // Swap the ES-module <script src="layout.js" type="module"> for a
     // classic deferred <script src="bundle.js">. Chrome blocks module
@@ -404,7 +461,7 @@ async function generatePage (pageDir, siteUrl, analyticsHtml) {
     html = applyAnalytics(html, page.json.analytics === false ? noAnalytics : analyticsHtml);
 
     writeFileSync(htmlPath, html);
-    console.log(`  generated: ${relPath}`);
+    console.log(`  generated: ${relative(siteRoot, pageDir) || "."}`);
 }
 
 /**
@@ -747,16 +804,50 @@ function generateLlmsFull (pages) {
 // Config
 // ---------------------------------------------------------------------------
 
-// Site config lives in colvmn.json at the site root. llms-config.json is its
-// older name and is still read when colvmn.json is absent.
-function loadConfig () {
-    for (const name of ["colvmn.json", "llms-config.json"]) {
-        const configPath = join(siteRoot, name);
-        if (existsSync(configPath)) {
-            return JSON.parse(readFileSync(configPath, "utf-8"));
+// Site config lives in colvmn.json at the site root (llms-config.json is its
+// older name). A site without one uses the nearest colvmn.json above it, so a
+// nested site gets its enclosing site's analytics and URLs: only "analytics"
+// and "siteUrl" (extended by the folder path) are taken from it. colvmn's own
+// docs never look upward — they're a separate site wherever they're vendored.
+function findConfig (localRoot) {
+    let dir = localRoot;
+    while (true) {
+        for (const name of ["colvmn.json", "llms-config.json"]) {
+            const configPath = join(dir, name);
+            if (existsSync(configPath)) {
+                return { dir, path: configPath, json: JSON.parse(readFileSync(configPath, "utf-8")) };
+            }
         }
+        const parent = dirname(dir);
+        if (parent === dir || localRoot === __dirname) return null;
+        dir = parent;
     }
-    return {};
+}
+
+const siteConfigCache = new Map();
+
+function siteConfigFor (localRoot) {
+    if (siteConfigCache.has(localRoot)) return siteConfigCache.get(localRoot);
+    const found = findConfig(localRoot);
+    const json = found ? found.json : {};
+    let siteUrl = json.siteUrl || "/";
+    if (found && found.dir !== localRoot && siteUrl !== "/") {
+        const sub = relative(found.dir, localRoot).split(sep).map(s => encodeURIComponent(s)).join("/");
+        siteUrl = siteUrl.replace(/\/?$/, "/") + sub + "/";
+    }
+    let analyticsHtml;
+    try {
+        analyticsHtml = buildAnalyticsHtml(json.analytics);
+    } catch (e) {
+        console.error(`Static gen: ${found.path}: ${e.message}`);
+        process.exit(1);
+    }
+    if (found && found.dir !== localRoot) {
+        console.log(`  ${relative(siteRoot, localRoot) || "."}: using siteUrl/analytics from ${found.path}`);
+    }
+    const config = { siteUrl, analyticsHtml };
+    siteConfigCache.set(localRoot, config);
+    return config;
 }
 
 // ---------------------------------------------------------------------------
@@ -764,16 +855,7 @@ function loadConfig () {
 // ---------------------------------------------------------------------------
 
 async function main () {
-    const config = loadConfig();
-    const siteUrl = config.siteUrl || "/";
-
-    let analyticsHtml;
-    try {
-        analyticsHtml = buildAnalyticsHtml(config.analytics);
-    } catch (e) {
-        console.error(`Static gen: ${e.message}`);
-        process.exit(1);
-    }
+    const { siteUrl } = siteConfigFor(siteRoot);
 
     // The site root must itself be a page. A siteRoot resolved one level too
     // high still finds every page below it, but none of them is ever isRoot,
@@ -787,20 +869,37 @@ async function main () {
     }
     const rootLabel = rootMeta.json.topTitle || rootMeta.json.title || "(untitled)";
 
-    // Build the classic-script bundle first; pages reference it.
-    const bundlePath = join(__dirname, "layout", "bundle.js");
-    writeFileSync(bundlePath, buildBundle());
-    console.log(`  generated: colvmn/layout/bundle.js`);
-
     const pages = findLayoutPages(siteRoot);
     if (!pages.includes(siteRoot)) {
         console.error(`Static gen: no root page at ${siteRoot} - its _index.* needs an index.html beside it.`);
         process.exit(1);
     }
+
+    // Nested sites must run the same colvmn as this build, since this build
+    // renders their pages while they load their own engine's CSS/JS.
+    const nestedRoots = [...new Set(pages.map(localRootFor))].filter(r => r !== siteRoot);
+    const version = engineVersion(__dirname);
+    const mismatched = nestedRoots.filter(r => engineVersion(engineDirFor(r)) !== version);
+    if (mismatched.length) {
+        for (const r of mismatched) {
+            console.error(`Static gen: ${relative(siteRoot, r)} has a different colvmn version than the root (${engineVersion(engineDirFor(r))} vs ${version}).`);
+        }
+        console.error("Update each nested site's colvmn to match this one, then rerun.");
+        process.exit(1);
+    }
+
+    // Build the classic-script bundle first; pages reference it. Nested
+    // sites' engines get the same bundle (their sources are identical).
+    const bundle = buildBundle();
+    for (const root of [siteRoot, ...nestedRoots]) {
+        const bundlePath = join(engineDirFor(root), "layout", "bundle.js");
+        writeFileSync(bundlePath, bundle);
+        console.log(`  generated: ${relative(process.cwd(), bundlePath)}`);
+    }
     console.log(`Static gen: found ${pages.length} layout pages under ${siteRoot} (root: "${rootLabel}")`);
 
     for (const pageDir of pages) {
-        await generatePage(pageDir, siteUrl, analyticsHtml);
+        await generatePage(pageDir);
     }
 
     // Write sitemap.xml at site root

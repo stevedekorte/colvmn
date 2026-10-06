@@ -111,6 +111,12 @@ At the site root:
 
 `siteUrl` (when set and not `/`) enables canonical-URL tags and absolute sitemap entries. The older name `llms-config.json` is still read if `colvmn.json` is absent.
 
+A site without its own `colvmn.json` uses the nearest one in a folder above it, taking only `analytics` and `siteUrl` (extended by the folder path). This is how a nested site — e.g. a submodule's docs served inside a larger site — gets the enclosing site's analytics and URLs. Giving a site its own `colvmn.json` stops the upward search.
+
+### Nested sites
+
+A folder below the site root with its own `colvmn/` engine (typically a submodule's docs) is a nested site. The root build regenerates its pages too, rendering them as their own site (own root page, header and brand), so the output matches what the nested site's own build produces. Because those pages load their own engine's CSS and JS, the root build fails if a nested site's colvmn version differs from the root's — update the nested copy, then rerun.
+
 #### Analytics
 
 The `analytics` section adds tracking snippets to every generated page — one key per provider, using the ID from that provider's dashboard. Several can be enabled at once:
