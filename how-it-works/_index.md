@@ -12,7 +12,7 @@ The generator also writes:
 - `llms.txt` — a curated index for LLM agents
 - `llms-full.txt` — the full site content as markdown, one page per section
 
-When the optional `llms-config.json` at the site root sets `siteUrl`, canonical `<link>` tags and absolute sitemap entries are emitted.
+When the optional `colvmn.json` at the site root sets `siteUrl`, canonical `<link>` tags and absolute sitemap entries are emitted.
 
 ## Generating
 

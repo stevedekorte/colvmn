@@ -95,18 +95,42 @@ The attribute list also accepts `#id` and `key=value` pairs, e.g. `{.colvmn-zoom
 
 It's progressive enhancement — the image renders normally without JavaScript, and `layout/Lightbox.js` attaches the zoom behavior at runtime.
 
-### Optional site config — `llms-config.json`
+### Optional site config — `colvmn.json`
 
 At the site root:
 
 ```json
 {
   "siteUrl": "https://example.com/",
-  "title": "My Site"
+  "title": "My Site",
+  "analytics": {
+    "cloudflare": { "token": "0123456789abcdef0123456789abcdef" }
+  }
 }
 ```
 
-`siteUrl` (when set and not `/`) enables canonical-URL tags and absolute sitemap entries.
+`siteUrl` (when set and not `/`) enables canonical-URL tags and absolute sitemap entries. The older name `llms-config.json` is still read if `colvmn.json` is absent.
+
+#### Analytics
+
+The `analytics` section adds tracking snippets to every generated page — one key per provider, using the ID from that provider's dashboard. Several can be enabled at once:
+
+| Provider | Config |
+|---|---|
+| Cloudflare Web Analytics | `"cloudflare": { "token": "…" }` — the `token` in Cloudflare's snippet |
+| Google Analytics 4 | `"googleAnalytics": { "measurementId": "G-…" }` |
+| Plausible | `"plausible": { "domain": "example.com" }` (optional `src` for self-hosted or a custom script URL) |
+| GoatCounter | `"goatcounter": { "code": "mysite" }` (or `endpoint` for a self-hosted count URL) |
+| Fathom | `"fathom": { "siteId": "…" }` |
+| Umami | `"umami": { "websiteId": "<uuid>" }` (optional `src` for self-hosted) |
+| Simple Analytics | `"simpleAnalytics": {}` |
+| Anything else | `"custom": { "head": "<raw html>", "body": "<raw html>" }` |
+
+- Snippets are written between `<!-- colvmn:analytics -->` markers and rebuilt on every regen, so changing or removing a provider takes effect cleanly.
+- A page opts out with `analytics: false` in its frontmatter / `_index.json`.
+- IDs are validated before being written into HTML, and an unknown provider or field fails the build. `custom` is passed through as-is.
+- These IDs are public — they ship in every page — so `colvmn.json` is safe to commit. Never put an account id or API token here.
+- Google Analytics sets cookies, which may require a consent banner for EU visitors; colvmn doesn't provide one. The other built-in providers are cookie-free.
 
 ## License
 

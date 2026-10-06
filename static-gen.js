@@ -37,6 +37,7 @@ import { ContentClassDoc } from "./layout/ContentClassDoc.js";
 import { ContentComparisonTable } from "./layout/ContentComparisonTable.js";
 import { PageIndex } from "./layout/PageIndex.js";
 import { parseMarkdown } from "./layout/MarkdownParser.js";
+import { buildAnalyticsHtml, applyAnalytics } from "./analytics.js";
 
 // Register content types (mirrors layout.js)
 ContentBase.typeMap = {
@@ -242,7 +243,7 @@ function defaultPageTemplate () {
     ].join("\n");
 }
 
-async function generatePage (pageDir, siteUrl) {
+async function generatePage (pageDir, siteUrl, analyticsHtml) {
     const relPath = relative(siteRoot, pageDir) || ".";
     const pathSegments = relPath === "."
         ? []
@@ -326,7 +327,7 @@ async function generatePage (pageDir, siteUrl) {
     }
 
     // Canonical URL — directory form, not index.html. Only when siteUrl is
-    // configured (llms-config.json { "siteUrl": "https://..." }).
+    // configured (colvmn.json { "siteUrl": "https://..." }).
     if (siteUrl && siteUrl !== "/") {
         const urlPath = relPath === "."
             ? ""
@@ -395,6 +396,12 @@ async function generatePage (pageDir, siteUrl) {
     } else if (/<\/body>/i.test(html)) {
         html = html.replace(/<\/body>/i, `  ${cacheTag}\n</body>`);
     }
+
+    // Analytics snippets from colvmn.json's "analytics" section (see
+    // analytics.js). A page opts out with `analytics: false`. Done after
+    // rewriteEngineLinks so provider URLs are left alone.
+    const noAnalytics = { head: "", body: "" };
+    html = applyAnalytics(html, page.json.analytics === false ? noAnalytics : analyticsHtml);
 
     writeFileSync(htmlPath, html);
     console.log(`  generated: ${relPath}`);
@@ -740,10 +747,14 @@ function generateLlmsFull (pages) {
 // Config
 // ---------------------------------------------------------------------------
 
+// Site config lives in colvmn.json at the site root. llms-config.json is its
+// older name and is still read when colvmn.json is absent.
 function loadConfig () {
-    const configPath = join(siteRoot, "llms-config.json");
-    if (existsSync(configPath)) {
-        return JSON.parse(readFileSync(configPath, "utf-8"));
+    for (const name of ["colvmn.json", "llms-config.json"]) {
+        const configPath = join(siteRoot, name);
+        if (existsSync(configPath)) {
+            return JSON.parse(readFileSync(configPath, "utf-8"));
+        }
     }
     return {};
 }
@@ -755,6 +766,14 @@ function loadConfig () {
 async function main () {
     const config = loadConfig();
     const siteUrl = config.siteUrl || "/";
+
+    let analyticsHtml;
+    try {
+        analyticsHtml = buildAnalyticsHtml(config.analytics);
+    } catch (e) {
+        console.error(`Static gen: ${e.message}`);
+        process.exit(1);
+    }
 
     // The site root must itself be a page. A siteRoot resolved one level too
     // high still finds every page below it, but none of them is ever isRoot,
@@ -781,7 +800,7 @@ async function main () {
     console.log(`Static gen: found ${pages.length} layout pages under ${siteRoot} (root: "${rootLabel}")`);
 
     for (const pageDir of pages) {
-        await generatePage(pageDir, siteUrl);
+        await generatePage(pageDir, siteUrl, analyticsHtml);
     }
 
     // Write sitemap.xml at site root

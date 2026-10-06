@@ -42,6 +42,7 @@ How it works:
 
 - `style.css` — base framework CSS (typography, page, cards, tables, timeline, hero, FAQ, mobile)
 - `static-gen.js` — Node.js generator that walks the site tree and rewrites each `index.html` (build-time render; also builds `layout/bundle.js`)
+- `analytics.js` — provider registry for the `analytics` section of `colvmn.json`; builds and injects the marked snippet blocks (build-time only, not bundled)
 - `layout/layout.js` — browser bootstrap; entry point for page-global runtime behavior
 - `layout/PageIndex.js` — page-level builder (`computePageHtml` for build; `render`/`postRender` for runtime — see "Rendering model")
 - `layout/ContentBase.js` — base class for content blocks (`computeHtml` = build markup; `postRender` = runtime behavior hook)
@@ -73,4 +74,5 @@ Top-level keys in `_index.json` (or `_index.md` frontmatter) recognised by the e
 - `title`, `subtitle`, `topTitle`, `cardSubtitle` — header / intro / parent-card text
 - `pageLayout` — adds a `page-{value}` class to the `.page` div for layout variants
 - `heroImage`, `heroLayout`, `heroAspect` — hero block configuration
+- `analytics: false` — omit the site's analytics snippets (from `colvmn.json`) on this page.
 - `nextSectionLink: true` — render a footer link at the bottom of the page pointing to the next sibling (taken from the parent's `ContentCards` items list). Falls back to an up-link to the parent if this page is the last sibling. Opt-in per page; absent flag = no footer.
