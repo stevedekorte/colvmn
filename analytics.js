@@ -70,6 +70,19 @@ const PROVIDERS = {
     },
 };
 
+// Per-browser opt-out, e.g. for the site owner's own visits. Opening any page
+// with ?analytics=off sets OPT_OUT_KEY in localStorage (per origin), and from
+// then on that browser's pages start no analytics; ?analytics=on clears it.
+// The snippets sit inert in a <template>; the loader after it copies them into
+// the page, re-creating each <script> so it runs, unless the browser opted out.
+export const OPT_OUT_KEY = "colvmn:no-analytics";
+
+const LOADER = `<script>(function(){var k=${JSON.stringify(OPT_OUT_KEY)},me=document.currentScript;try{var m=/[?&]analytics=(off|on)\\b/.exec(location.search);if(m){if(m[1]==="off")localStorage.setItem(k,"1");else localStorage.removeItem(k);console.info("analytics "+m[1]+" for this browser")}if(localStorage.getItem(k))return}catch(e){}var t=me.previousElementSibling;t.content.childNodes.forEach(function(n){var c;if(n.nodeName==="SCRIPT"){c=document.createElement("script");for(var i=0;i<n.attributes.length;i++)c.setAttribute(n.attributes[i].name,n.attributes[i].value);if(!n.hasAttribute("async"))c.async=false;c.text=n.text}else c=document.importNode(n,true);me.parentNode.insertBefore(c,me)})})();</script>`;
+
+function guarded (html) {
+    return html ? `<template data-colvmn-analytics>\n${html}\n</template>\n${LOADER}` : "";
+}
+
 // Turn the "analytics" config section into { head, body } HTML strings.
 // Throws with a readable message on unknown providers or bad values.
 export function buildAnalyticsHtml (analytics) {
@@ -107,7 +120,7 @@ export function buildAnalyticsHtml (analytics) {
             out[provider.placement].push(provider.html(c));
         }
     }
-    return { head: out.head.join("\n"), body: out.body.join("\n") };
+    return { head: guarded(out.head.join("\n")), body: guarded(out.body.join("\n")) };
 }
 
 // Replace the marked analytics blocks in a page. Each build strips whatever

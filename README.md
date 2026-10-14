@@ -134,6 +134,7 @@ The `analytics` section adds tracking snippets to every generated page — one k
 
 - Snippets are written between `<!-- colvmn:analytics -->` markers and rebuilt on every regen, so changing or removing a provider takes effect cleanly.
 - A page opts out with `analytics: false` in its frontmatter / `_index.json`.
+- A browser opts out by opening any page with `?analytics=off` (e.g. the site owner's own browsers, so their visits aren't counted). It's remembered in that browser's `localStorage` for the whole site; `?analytics=on` undoes it. The snippets sit in an inert `<template>` and a small inline loader starts them only for browsers that haven't opted out.
 - IDs are validated before being written into HTML, and an unknown provider or field fails the build. `custom` is passed through as-is.
 - These IDs are public — they ship in every page — so `colvmn.json` is safe to commit. Never put an account id or API token here.
 - Google Analytics sets cookies, which may require a consent banner for EU visitors; colvmn doesn't provide one. The other built-in providers are cookie-free.

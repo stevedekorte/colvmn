@@ -42,7 +42,7 @@ How it works:
 
 - `style.css` — base framework CSS (typography, page, cards, tables, timeline, hero, FAQ, mobile)
 - `static-gen.js` — Node.js generator that walks the site tree and rewrites each `index.html` (build-time render; also builds `layout/bundle.js`)
-- `analytics.js` — provider registry for the `analytics` section of `colvmn.json`; builds and injects the marked snippet blocks (build-time only, not bundled)
+- `analytics.js` — provider registry for the `analytics` section of `colvmn.json`; builds and injects the marked snippet blocks (build-time only, not bundled); the snippets are wrapped in a `<template>` plus a loader that skips them in browsers opted out via `?analytics=off`
 - `layout/layout.js` — browser bootstrap; entry point for page-global runtime behavior
 - `layout/PageIndex.js` — page-level builder (`computePageHtml` for build; `render`/`postRender` for runtime — see "Rendering model")
 - `layout/ContentBase.js` — base class for content blocks (`computeHtml` = build markup; `postRender` = runtime behavior hook)
