@@ -101,6 +101,31 @@ function parseBlocks (lines) {
 
         if (line.trim() === "") { i++; continue; }
 
+        // Raw HTML / SVG block element (e.g., <svg>, <div>, <object>, <figure>, <picture>, etc.)
+        const rawHtmlBlockMatch = line.trim().match(/^<([A-Za-z][\w-]*)\b/);
+        if (rawHtmlBlockMatch) {
+            const tagName = rawHtmlBlockMatch[1].toLowerCase();
+            const inlineFormattingTags = new Set(["a", "span", "b", "i", "em", "strong", "code", "sub", "sup", "small", "mark", "del", "ins", "abbr", "cite", "kbd"]);
+            if (htmlElementNames.has(tagName) && !inlineFormattingTags.has(tagName)) {
+                const htmlLines = [line];
+                i++;
+                const closingTag = `</${tagName}>`;
+                const isSingleLineSelfClosed = line.toLowerCase().includes(closingTag) || line.trim().endsWith("/>");
+                if (!isSingleLineSelfClosed) {
+                    while (i < lines.length) {
+                        htmlLines.push(lines[i]);
+                        if (lines[i].toLowerCase().includes(closingTag)) {
+                            i++;
+                            break;
+                        }
+                        i++;
+                    }
+                }
+                blocks.push({ type: "html", html: htmlLines.join("\n") });
+                continue;
+            }
+        }
+
         // Fenced code block
         if (line.trim().startsWith("```")) {
             const codeLines = [];
