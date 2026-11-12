@@ -75,4 +75,5 @@ Top-level keys in `_index.json` (or `_index.md` frontmatter) recognised by the e
 - `pageLayout` — adds a `page-{value}` class to the `.page` div for layout variants
 - `heroImage`, `heroLayout`, `heroAspect` — hero block configuration
 - `analytics: false` — omit the site's analytics snippets (from `colvmn.json`) on this page.
+- `llms: false` — leave this page and everything under it out of `llms.txt` / `llms-full.txt` (it is still generated and in the sitemap). Site-wide folder patterns go in `colvmn.json` as `llmsExclude`.
 - `nextSectionLink: true` — render a footer link at the bottom of the page pointing to the next sibling (taken from the parent's `ContentCards` items list). Falls back to an up-link to the parent if this page is the last sibling. Opt-in per page; absent flag = no footer.

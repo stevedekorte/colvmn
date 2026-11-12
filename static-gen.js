@@ -26,6 +26,7 @@
 
 import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { join, relative, dirname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -323,8 +324,14 @@ async function generatePage (pageDir) {
         return;
     }
 
-    const pageHtml = page.computePageHtml();
+    let pageHtml = page.computePageHtml();
     const docTitle = page.computeDocumentTitle();
+
+    // The build stamp goes on the site's root page only, so a new stamp
+    // rewrites one page, not all of them.
+    if (pageDir === siteRoot && siteBuildStamp) {
+        pageHtml += `<div class="build-stamp">${escapeHtml(siteBuildStamp)}</div>`;
+    }
 
     // The "loaded" class is the contract with the browser runtime: PageIndex.render
     // skips HTML generation when it sees it, so the markup written here is the single
@@ -492,6 +499,68 @@ function truncateDescription (text) {
     const lastSpace = truncated.lastIndexOf(" ");
     return (lastSpace > 100 ? truncated.slice(0, lastSpace) : truncated) + "...";
 }
+
+function escapeHtml (s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// ---------------------------------------------------------------------------
+// Pages left out of llms.txt / llms-full.txt
+// ---------------------------------------------------------------------------
+
+// A pattern without "/" matches a folder name at any depth ("_unused"); one
+// with "/" matches that path from the site root, and everything under it.
+function matchesLlmsExclude (relPath, patterns) {
+    const segments = relPath.split(sep);
+    const posixPath = segments.join("/");
+    return patterns.some(pattern => {
+        const p = pattern.replace(/\/+$/, "");
+        if (!p.includes("/")) return segments.includes(p);
+        return posixPath === p || posixPath.startsWith(p + "/");
+    });
+}
+
+// A page is left out when its path matches the site's "llmsExclude", or when
+// it or any page folder above it says "llms": false.
+function isExcludedFromLlms (pageDir, patterns) {
+    const relPath = relative(siteRoot, pageDir);
+    if (relPath && matchesLlmsExclude(relPath, patterns)) return true;
+    let dir = pageDir;
+    while (dir === siteRoot || dir.startsWith(siteRoot + sep)) {
+        const meta = readPageMeta(dir);
+        if (meta && meta.json && meta.json.llms === false) return true;
+        if (dir === siteRoot) break;
+        dir = dirname(dir);
+    }
+    return false;
+}
+
+// ---------------------------------------------------------------------------
+// Build stamp (opt-in via colvmn.json "buildStamp": true)
+// ---------------------------------------------------------------------------
+
+// Names the last commit that changed what the llms files contain: page
+// sources, minus excluded pages. Rebuilding without such a change leaves the
+// stamp as it was, so a job that commits only generated output, or only
+// excluded pages, never moves it. Null outside a git repo.
+function computeBuildStamp (excludedPages, siteTitle) {
+    const specs = [":(glob)**/_index.md", ":(glob)**/_index.json"];
+    for (const p of excludedPages) {
+        specs.push(`:(exclude)${relative(siteRoot, p).split(sep).join("/")}`);
+    }
+    let out = "";
+    try {
+        out = execFileSync("git", ["-C", siteRoot, "log", "-1", "--format=%h %cs", "--", ...specs],
+            { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    } catch {
+        return null;
+    }
+    if (!out) return null;
+    const [hash, date] = out.split(" ");
+    return `Site build: ${siteTitle} · ${date} · ${hash}`;
+}
+
+let siteBuildStamp = null;
 
 // ---------------------------------------------------------------------------
 // Sitemap generator
@@ -724,6 +793,7 @@ function generateLlmsIndex (pages) {
 
     let txt = `# ${rootTitle}\n\n`;
     if (rootSubtitle) txt += `> ${rootSubtitle}\n\n`;
+    if (siteBuildStamp) txt += `${siteBuildStamp}\n\n`;
 
     for (const group of sortedGroups) {
         const groupDir = join(siteRoot, group);
@@ -775,6 +845,7 @@ function generateLlmsFull (pages) {
     });
 
     let out = `# ${rootTitle} — Full Documentation\n\n`;
+    if (siteBuildStamp) out += `${siteBuildStamp}\n\n`;
     const summary = rootFirstParagraph();
     if (summary) out += `${summary}\n\n`;
     out += "See also: /llms.txt (curated index) and /sitemap.xml.\n\n";
@@ -845,7 +916,14 @@ function siteConfigFor (localRoot) {
     if (found && found.dir !== localRoot) {
         console.log(`  ${relative(siteRoot, localRoot) || "."}: using siteUrl/analytics from ${found.path}`);
     }
-    const config = { siteUrl, analyticsHtml };
+    // A site's own settings, never inherited from an enclosing site's config.
+    const own = found && found.dir === localRoot ? json : {};
+    const config = {
+        siteUrl,
+        analyticsHtml,
+        buildStamp: own.buildStamp === true,
+        llmsExclude: Array.isArray(own.llmsExclude) ? own.llmsExclude : [],
+    };
     siteConfigCache.set(localRoot, config);
     return config;
 }
@@ -855,7 +933,7 @@ function siteConfigFor (localRoot) {
 // ---------------------------------------------------------------------------
 
 async function main () {
-    const { siteUrl } = siteConfigFor(siteRoot);
+    const { siteUrl, buildStamp, llmsExclude } = siteConfigFor(siteRoot);
 
     // The site root must itself be a page. A siteRoot resolved one level too
     // high still finds every page below it, but none of them is ever isRoot,
@@ -898,6 +976,16 @@ async function main () {
     }
     console.log(`Static gen: found ${pages.length} layout pages under ${siteRoot} (root: "${rootLabel}")`);
 
+    const llmsPages = pages.filter(p => !isExcludedFromLlms(p, llmsExclude));
+    const excludedPages = pages.filter(p => !llmsPages.includes(p));
+    if (excludedPages.length) {
+        console.log(`  left out of llms.txt / llms-full.txt: ${excludedPages.length} pages`);
+    }
+    if (buildStamp) {
+        siteBuildStamp = computeBuildStamp(excludedPages, rootLabel);
+        console.log(`  build stamp: ${siteBuildStamp || "(none: not a git repo, or no committed pages)"}`);
+    }
+
     for (const pageDir of pages) {
         await generatePage(pageDir);
     }
@@ -908,12 +996,12 @@ async function main () {
     console.log(`  generated: sitemap.xml (${pages.length} URLs)`);
 
     // Write llms.txt (curated index for LLMs)
-    const llmsIndex = generateLlmsIndex(pages);
+    const llmsIndex = generateLlmsIndex(llmsPages);
     writeFileSync(join(siteRoot, "llms.txt"), llmsIndex);
     console.log("  generated: llms.txt");
 
     // Write llms-full.txt (full content for LLMs)
-    const llmsFull = generateLlmsFull(pages);
+    const llmsFull = generateLlmsFull(llmsPages);
     writeFileSync(join(siteRoot, "llms-full.txt"), llmsFull);
     console.log("  generated: llms-full.txt");
 

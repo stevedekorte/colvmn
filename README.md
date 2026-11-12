@@ -113,6 +113,19 @@ At the site root:
 
 A site without its own `colvmn.json` uses the nearest one in a folder above it, taking only `analytics` and `siteUrl` (extended by the folder path). This is how a nested site — e.g. a submodule's docs served inside a larger site — gets the enclosing site's analytics and URLs. Giving a site its own `colvmn.json` stops the upward search.
 
+#### What the llms files leave out — `llmsExclude` and `llms: false`
+
+`llms.txt` and `llms-full.txt` include every page unless told otherwise. Pages left out stay in the sitemap and are still generated; only the llms files skip them.
+
+- A page sets `llms: false` in its frontmatter (or `"llms": false` in `_index.json`) to leave out itself and everything under it.
+- A site lists folders in `colvmn.json`: `"llmsExclude": ["_unused", "drafts/old"]`. A name without `/` matches a folder of that name at any depth; one with `/` matches that path from the site root, and everything under it.
+
+#### Build stamp — `buildStamp`
+
+`"buildStamp": true` adds a line like `Site build: My Site · 2026-11-12 · 3c23b7b` to the top of `llms.txt` and `llms-full.txt` and to the bottom of the root page. It names the last commit that changed a page the llms files include, so rebuilding without such a change, or committing only generated output or excluded pages, leaves it as it was. Uncommitted edits don't count until they're committed. Nothing is written outside a git repo.
+
+`buildStamp` and `llmsExclude` belong to a site's own `colvmn.json`; a nested site doesn't inherit them.
+
 ### Nested sites
 
 A folder below the site root with its own `colvmn/` engine (typically a submodule's docs) is a nested site. The root build regenerates its pages too, rendering them as their own site (own root page, header and brand), so the output matches what the nested site's own build produces. Because those pages load their own engine's CSS and JS, the root build fails if a nested site's colvmn version differs from the root's — update the nested copy, then rerun.
