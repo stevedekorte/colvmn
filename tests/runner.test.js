@@ -12,6 +12,7 @@ import { main } from "../update.js";
 import { UpdateJobs } from "../update/UpdateJobs.js";
 import { JobRunner } from "../update/JobRunner.js";
 import { Git } from "../update/Git.js";
+import { Credentials } from "../update/Credentials.js";
 
 function git (root, ...args) {
     return execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
@@ -119,12 +120,12 @@ test("a script gets only the credentials it lists, and a missing one stops it", 
 writeFileSync("env.json", JSON.stringify(Object.keys(process.env).sort()));
 `;
     const job = JOB.replace("publish: direct", "publish: direct\nsecrets: [API_KEY]");
-    withRepo({ "Job/_update.md": job, "Job/job.js": script }, (root) => {
+    withRepo({ "Job/_update.md": job, "Job/job.js": script, "_credentials/API_KEY.json": "{}" }, (root) => {
         const theJob = UpdateJobs.inSite(root).inFolder("Job");
         const g = new Git(root);
         const missing = new JobRunner({ siteRoot: root, git: g, env: { PATH: process.env.PATH } }).run(theJob);
         assert.equal(missing.result, "failed");
-        assert.match(missing.message, /credential API_KEY is not set/);
+        assert.match(missing.message, /credential API_KEY has no value/);
 
         const env = { PATH: process.env.PATH, API_KEY: "k", OTHER_SECRET: "s" };
         const r = new JobRunner({ siteRoot: root, git: g, env }).run(theJob);
@@ -183,5 +184,75 @@ test("update files: on, watch and minInterval are checked", () => {
         assert.match(jobs.inFolder("A").problems().join(), /on must be push/);
         assert.match(jobs.inFolder("B").problems().join(), /schedule or an on: trigger, not both/);
         assert.match(jobs.inFolder("C").problems().join(), /minInterval must be/);
+    });
+});
+
+// --- step 3: credentials, the leak check, publish: pr ---
+
+const KEY_JOB = JOB.replace("publish: direct", "publish: direct\nsecrets: [API_KEY]");
+
+test("credentials: the nearest description wins, blocked refuses, and a job lists what it gets", () => {
+    withRepo({
+        "_credentials/API_KEY.json": "{}",
+        "Open/_update.md": KEY_JOB, "Open/job.js": APPEND,
+        "Closed/_credentials/API_KEY.json": "{ \"blocked\": true }",
+        "Closed/_update.md": KEY_JOB, "Closed/job.js": APPEND,
+        "Undescribed/_update.md": KEY_JOB.replace("API_KEY", "OTHER_KEY"), "Undescribed/job.js": APPEND
+    }, (root) => {
+        const creds = new Credentials(root, { API_KEY: "a-long-key-value", OTHER_KEY: "another-value" });
+        const jobs = UpdateJobs.inSite(root);
+        assert.deepEqual(creds.forJob(jobs.inFolder("Open")), { values: { API_KEY: "a-long-key-value" }, problems: [] });
+        assert.match(creds.forJob(jobs.inFolder("Closed")).problems.join(), /API_KEY is blocked for this folder/);
+        assert.match(creds.forJob(jobs.inFolder("Undescribed")).problems.join(), /OTHER_KEY isn't described/);
+    });
+});
+
+test("credentials: values from .secret files, unless locked by git-crypt; formats are checked", () => {
+    withRepo({
+        "_credentials/STRIPE_KEY.json": "{ \"pattern\": \"^rk_\" }",
+        "_credentials/STRIPE_KEY.secret": "rk_live_abcdef\n",
+        "_credentials/SERVICE.json": "{ \"format\": \"json\" }",
+        "_credentials/SERVICE.secret": "not json",
+        "_credentials/LOCKED.json": "{}",
+        "_credentials/LOCKED.secret": "\u0000GITCRYPT\u0000ciphertext",
+        "Job/_update.md": JOB
+    }, (root) => {
+        const creds = new Credentials(root, {});
+        const folder = join(root, "Job");
+        assert.deepEqual(creds.resolve("STRIPE_KEY", folder), { value: "rk_live_abcdef" });
+        assert.match(creds.resolve("SERVICE", folder).problem, /should be JSON/);
+        assert.match(creds.resolve("LOCKED", folder).problem, /has no value/);
+        assert.deepEqual(new Credentials(root, { LOCKED: "from-env" }).resolve("LOCKED", folder), { value: "from-env" });
+        const wrong = new Credentials(root, { STRIPE_KEY: "sk_live_x" }).resolve("STRIPE_KEY", folder);
+        assert.match(wrong.problem, /should match \^rk_/);
+        assert.doesNotMatch(wrong.problem, /sk_live_x/);
+    });
+});
+
+test("the leak check refuses a change that contains a credential value", () => {
+    const script = `import { writeFileSync } from "node:fs";
+writeFileSync("out.txt", "key: " + process.env.API_KEY);
+`;
+    withRepo({ "Job/_update.md": KEY_JOB, "Job/job.js": script, "_credentials/API_KEY.json": "{}" }, (root) => {
+        const before = git(root, "rev-parse", "HEAD");
+        const r = new JobRunner({ siteRoot: root, git: new Git(root), env: { PATH: process.env.PATH, API_KEY: "secret-value-123" } })
+            .run(UpdateJobs.inSite(root).inFolder("Job"));
+        assert.equal(r.result, "failed");
+        assert.equal(r.message, "Job/out.txt contains the value of credential API_KEY");
+        assert.equal(git(root, "rev-parse", "HEAD"), before);
+        assert.equal(git(root, "status", "--porcelain"), "");
+    });
+});
+
+test("publish: pr commits on the job's branch, returns, and waits while that branch exists", () => {
+    const job = JOB.replace("publish: direct", "publish: pr");
+    withRepo({ "Job/_update.md": job, "Job/job.js": APPEND }, (root) => {
+        const base = git(root, "rev-parse", "--abbrev-ref", "HEAD");
+        const before = git(root, "rev-parse", "HEAD");
+        assert.match(run([root]).out, /Job: changed — committed on colvmn-update\/Job \(not pushed/);
+        assert.equal(git(root, "rev-parse", "--abbrev-ref", "HEAD"), base);
+        assert.equal(git(root, "rev-parse", "HEAD"), before);
+        assert.match(git(root, "log", "-1", "--format=%s", "colvmn-update/Job"), /^Job: update/);
+        assert.match(run([root, "--now", "2099-01-01T00:00:00Z"]).out, /Job: nothing — an earlier update is awaiting review on colvmn-update\/Job/);
     });
 });

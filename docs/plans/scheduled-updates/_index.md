@@ -3,7 +3,7 @@ subtitle: Folders that refresh their own pages on a schedule. An update file in 
 ---
 # Scheduled Updates
 
-> Status (2026-11-12): **design settled; script jobs run** (on `main`). `update.js` finds jobs, decides which are due (schedule or `on: push`, `watch`, `minInterval`), runs script jobs with only their listed credentials, checks `writes`, rebuilds the pages, records the run and commits it (`publish: direct`), and pushes with `--push`. Next: credential files and the leak check, `publish: pr`, then prompt jobs. Agreed with Steve 2026-11-09, 2026-11-10 and 2026-11-12.
+> Status (2026-11-12): **design settled; script jobs run** (on `main`). `update.js` finds jobs, decides which are due (schedule or `on: push`, `watch`, `minInterval`), runs script jobs with only their listed credentials, resolves credentials from `_credentials/` (nearest description, `blocked`, `.secret` files or environment variables, format checks), checks `writes`, rebuilds the pages, refuses changes containing a credential value, records the run, and publishes (`direct`, or `pr` on a branch per job, pushed and opened with `--push`). Next: prompt jobs, email, the workflow template and the docs page. Agreed with Steve 2026-11-09, 2026-11-10 and 2026-11-12.
 >
 > This plan covers the general colvmn feature. Site-specific setup lives with each site; the first site is undreamedof.biz (Uo repo: `Servers/GameServer/docs/Plans/Scheduled Updates`).
 
@@ -184,9 +184,9 @@ A site can ask the runner to send an email after jobs run. Off by default. Set i
 - Update-file parsing (frontmatter with lists). **(done, step 1)**
 - Script jobs: run with only their listed credentials, as environment variables. **(done, step 2)**
 - Prompt jobs: Claude Code headless, restricted tools, budget stop, reported cost.
-- Credentials: look-up from folder to root, `blocked`, `secrets:` lists, prompt jobs refused credentials, value loading from `.secret` files (or from environment variables when present), format checks.
-- Checks after a run: `writes`, leaked values.
-- Publishing: `direct` **(done, step 2)** and `pr`.
+- Credentials: look-up from folder to root, `blocked`, `secrets:` lists, prompt jobs refused credentials, value loading from `.secret` files (or from environment variables when present; the variable wins), format checks (`pattern`, `format: json`). **(done, step 3)**
+- Checks after a run: `writes` **(done, step 2)**, leaked values **(done, step 3)**.
+- Publishing: `direct` **(done, step 2)** and `pr` **(done, step 3)**: a branch per job, `colvmn-update/<folder>`; with `--push` it is pushed and a PR opened with `gh`; while the branch exists the job waits rather than open another.
 - Page footer: last update and its cost.
 - A workflow template sites copy, for GitHub-hosted and self-hosted runners.
 - Tests: due logic, credential look-up and blocking, the `writes` check, the leak check, a prompt job refused credentials.

@@ -73,4 +73,44 @@ export class Git {
     push () {
         return this.run(["push", "-q"]);
     }
+
+    /** The current branch, or the commit when HEAD is detached. */
+    currentBranch () {
+        const name = this.run(["rev-parse", "--abbrev-ref", "HEAD"]);
+        return name === "HEAD" ? this.head() : name;
+    }
+
+    /** Whether a branch exists here, or on origin. */
+    branchExists (name) {
+        try {
+            this.run(["rev-parse", "--verify", "--quiet", `refs/heads/${name}`]);
+            return true;
+        } catch {
+            return this.remoteBranchExists(name);
+        }
+    }
+
+    remoteBranchExists (name) {
+        try {
+            return this.run(["ls-remote", "--heads", "origin", name]) !== "";
+        } catch {
+            return false;
+        }
+    }
+
+    checkoutNewBranch (name) {
+        this.run(["checkout", "-q", "-b", name]);
+    }
+
+    checkout (ref) {
+        this.run(["checkout", "-q", ref]);
+    }
+
+    pushBranch (name) {
+        this.run(["push", "-q", "-u", "origin", name]);
+    }
+
+    deleteBranch (name) {
+        this.run(["branch", "-q", "-D", name]);
+    }
 }

@@ -9,7 +9,7 @@
  * Usage:
  *   node colvmn/update.js                           # run every scheduled job that is due, and commit each
  *   node colvmn/update.js --on push                 # run every on: push job whose watched paths changed
- *   node colvmn/update.js --push                    # ... and push the commits
+ *   node colvmn/update.js --push                    # ... and push the commits, and open PRs
  *   node colvmn/update.js --folder Competition      # run one job now, due or not
  *   node colvmn/update.js --dry-run                 # every job: due or not, and what it would be given
  *   node colvmn/update.js --dry-run --folder Competition
@@ -17,8 +17,9 @@
  *   node colvmn/update.js --dry-run --now 2026-11-10T07:30:00Z   # as if at another time
  *   node colvmn/update.js --dry-run --json          # the same, as JSON
  *
- * Script jobs run and publish directly (publish: direct). Prompt jobs and
- * publish: pr are not built yet; such jobs are reported as failed. The runner
+ * Script jobs run and publish (publish: direct commits here; publish: pr
+ * commits on a branch, and --push pushes it and opens the PR). Prompt jobs
+ * are not built yet; such jobs are reported as failed. The runner
  * refuses to start on a working tree with uncommitted changes. See
  * update/JobRunner.js for what a script gets and how its exit status is read.
  */
@@ -28,6 +29,7 @@ import { fileURLToPath } from "node:url";
 import { UpdateJobs } from "./update/UpdateJobs.js";
 import { JobRunner } from "./update/JobRunner.js";
 import { Git } from "./update/Git.js";
+import { Credentials } from "./update/Credentials.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -110,7 +112,12 @@ export function main (argv) {
     if (!options.dryRun) {
         return runJobs(selected, options, git, context);
     }
-    const descriptions = selected.map(j => j.describe(options.now, context));
+    const credentials = new Credentials(options.siteRoot);
+    const descriptions = selected.map(j => {
+        const d = j.describe(options.now, context);
+        d.problems.push(...credentials.forJob(j).problems);
+        return d;
+    });
     if (options.json) {
         console.log(JSON.stringify({ siteRoot: options.siteRoot, now: options.now.toISOString(), jobs: descriptions }, null, 2));
         return 0;
@@ -142,7 +149,7 @@ export function runJobs (selected, options, git, context) {
         console.log(`No jobs due (${options.trigger}).`);
         return 0;
     }
-    const runner = new JobRunner({ siteRoot: options.siteRoot, git, now: options.now });
+    const runner = new JobRunner({ siteRoot: options.siteRoot, git, now: options.now, push: options.push });
     const results = toRun.map(job => ({ job, ...runner.run(job) }));
     results.forEach(r => console.log(`${r.job.folderName()}: ${r.result} — ${r.message}`));
     if (options.push && results.some(r => r.commit)) {

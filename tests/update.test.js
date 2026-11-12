@@ -172,7 +172,12 @@ test("a recorded run makes the job not due until its schedule comes round", () =
 // --- the command ---
 
 test("--dry-run lists the jobs; --folder picks one; without --dry-run nothing runs", () => {
-    withSite({ "Competition/_update.md": COMPETITION, "Usage/_update.md": USAGE }, (root) => {
+    withSite({
+        "Competition/_update.md": COMPETITION,
+        "Usage/_update.md": USAGE,
+        "_credentials/GCP_PROD_READER.json": "{}",
+        "_credentials/GCP_PROD_READER.secret": "service-account-json"
+    }, (root) => {
         const out = [];
         const log = console.log;
         console.log = (s) => out.push(String(s));
