@@ -23,7 +23,9 @@ import { dirname, join, relative, sep } from "node:path";
 export const UPDATE_FILE_NAME = "_update.md";
 
 const PUBLISH_MODES = ["pr", "direct"];
-const KNOWN_KEYS = ["schedule", "target", "writes", "publish", "model", "budget", "run", "secrets"];
+const KNOWN_KEYS = ["schedule", "on", "watch", "minInterval", "target", "writes", "publish", "model", "budget", "run", "secrets"];
+const TRIGGERS = ["push"];
+const INTERVAL_UNITS = { m: 60e3, h: 3600e3, d: 86400e3, w: 7 * 86400e3 };
 const SECRET_NAME = /^[A-Z][A-Z0-9_]*$/;
 
 export class UpdateFile {
@@ -64,6 +66,35 @@ export class UpdateFile {
 
     schedule () {
         return this.fields.schedule || null;
+    }
+
+    /** What starts the job: "push" (`on: push`), else "schedule". */
+    trigger () {
+        return this.fields.on === undefined ? "schedule" : this.fields.on;
+    }
+
+    /**
+     * What the job watches: folders or globs relative to the site root. The
+     * job runs only when one of them changed since its last run. Empty: no
+     * condition.
+     */
+    watch () {
+        const w = this.fields.watch;
+        if (w === undefined) {
+            return [];
+        }
+        return Array.isArray(w) ? w.map(String) : [String(w)];
+    }
+
+    /** The watch list as git pathspecs: a folder or file as it is, a glob with glob magic. */
+    watchPathspecs () {
+        return this.watch().map(w => /[*?[]/.test(w) ? `:(glob)${w}` : w.replace(/\/+$/, ""));
+    }
+
+    /** The least time between runs, in milliseconds, or null for none. */
+    minIntervalMs () {
+        const m = String(this.fields.minInterval ?? "").trim().match(/^(\d+)\s*([mhdw])$/);
+        return m ? Number(m[1]) * INTERVAL_UNITS[m[2]] : null;
     }
 
     /** The page the job refreshes: the file's `target`, else the folder's own page. */
@@ -115,6 +146,7 @@ export class UpdateFile {
         return [
             ...this.unknownKeyProblems(),
             ...this.scheduleProblems(),
+            ...this.minIntervalProblems(),
             ...this.publishProblems(),
             ...this.budgetProblems(),
             ...this.secretProblems(),
@@ -127,7 +159,21 @@ export class UpdateFile {
     }
 
     scheduleProblems () {
-        return this.schedule() ? [] : ["no schedule (daily, weekly, monthly, or a cron string)"];
+        if (this.fields.on !== undefined) {
+            const problems = TRIGGERS.includes(this.fields.on) ? [] : [`on must be push, not "${this.fields.on}"`];
+            if (this.schedule()) {
+                problems.push("a job has a schedule or an on: trigger, not both");
+            }
+            return problems;
+        }
+        return this.schedule() ? [] : ["no schedule (daily, weekly, monthly, or a cron string) and no on: trigger"];
+    }
+
+    minIntervalProblems () {
+        if (this.fields.minInterval === undefined || this.minIntervalMs() !== null) {
+            return [];
+        }
+        return [`minInterval must be a number and a unit (m, h, d or w), e.g. 30d, not "${this.fields.minInterval}"`];
     }
 
     publishProblems () {

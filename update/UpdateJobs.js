@@ -30,7 +30,7 @@ export class UpdateJob {
         return join(this.updateFile.folder(), STATE_FILE_NAME);
     }
 
-    /** The saved state: { lastRun, lastCost, lastResult }, or {} before the first run. */
+    /** The saved state: { lastRun, lastCost, lastResult, lastCommit }, or {} before the first run. */
     state () {
         if (!existsSync(this.statePath())) {
             return {};
@@ -60,29 +60,75 @@ export class UpdateJob {
         return problems;
     }
 
-    isDue (now) {
-        return this.problems().length === 0 && this.schedule().isDue(this.lastRun(), now);
+    /**
+     * Whether the job should run now: its trigger has fired, it is past its
+     * minInterval, and something it watches has changed.
+     * @param {Date} now
+     * @param {{ trigger?: string, git?: Git }} context - the trigger this
+     *   invocation is for ("schedule" by default), and the site's git, for watch
+     */
+    isDue (now, context = {}) {
+        return this.problems().length === 0
+            && this.triggerFires(now, context.trigger || "schedule")
+            && !this.isWithinMinInterval(now)
+            && this.watchedPathsChanged(context.git);
+    }
+
+    triggerFires (now, trigger) {
+        if (this.updateFile.trigger() !== "schedule") {
+            return trigger === this.updateFile.trigger();
+        }
+        return trigger === "schedule" && this.schedule().isDue(this.lastRun(), now);
+    }
+
+    isWithinMinInterval (now) {
+        const interval = this.updateFile.minIntervalMs();
+        const last = this.lastRun();
+        return interval !== null && last !== null && now.getTime() - last.getTime() < interval;
+    }
+
+    /**
+     * Whether a watched path changed since the commit recorded at the last
+     * run. The job's own writes and the runner's state files never count, so
+     * a job's own output can't make it due; another job's output can. With no
+     * watch list, no recorded commit, or no git, the answer is yes.
+     */
+    watchedPathsChanged (git) {
+        const specs = this.updateFile.watchPathspecs();
+        const since = this.state().lastCommit;
+        if (specs.length === 0 || !git || !since || !git.hasCommit(since)) {
+            return true;
+        }
+        return git.hasChangesSince(since, [...specs, ...this.ownOutputExcludes()]);
+    }
+
+    ownOutputExcludes () {
+        return [...this.updateFile.writes().map(w => `:(exclude,glob)${w}`), `:(exclude,glob)**/${STATE_FILE_NAME}`];
     }
 
     /**
      * Records a run, for the next due check.
-     * @param {{ at: Date, cost?: number, result: string }} run
+     * @param {{ at: Date, cost?: number, result: string, commit?: string }} run -
+     *   `commit` is the commit the run started from; watch looks at changes after it
      */
-    recordRun ({ at, cost = null, result }) {
-        const state = { lastRun: at.toISOString(), lastCost: cost, lastResult: result };
+    recordRun ({ at, cost = null, result, commit = null }) {
+        const state = { lastRun: at.toISOString(), lastCost: cost, lastResult: result, lastCommit: commit };
         writeFileSync(this.statePath(), JSON.stringify(state, null, 4) + "\n");
         return this;
     }
 
     /** A plain description for --dry-run and logs. */
-    describe (now) {
+    describe (now, context = {}) {
         const f = this.updateFile;
         return {
             folder: this.folderName(),
             kind: f.kind(),
             schedule: f.schedule(),
+            trigger: f.trigger(),
+            watch: f.watch(),
+            minInterval: f.fields.minInterval ?? null,
             lastRun: this.state().lastRun || null,
-            due: this.isDue(now),
+            due: this.isDue(now, context),
             target: f.target(),
             writes: f.writes(),
             publish: f.publish(),
@@ -115,8 +161,8 @@ export class UpdateJobs {
         return this.jobs;
     }
 
-    due (now) {
-        return this.jobs.filter(j => j.isDue(now));
+    due (now, context = {}) {
+        return this.jobs.filter(j => j.isDue(now, context));
     }
 
     /** The job whose folder is this one (relative to the site root), or null. */

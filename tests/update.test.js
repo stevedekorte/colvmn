@@ -165,7 +165,7 @@ test("a recorded run makes the job not due until its schedule comes round", () =
         job.recordRun({ at: at("2026-11-10T07:30:00Z"), cost: 0.42, result: "published" });
         assert.equal(job.isDue(at("2026-11-12T07:30:00Z")), false);
         assert.equal(job.isDue(at("2026-11-17T07:30:00Z")), true);
-        assert.deepEqual(job.state(), { lastRun: "2026-11-10T07:30:00.000Z", lastCost: 0.42, lastResult: "published" });
+        assert.deepEqual(job.state(), { lastRun: "2026-11-10T07:30:00.000Z", lastCost: 0.42, lastResult: "published", lastCommit: null });
     });
 });
 
@@ -185,8 +185,7 @@ test("--dry-run lists the jobs; --folder picks one; without --dry-run nothing ru
             assert.equal(main([root, "--dry-run", "--folder", "Competition", "--json"]), 0);
             assert.deepEqual(JSON.parse(out.join("\n")).jobs.map(j => j.folder), ["Competition"]);
             out.length = 0;
-            assert.equal(main([root]), 2);
-            assert.match(out.join("\n"), /Nothing was changed/);
+            assert.throws(() => main([root]), /not in a git repo/);
         } finally {
             console.log = log;
         }

@@ -3,7 +3,7 @@ subtitle: Folders that refresh their own pages on a schedule. An update file in 
 ---
 # Scheduled Updates
 
-> Status (2026-11-12): **design settled; step 1 done** on the `scheduled-updates` branch (`d36751e`, not pushed): `update.js` finds jobs, reads their settings, decides which are due, keeps the last run, and reports with `--dry-run`. Running jobs comes next. Agreed with Steve 2026-11-09 and 2026-11-10.
+> Status (2026-11-12): **design settled; script jobs run** (on `main`). `update.js` finds jobs, decides which are due (schedule or `on: push`, `watch`, `minInterval`), runs script jobs with only their listed credentials, checks `writes`, rebuilds the pages, records the run and commits it (`publish: direct`), and pushes with `--push`. Next: credential files and the leak check, `publish: pr`, then prompt jobs. Agreed with Steve 2026-11-09, 2026-11-10 and 2026-11-12.
 >
 > This plan covers the general colvmn feature. Site-specific setup lives with each site; the first site is undreamedof.biz (Uo repo: `Servers/GameServer/docs/Plans/Scheduled Updates`).
 
@@ -127,7 +127,7 @@ run: classTree.js
 - **Without `watch`:** as today. A scheduled job runs on its schedule; a push job runs on every push.
 - **Paths are relative to the site root**, not the job's folder: a job usually watches something outside its own folder (a class-hierarchy job in `docs/` watches `source/`).
 - **Folders or globs:** `source` means `source/**`.
-- **Generated output and job output are never counted as changes**, whatever `watch` says, so no job triggers itself.
+- **A job's own output never counts as a change** (its `writes`, and every `_update.state.json`), so no job triggers itself. Other jobs' output does count: that is how one job triggers another.
 - `minInterval`: a floor between runs, so a site edited daily doesn't rerun a costly job daily.
 - One job can trigger another by writing a file the other watches. Example: a cheap daily script checks providers' model lists and writes `models.json` (published as a PR, since "top model" needs a human to confirm); the review job watches it.
 
@@ -144,7 +144,7 @@ on: push           # instead of schedule
 run: classTree.js
 ```
 
-A workflow that fires on each push to the site's main branch runs the runner with `--on push`, which runs every job with `on: push` whose `watch` paths the push touched (or every one without `watch`), and commits their output as one follow-up commit. Keeping these in the runner rather than in a separate release script keeps every "page that refreshes itself" in one place, with one log. (The strvct site treats every push of code as a release; decided 2026-11-12.)
+A workflow that fires on each push to the site's main branch runs the runner with `--on push`, which runs every job with `on: push` whose `watch` paths the push touched (or every one without `watch`), and commits each job's output as its own commit. Keeping these in the runner rather than in a separate release script keeps every "page that refreshes itself" in one place, with one log. (The strvct site treats every push of code as a release; decided 2026-11-12.)
 
 The workflow must not fire on its own follow-up commit: it ignores pushes that change only generated output and job output (`paths-ignore`). GitHub also doesn't start workflow runs for commits pushed with the workflow's own `GITHUB_TOKEN`, but a self-hosted runner pushing with another credential would, so the path filter is the guard to rely on.
 
@@ -154,7 +154,7 @@ A site that prefers one commit per push can instead use a CI check that fails wh
 
 A job whose output changes something it watches retriggers itself. Found in the AI Reviews design: the runner rebuilds the pages after a run, the rebuild rewrote the build stamp in `llms-full.txt`, and the job watched `llms-full.txt`. Three rules:
 
-1. **Record the commit the run produced**, not the one it started from, as the last run's commit. `watch` compares against that, so a run's own changes never count as new input.
+1. **A run's own changes never count as new input.** The state file records the commit the run started from (it can't name the commit it is part of), and `watch` ignores the job's own `writes` and the state files, so the run's commit adds nothing `watch` sees.
 2. **"Nothing to do" leaves no trace.** A script job can exit with a reserved status meaning nothing changed; the runner then commits nothing and doesn't rebuild. It only updates the last-checked time in `_update.state.json`, which is not a watched file. `watch` then only decides whether to check, and a job decides for itself, cheaply, whether anything really changed (e.g. by comparing an input hash).
 3. **Stable stamps.** A site's build stamp should name the last commit that changed sources, not the latest commit, or every job's own commit changes every page that carries it.
 
@@ -182,13 +182,14 @@ A site can ask the runner to send an email after jobs run. Off by default. Set i
 
 - `update.js`: discovery, due check, `--folder`, `--dry-run`, last-run state. **(done, step 1)**
 - Update-file parsing (frontmatter with lists). **(done, step 1)**
-- Script jobs: run with only their listed credentials, as environment variables.
+- Script jobs: run with only their listed credentials, as environment variables. **(done, step 2)**
 - Prompt jobs: Claude Code headless, restricted tools, budget stop, reported cost.
 - Credentials: look-up from folder to root, `blocked`, `secrets:` lists, prompt jobs refused credentials, value loading from `.secret` files (or from environment variables when present), format checks.
 - Checks after a run: `writes`, leaked values.
-- Publishing: `direct` and `pr`.
+- Publishing: `direct` **(done, step 2)** and `pr`.
 - Page footer: last update and its cost.
 - A workflow template sites copy, for GitHub-hosted and self-hosted runners.
 - Tests: due logic, credential look-up and blocking, the `writes` check, the leak check, a prompt job refused credentials.
 - colvmn docs: a "Scheduled updates" page (authoring an update file, credentials, running jobs by hand, setting up a runner), then push to colvmn.
-- `watch` / `minInterval`; the public-repo credentials path; `on: push` and `--on push`; recording the produced commit; the "nothing to do" exit status; optional email notifications.
+- `watch` / `minInterval`, `on: push` and `--on push`, the run's own changes not counting, the "nothing to do" exit status. **(done, step 2)**
+- The public-repo credentials path (values from environment variables works; the workflow template is still to do); optional email notifications.
