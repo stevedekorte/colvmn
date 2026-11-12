@@ -18,6 +18,9 @@ colvmn/
     ContentBase.js     # base class for content blocks
     Content*.js        # content block renderers (Text, Cards, Table, Image, Timeline, ...)
     MarkdownParser.js  # frontmatter + markdown → page JSON
+  update.js            # scheduled-updates runner (see "Scheduled updates")
+  update/              # its parts: update files, schedules, credentials, runner, notifier, workflow template
+  tests/               # npm test
 ```
 
 ## Usage as a submodule
@@ -125,6 +128,17 @@ A site without its own `colvmn.json` uses the nearest one in a folder above it, 
 `"buildStamp": true` adds a line like `Site build: My Site · 2026-11-12 · 3c23b7b` to the top of `llms.txt` and `llms-full.txt` and to the bottom of the root page. It names the last commit that changed a page the llms files include, so rebuilding without such a change, or committing only generated output or excluded pages, leaves it as it was. Uncommitted edits don't count until they're committed. Nothing is written outside a git repo.
 
 `buildStamp` and `llmsExclude` belong to a site's own `colvmn.json`; a nested site doesn't inherit them.
+
+### Scheduled updates
+
+A folder with an `_update.md` refreshes its own page: on a schedule or on push, when what it `watch`es changed, by running a Node script or a Claude prompt. The runner checks what the job changed, rebuilds the pages, and commits it or opens a pull request:
+
+```bash
+node colvmn/update.js --dry-run       # what is due, and what each job would be given
+node colvmn/update.js --push          # run the due jobs, push, open PRs
+```
+
+Credentials are described in `_credentials/` folders and given only to the script jobs that list them. `update/workflow-template.yml` runs it from GitHub Actions. The full guide is the "Scheduled Updates" page (`scheduled-updates/_index.md`).
 
 ### Nested sites
 

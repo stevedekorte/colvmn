@@ -30,6 +30,7 @@ import { UpdateJobs } from "./update/UpdateJobs.js";
 import { JobRunner } from "./update/JobRunner.js";
 import { Git } from "./update/Git.js";
 import { Credentials } from "./update/Credentials.js";
+import { Notifier } from "./update/Notifier.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -103,14 +104,19 @@ export function describeJobLines (description) {
     return lines;
 }
 
-export function main (argv) {
+/**
+ * @param {string[]} argv
+ * @param {Object} [report] - filled with { results, handedOut } when jobs run, for notifications
+ * @returns {number} exit status
+ */
+export function main (argv, report = {}) {
     const options = parseArgs(argv);
     const jobs = UpdateJobs.inSite(options.siteRoot);
     const selected = selectJobs(jobs, options);
     const git = new Git(options.siteRoot);
     const context = { trigger: options.trigger, git: git.isRepo() ? git : null };
     if (!options.dryRun) {
-        return runJobs(selected, options, git, context);
+        return runJobs(selected, options, git, context, report);
     }
     const credentials = new Credentials(options.siteRoot);
     const descriptions = selected.map(j => {
@@ -137,7 +143,7 @@ export function main (argv) {
  * on its own, and pushes the commits with --push.
  * @returns {number} exit status: 1 if any job failed
  */
-export function runJobs (selected, options, git, context) {
+export function runJobs (selected, options, git, context, report = {}) {
     if (!context.git) {
         throw new Error(`${options.siteRoot} is not in a git repo; jobs commit what they change`);
     }
@@ -151,6 +157,8 @@ export function runJobs (selected, options, git, context) {
     }
     const runner = new JobRunner({ siteRoot: options.siteRoot, git, now: options.now, push: options.push });
     const results = toRun.map(job => ({ job, ...runner.run(job) }));
+    report.results = results;
+    report.handedOut = runner.handedOut;
     results.forEach(r => console.log(`${r.job.folderName()}: ${r.result} — ${r.message}`));
     if (options.push && results.some(r => r.commit)) {
         git.push();
@@ -159,9 +167,23 @@ export function runJobs (selected, options, git, context) {
     return results.some(r => r.result === "failed") ? 1 : 0;
 }
 
+/** Emails a summary of the run, when the site turns notifications on. */
+export async function notify (argv, report) {
+    if (!report.results || report.results.length === 0) {
+        return;
+    }
+    const notifier = Notifier.forSite(parseArgs(argv).siteRoot);
+    if (notifier) {
+        console.log(await notifier.send(report.results, report.handedOut));
+    }
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+    const argv = process.argv.slice(2);
+    const report = {};
     try {
-        process.exitCode = main(process.argv.slice(2));
+        process.exitCode = main(argv, report);
+        await notify(argv, report);
     } catch (e) {
         console.error(e.message);
         process.exitCode = 1;

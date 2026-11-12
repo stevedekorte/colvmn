@@ -23,7 +23,7 @@ import { dirname, join, relative, sep } from "node:path";
 export const UPDATE_FILE_NAME = "_update.md";
 
 const PUBLISH_MODES = ["pr", "direct"];
-const KNOWN_KEYS = ["schedule", "on", "watch", "minInterval", "target", "writes", "publish", "model", "budget", "run", "secrets"];
+const KNOWN_KEYS = ["schedule", "on", "watch", "minInterval", "target", "writes", "publish", "model", "budget", "run", "secrets", "notify"];
 const TRIGGERS = ["push"];
 const INTERVAL_UNITS = { m: 60e3, h: 3600e3, d: 86400e3, w: 7 * 86400e3 };
 const SECRET_NAME = /^[A-Z][A-Z0-9_]*$/;

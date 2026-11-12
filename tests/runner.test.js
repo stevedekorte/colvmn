@@ -13,6 +13,7 @@ import { UpdateJobs } from "../update/UpdateJobs.js";
 import { JobRunner } from "../update/JobRunner.js";
 import { Git } from "../update/Git.js";
 import { Credentials } from "../update/Credentials.js";
+import { Notifier } from "../update/Notifier.js";
 
 function git (root, ...args) {
     return execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
@@ -255,4 +256,108 @@ test("publish: pr commits on the job's branch, returns, and waits while that bra
         assert.match(git(root, "log", "-1", "--format=%s", "colvmn-update/Job"), /^Job: update/);
         assert.match(run([root, "--now", "2099-01-01T00:00:00Z"]).out, /Job: nothing — an earlier update is awaiting review on colvmn-update\/Job/);
     });
+});
+
+// --- step 4: prompt jobs, notifications ---
+
+const PROMPT_JOB = `---
+schedule: daily
+publish: direct
+model: claude-haiku-5-5
+budget: 0.50
+---
+Update the page.`;
+
+/** A stand-in for Claude Code: records its arguments and environment, edits the page, prints a result. */
+function fakeClaude (root, { fail = false } = {}) {
+    const path = join(root, "..", `fake-claude-${process.pid}-${Math.random().toString(36).slice(2)}.mjs`);
+    writeFileSync(path, `#!/usr/bin/env node
+import { writeFileSync } from "node:fs";
+writeFileSync(${JSON.stringify(join(root, "..", "claude-call.json"))}, JSON.stringify({ args: process.argv.slice(2), env: Object.keys(process.env), cwd: process.cwd() }));
+${fail ? "" : `writeFileSync("Job/_index.md", "# Updated\\n");`}
+console.log(JSON.stringify(${fail ? `{ is_error: true, subtype: "error_max_budget_usd", total_cost_usd: 0.5 }` : `{ is_error: false, subtype: "success", result: "Updated the page.", total_cost_usd: 0.12 }`}));
+process.exit(${fail ? 1 : 0});
+`);
+    execFileSync("chmod", ["+x", path]);
+    return path;
+}
+
+test("a prompt job runs Claude Code bare, with no shell, edits only in writes, its budget, and its cost recorded", () => {
+    withRepo({ "Job/_update.md": PROMPT_JOB, "Job/_index.md": "# Old\n" }, (root) => {
+        const env = { PATH: process.env.PATH, ANTHROPIC_API_KEY: "runner-key-123", JOB_SECRET: "x", COLVMN_CLAUDE: fakeClaude(root) };
+        const r = new JobRunner({ siteRoot: root, git: new Git(root), env }).run(UpdateJobs.inSite(root).inFolder("Job"));
+        assert.equal(r.result, "changed", r.message);
+        assert.equal(r.cost, 0.12);
+        const call = JSON.parse(readFileSync(join(root, "..", "claude-call.json"), "utf8"));
+        const args = call.args.join(" ");
+        assert.match(args, /--bare/);
+        assert.match(args, /--model claude-haiku-5-5/);
+        assert.match(args, /--max-budget-usd 0\.5/);
+        assert.match(args, /--permission-mode dontAsk/);
+        assert.match(args, /Edit\(Job\/\*\*\) Write\(Job\/\*\*\)/);
+        assert.match(args, /--disallowedTools Bash/);
+        assert.match(call.args[1], /You may change only files matching: Job\/\*\*[\s\S]*Update the page\./);
+        assert.ok(call.env.includes("ANTHROPIC_API_KEY"));
+        assert.ok(!call.env.includes("JOB_SECRET"));
+        const state = JSON.parse(readFileSync(join(root, "Job/_update.state.json"), "utf8"));
+        assert.equal(state.lastCost, 0.12);
+    });
+});
+
+test("a prompt job that hits its budget fails, keeps nothing, and reports its cost; without the runner's key it doesn't start", () => {
+    withRepo({ "Job/_update.md": PROMPT_JOB, "Job/_index.md": "# Old\n" }, (root) => {
+        const job = UpdateJobs.inSite(root).inFolder("Job");
+        const noKey = new JobRunner({ siteRoot: root, git: new Git(root), env: { PATH: process.env.PATH } }).run(job);
+        assert.match(noKey.message, /need ANTHROPIC_API_KEY/);
+        const env = { PATH: process.env.PATH, ANTHROPIC_API_KEY: "k", COLVMN_CLAUDE: fakeClaude(root, { fail: true }) };
+        const r = new JobRunner({ siteRoot: root, git: new Git(root), env }).run(job);
+        assert.equal(r.result, "failed");
+        assert.match(r.message, /error_max_budget_usd/);
+        assert.equal(r.cost, 0.5);
+        assert.equal(git(root, "status", "--porcelain"), "");
+    });
+});
+
+test("notifications: off by default; on failure and changes, or what a job asks for; addresses come from credentials", async () => {
+    withRepo({
+        "colvmn.json": "{}",
+        "A/_update.md": JOB, "B/_update.md": JOB.replace("publish: direct", "publish: direct\nnotify: [all]")
+    }, (root) => assert.equal(Notifier.forSite(root), null));
+
+    const files = {
+        "colvmn.json": JSON.stringify({ updates: { notify: {} } }),
+        "_credentials/NOTIFY_EMAIL_TO.json": "{}",
+        "_credentials/NOTIFY_EMAIL_FROM.json": "{}",
+        "_credentials/RESEND_API_KEY.json": "{}",
+        "A/_update.md": JOB,
+        "B/_update.md": JOB.replace("publish: direct", "publish: direct\nnotify: [all]")
+    };
+    const root = mkdtempSync(join(tmpdir(), "colvmn-notify-"));
+    try {
+        for (const [rel, text] of Object.entries(files)) {
+            write(root, rel, text);
+        }
+        const jobs = UpdateJobs.inSite(root);
+        const results = [
+            { job: jobs.inFolder("A"), result: "nothing", message: "the job had nothing to do" },
+            { job: jobs.inFolder("B"), result: "nothing", message: "the job had nothing to do" }
+        ];
+        const sent = [];
+        const env = { NOTIFY_EMAIL_TO: "me@example.com, you@example.com", NOTIFY_EMAIL_FROM: "bot@example.com", RESEND_API_KEY: "re_key_123", GITHUB_SERVER_URL: "https://github.com", GITHUB_REPOSITORY: "o/r", GITHUB_RUN_ID: "7" };
+        const notifier = Notifier.forSite(root, env, async (url, init) => { sent.push({ url, body: JSON.parse(init.body), auth: init.headers.Authorization }); return { ok: true }; });
+
+        assert.equal(await notifier.send(results, new Set()), "notification sent");
+        assert.equal(sent.length, 1);
+        assert.deepEqual(sent[0].body.to, ["me@example.com", "you@example.com"]);
+        assert.equal(sent[0].auth, "Bearer re_key_123");
+        assert.match(sent[0].body.text, /^B: nothing/);
+        assert.doesNotMatch(sent[0].body.text, /^A:/m);
+        assert.match(sent[0].body.text, /Run log: https:\/\/github\.com\/o\/r\/actions\/runs\/7/);
+
+        const withheld = notifier.compose([{ job: jobs.inFolder("A"), result: "failed", message: "leaked the-secret-value" }], new Set(["the-secret-value"]));
+        assert.match(withheld.text, /withheld/);
+        assert.equal(notifier.compose([results[0]]), null);
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
 });

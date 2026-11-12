@@ -6,6 +6,12 @@
  * Credentials.js), and COLVMN_* values describing the run. Nothing else in
  * the runner's environment reaches it.
  *
+ * A prompt job runs Claude Code headless (`claude -p --bare`) in the site
+ * root, with the runner's ANTHROPIC_API_KEY and nothing else from its
+ * environment, no shell, edit access only to the job's `writes`, and the
+ * job's budget as a hard stop (--max-budget-usd). Its cost is recorded.
+ * COLVMN_CLAUDE overrides the command (tests use a stand-in).
+ *
  * The script's exit status says what happened:
  *   0                       done; whatever it changed is checked and published
  *   NOTHING_TO_DO_STATUS    nothing to do; changes are discarded, nothing is
@@ -35,6 +41,8 @@ export const NOTHING_TO_DO_STATUS = 3;
 const BASE_ENV = ["PATH", "HOME", "USER", "LANG", "LC_ALL", "TMPDIR", "TZ"];
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000;
 const MIN_LEAK_CHECK_LENGTH = 8;
+const DEFAULT_PROMPT_MODEL = "claude-sonnet-5-5";
+const PROMPT_READ_TOOLS = ["Read", "Glob", "Grep", "WebSearch", "WebFetch"];
 
 export class JobRunner {
 
@@ -50,6 +58,7 @@ export class JobRunner {
         this.now = now;
         this.push = push;
         this.timeoutMs = timeoutMs;
+        this.handedOut = new Set();
     }
 
     /**
@@ -66,21 +75,23 @@ export class JobRunner {
         if (job.updateFile.publish() === "pr" && this.git.branchExists(prBranchName(job))) {
             return nothing(`an earlier update is awaiting review on ${prBranchName(job)}`);
         }
+        Object.values(values).forEach(v => this.handedOut.add(v));
         const startCommit = this.git.head();
-        const status = this.runScript(job, values);
-        if (status !== 0) {
+        const outcome = job.updateFile.kind() === "prompt" ? this.runPrompt(job) : { status: this.runScript(job, values), cost: null };
+        if (outcome.status !== 0) {
             this.git.discardChanges();
-            return status === NOTHING_TO_DO_STATUS ? nothing("the job had nothing to do") : failed(`the script exited with status ${status}`);
+            const r = outcome.status === NOTHING_TO_DO_STATUS ? nothing("the job had nothing to do") : failed(outcome.error || `the script exited with status ${outcome.status}`);
+            return { ...r, cost: outcome.cost };
         }
-        return this.checkAndPublish(job, startCommit, values);
+        return { ...this.checkAndPublish(job, startCommit, values, outcome.cost), cost: outcome.cost };
     }
 
     /** Why the job can't be run, or null. */
     refusal (job, credentialProblems) {
         const f = job.updateFile;
         const problems = [...job.problems(), ...credentialProblems];
-        if (f.kind() === "prompt") {
-            problems.push("prompt jobs aren't built yet");
+        if (f.kind() === "prompt" && !this.env.ANTHROPIC_API_KEY) {
+            problems.push("prompt jobs need ANTHROPIC_API_KEY in the runner's environment (the runner's own key, not a job credential)");
         }
         if (f.scriptPath() && !existsSync(f.scriptPath())) {
             problems.push(`no script at ${f.fields.run}`);
@@ -99,16 +110,65 @@ export class JobRunner {
         return r.status === null ? 1 : r.status;
     }
 
-    scriptEnv (job, values) {
+    /**
+     * Runs a prompt job through Claude Code.
+     * @returns {{ status: number, cost: number|null, error?: string }}
+     */
+    runPrompt (job) {
+        const r = spawnSync(this.env.COLVMN_CLAUDE || "claude", this.promptArgs(job), {
+            cwd: this.siteRoot,
+            env: { ...this.baseEnv(), ANTHROPIC_API_KEY: this.env.ANTHROPIC_API_KEY },
+            encoding: "utf8",
+            timeout: this.timeoutMs,
+            maxBuffer: 64 * 1024 * 1024
+        });
+        if (r.error) {
+            return { status: 1, cost: null, error: `couldn't start Claude Code: ${r.error.message}` };
+        }
+        let report = null;
+        try {
+            report = JSON.parse(r.stdout);
+        } catch {
+            return { status: 1, cost: null, error: `Claude Code exited with status ${r.status} and no result` };
+        }
+        const cost = typeof report.total_cost_usd === "number" ? report.total_cost_usd : null;
+        if (r.status !== 0 || report.is_error) {
+            return { status: 1, cost, error: `Claude Code stopped: ${report.subtype || "error"}` };
+        }
+        return { status: 0, cost };
+    }
+
+    promptArgs (job) {
+        const f = job.updateFile;
+        const edits = f.writes().flatMap(w => [`Edit(${w})`, `Write(${w})`]);
+        return [
+            "-p", promptText(job),
+            "--bare",
+            "--output-format", "json",
+            "--model", f.model() || DEFAULT_PROMPT_MODEL,
+            "--max-budget-usd", String(f.budget()),
+            "--permission-mode", "dontAsk",
+            "--allowedTools", ...PROMPT_READ_TOOLS, ...edits,
+            "--disallowedTools", "Bash",
+            "--strict-mcp-config",
+            "--no-session-persistence"
+        ];
+    }
+
+    baseEnv () {
         const env = {};
         for (const name of BASE_ENV) {
             if (this.env[name] !== undefined) {
                 env[name] = this.env[name];
             }
         }
+        return env;
+    }
+
+    scriptEnv (job, values) {
         const state = job.state();
         return {
-            ...env,
+            ...this.baseEnv(),
             ...values,
             COLVMN_SITE_ROOT: this.siteRoot,
             COLVMN_JOB_FOLDER: job.folderName(),
@@ -119,10 +179,10 @@ export class JobRunner {
     }
 
     /** The checks after a successful script, then publishing; discards the changes if a check fails. */
-    checkAndPublish (job, startCommit, values) {
+    checkAndPublish (job, startCommit, values, cost) {
         const changed = this.git.changedFiles();
         if (changed.length === 0) {
-            return nothing("the script changed nothing");
+            return nothing("the job changed nothing");
         }
         const problem = this.writesProblem(job, changed)
             || (this.rebuild() ? null : "rebuilding the pages failed")
@@ -131,9 +191,10 @@ export class JobRunner {
             this.git.discardChanges();
             return failed(problem);
         }
-        job.recordRun({ at: this.now, result: "changed", commit: startCommit });
+        job.recordRun({ at: this.now, result: "changed", commit: startCommit, cost });
         const message = `${job.folderName()}: update (${changed.length} file${changed.length === 1 ? "" : "s"})`;
-        return job.updateFile.publish() === "pr" ? this.publishPr(job, message) : this.publishDirect(message, changed.length);
+        const published = job.updateFile.publish() === "pr" ? this.publishPr(job, message) : this.publishDirect(message, changed.length);
+        return { ...published, files: changed };
     }
 
     writesProblem (job, changed) {
@@ -197,6 +258,20 @@ export class JobRunner {
         }
         return `pushed ${branch}, but couldn't open the PR (${r.error ? "gh not found" : (r.stderr || "").trim()}); open it by hand`;
     }
+}
+
+/** What Claude Code is told: the job's limits, then the job's own prompt. */
+export function promptText (job) {
+    const f = job.updateFile;
+    const folder = job.folderName();
+    return [
+        "You are refreshing part of a website, as a scheduled job. Your working folder is the site's root.",
+        `The job's folder is ${folder}; the page to update is ${folder === "." ? "" : folder + "/"}${f.target()}.`,
+        `You may change only files matching: ${f.writes().join(", ")}. Any other change fails the run.`,
+        "You have no shell. When you are done, reply with one line saying what you changed, or \"Nothing to change.\"",
+        "",
+        f.prompt()
+    ].join("\n");
 }
 
 /** The branch a job's PR is published on. */

@@ -14,3 +14,7 @@
 
 - [Quick Start](/quick-start/)
 
+## Scheduled Updates
+
+- [Scheduled Updates](/scheduled-updates/): Pages that refresh themselves. A folder with an update file runs a script or a prompt on a schedule, or when what it watches changes, and publishes the result.
+

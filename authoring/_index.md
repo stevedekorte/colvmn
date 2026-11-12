@@ -20,6 +20,7 @@ The same top-level keys work in markdown frontmatter and at the top of `_index.j
 | `topTitle` | The brand shown at the top of every page; inherited down the directory tree when unset. |
 | `subtitle` | A tagline rendered just under the header. |
 | `content` | An array of content blocks. In JSON this is the body; in markdown frontmatter it replaces the body. |
+| `llms` | `false` leaves the page and everything under it out of `llms.txt` and `llms-full.txt`. It is still generated and in the sitemap. |
 
 ## Content blocks
 

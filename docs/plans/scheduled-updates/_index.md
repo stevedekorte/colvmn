@@ -3,7 +3,7 @@ subtitle: Folders that refresh their own pages on a schedule. An update file in 
 ---
 # Scheduled Updates
 
-> Status (2026-11-12): **design settled; script jobs run** (on `main`). `update.js` finds jobs, decides which are due (schedule or `on: push`, `watch`, `minInterval`), runs script jobs with only their listed credentials, resolves credentials from `_credentials/` (nearest description, `blocked`, `.secret` files or environment variables, format checks), checks `writes`, rebuilds the pages, refuses changes containing a credential value, records the run, and publishes (`direct`, or `pr` on a branch per job, pushed and opened with `--push`). Next: prompt jobs, email, the workflow template and the docs page. Agreed with Steve 2026-11-09, 2026-11-10 and 2026-11-12.
+> Status (2026-11-12): **built** (on `main`): script and prompt jobs, schedules and `on: push`, `watch`, `minInterval`, credentials, the `writes` and leak checks, `direct` and `pr` publishing, email notifications, the workflow template, and the "Scheduled Updates" docs page. Not yet run against a real repo with a remote, GitHub Actions, `gh`, Claude Code or Resend: the tests use local repos and stand-ins. Agreed with Steve 2026-11-09, 2026-11-10 and 2026-11-12.
 >
 > This plan covers the general colvmn feature. Site-specific setup lives with each site; the first site is undreamedof.biz (Uo repo: `Servers/GameServer/docs/Plans/Scheduled Updates`).
 
@@ -165,17 +165,19 @@ A site can ask the runner to send an email after jobs run. Off by default. Set i
 ```json
 "updates": {
     "notify": {
-        "email": "NOTIFY_EMAIL_TO",
-        "on": ["failure", "changed"]
+        "on": ["failure", "changed"],
+        "to": "NOTIFY_EMAIL_TO",
+        "from": "NOTIFY_EMAIL_FROM",
+        "key": "RESEND_API_KEY"
     }
 }
 ```
 
 - **When:** `failure` (a job failed, including a failed `writes` or leak check, or a budget stop), `changed` (a job committed or opened a PR), `nothing` (a job ran and had nothing to do), or `all`. The default is `["failure", "changed"]`, so routine "nothing to do" runs stay quiet. A job can override this, e.g. `notify: [failure]` on a noisy job.
 - **What:** one email per runner invocation, not per job: for each job that matches, its folder, result, cost, changed files, and links to the commit or PR and to the run's log. A failure includes the error message. The email never includes page content or job output beyond that, and it goes through the same leak check as committed files.
-- **Recipients are not in the repo.** `email` names a credential (here `NOTIFY_EMAIL_TO`), not an address, so a public repo doesn't publish anyone's email address.
+- **Addresses are not in the repo.** `to` and `from` name credentials, not addresses, so a public repo doesn't publish anyone's email address. The names shown are the defaults.
 - **Sending:** through an email API (e.g. Resend, Postmark) or SMTP, with its key held as a runner-level credential, like the Anthropic key for prompt jobs. It belongs to the runner, not to any job, so jobs never see it.
-- **If sending fails,** the run's result doesn't change. The failure is logged in the run and recorded in `_update.state.json`.
+- **If sending fails,** the run's result doesn't change. The failure is logged in the run. (Not recorded in `_update.state.json`: that file is committed with a job's changes, and the email is sent after.)
 - **Why not just GitHub's own emails:** GitHub only emails about failed workflow runs, and only to its own users. It can't report what a job changed or cost, and a self-hosted runner's job failing a check inside a successful workflow wouldn't trigger it.
 
 ## Work
@@ -183,13 +185,13 @@ A site can ask the runner to send an email after jobs run. Off by default. Set i
 - `update.js`: discovery, due check, `--folder`, `--dry-run`, last-run state. **(done, step 1)**
 - Update-file parsing (frontmatter with lists). **(done, step 1)**
 - Script jobs: run with only their listed credentials, as environment variables. **(done, step 2)**
-- Prompt jobs: Claude Code headless, restricted tools, budget stop, reported cost.
+- Prompt jobs: Claude Code headless, restricted tools, budget stop, reported cost. **(done, step 4)**: `claude -p --bare` in the site root with the runner's `ANTHROPIC_API_KEY` only, `--permission-mode dontAsk`, read and web tools plus `Edit`/`Write` limited to `writes`, `Bash` denied, `--max-budget-usd`; default model `claude-sonnet-5-5`.
 - Credentials: look-up from folder to root, `blocked`, `secrets:` lists, prompt jobs refused credentials, value loading from `.secret` files (or from environment variables when present; the variable wins), format checks (`pattern`, `format: json`). **(done, step 3)**
 - Checks after a run: `writes` **(done, step 2)**, leaked values **(done, step 3)**.
 - Publishing: `direct` **(done, step 2)** and `pr` **(done, step 3)**: a branch per job, `colvmn-update/<folder>`; with `--push` it is pushed and a PR opened with `gh`; while the branch exists the job waits rather than open another.
-- Page footer: last update and its cost.
-- A workflow template sites copy, for GitHub-hosted and self-hosted runners.
+- Page footer: last update and its cost. (Not built: the cost is in `_update.state.json` and in notifications.)
+- A workflow template sites copy, for GitHub-hosted and self-hosted runners. **(done, step 4: `update/workflow-template.yml`)**
 - Tests: due logic, credential look-up and blocking, the `writes` check, the leak check, a prompt job refused credentials.
-- colvmn docs: a "Scheduled updates" page (authoring an update file, credentials, running jobs by hand, setting up a runner), then push to colvmn.
+- colvmn docs: a "Scheduled updates" page (authoring an update file, credentials, running jobs by hand, setting up a runner), then push to colvmn. **(done, step 4: `scheduled-updates/`)**
 - `watch` / `minInterval`, `on: push` and `--on push`, the run's own changes not counting, the "nothing to do" exit status. **(done, step 2)**
-- The public-repo credentials path (values from environment variables works; the workflow template is still to do); optional email notifications.
+- The public-repo credentials path (values from environment variables works; the workflow template is still to do); optional email notifications **(done, step 4: Resend; addresses and key are credentials)**.
