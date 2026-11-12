@@ -255,9 +255,13 @@ function rewriteEngineLinks (html, pageDir, localRoot) {
             if (urlValue.startsWith("#") || urlValue.startsWith("?")) return match;
 
             // Resolve against the page's site root (server-absolute) or pageDir (relative).
-            const absPath = urlValue.startsWith("/")
-                ? resolve(localRoot, urlValue.slice(1))
-                : resolve(pageDir, urlValue);
+            // "/colvmn/..." names the engine wherever it lives: a colvmn/
+            // subfolder in an installed site, the site root in colvmn's own docs.
+            const absPath = urlValue.startsWith("/colvmn/")
+                ? join(engineDir, urlValue.slice("/colvmn/".length))
+                : urlValue.startsWith("/")
+                    ? resolve(localRoot, urlValue.slice(1))
+                    : resolve(pageDir, urlValue);
 
             // Only rewrite assets that live inside the site's colvmn folder.
             const inColvmn = absPath === engineDir || absPath.startsWith(engineDir + sep);
