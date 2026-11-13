@@ -74,7 +74,10 @@ export async function askClaude (key, prompt, env = process.env) {
         if (r.stop_reason === "refusal") {
             throw new Error("Claude declined to choose");
         }
-        return parseChoice((r.content || []).filter(b => b.type === "text").map(b => b.text).join(""));
+        const text = (r.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+        const choice = parseChoice(text);
+        Object.defineProperty(choice, "answerText", { value: text });   // for the log when a choice is missing
+        return choice;
     }
     throw new Error("Claude didn't finish choosing");
 }
@@ -85,8 +88,9 @@ export async function askClaude (key, prompt, env = process.env) {
  */
 export function validChoices (choice, lists) {
     const chosen = {}, rejected = [];
+    const keyFor = name => Object.keys(choice).find(k => k.toLowerCase().startsWith(name.toLowerCase()));
     for (const [name, l] of Object.entries(lists)) {
-        const c = choice[name];
+        const c = choice[keyFor(name)];
         if (!c || !c.id) {
             rejected.push(`${name}: no choice${c?.why ? ` (${c.why})` : ""}`);
         } else if (!l.ids.includes(c.id)) {

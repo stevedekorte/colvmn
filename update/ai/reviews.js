@@ -120,11 +120,26 @@ async function chooseModels (reviews, providers, claudeKey, keyOf, env, today) {
         return models;
     }
     try {
-        const { chosen, rejected } = validChoices(await askClaude(claudeKey, chooserPrompt(lists, today), env), lists);
-        rejected.forEach(r => console.log(`skipped, no model chosen: ${r}`));
+        const choice = await askClaude(claudeKey, chooserPrompt(lists, today), env);
+        const { chosen, rejected } = validChoices(choice, lists);
+        if (rejected.length) {
+            rejected.forEach(r => console.log(`no model chosen this run: ${r}`));
+            console.log(`Claude's answer ended: ${String(choice.answerText || "").slice(-600)}`);
+        }
         Object.assign(models, chosen);
     } catch (e) {
         console.log(`couldn't ask Claude to choose the models: ${e.message}`);
+    }
+    // A provider not chosen this run keeps the model Claude chose last time, if it's still listed; one never chosen is skipped.
+    const recorded = existsSync(reviews.modelsPath()) ? JSON.parse(readFileSync(reviews.modelsPath(), "utf8")) : {};
+    for (const name of Object.keys(lists).filter(n => !models[n])) {
+        const last = recorded[name];
+        if (last && last.source && !/guessed/.test(last.source) && lists[name].ids.includes(last.id)) {
+            models[name] = last;
+            console.log(`${name}: keeping the last choice, ${last.id}`);
+        } else {
+            console.log(`${name}: skipped (no model chosen)`);
+        }
     }
     for (const [name, m] of Object.entries(models)) {
         console.log(`${name}: ${m.id} (${m.name})${m.source ? ` — ${m.source}` : ""}`);

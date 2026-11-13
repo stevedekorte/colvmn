@@ -157,7 +157,7 @@ test("an ID Claude names that isn't in the provider's list is refused, and that 
     try {
         const r = await runReviews(site, api.url);
         assert.equal(r.status, 3, r.out);
-        assert.match(r.out, /skipped, no model chosen: Claude: claude-made-up-9 isn't in its model list/);
+        assert.match(r.out, /no model chosen this run: Claude: claude-made-up-9 isn't in its model list[\s\S]*Claude: skipped \(no model chosen\)/);
         assert.equal(api.calls.reviews, 0);
         assert.ok(!existsSync(join(site, "AI Reviews", "Claude")));
     } finally {
@@ -231,6 +231,22 @@ test("keys: the standard names by default, a site's own names with aiReviews key
         assert.deepEqual(reviews.updateFile.secrets(), ["CLAUDE_REVIEW_KEY", "OPENAI_API_KEY"], "Claude uses its own key, not the runner's");
         assert.deepEqual(reviews.problems(), []);
     } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
+test("a provider not chosen this run keeps Claude's last choice when it is still listed", async () => {
+    const site = makeSite({ folder: "AI Reviews", providers: ["Claude"] });
+    const api = await fakeClaude("Build stamp: none\nVerdict: Fine.\n\nA review.\n", "claude-made-up-9");
+    try {
+        mkdirSync(join(site, "AI Reviews", "_models"), { recursive: true });
+        writeFileSync(join(site, "AI Reviews", "_models", "models.json"), JSON.stringify({ Claude: { id: "claude-opus-5-5", name: "Claude Opus 5.5", source: "https://www.anthropic.com/news/y" } }));
+        const r = await runReviews(site, api.url);
+        assert.equal(r.status, 0, r.out);
+        assert.match(r.out, /Claude: keeping the last choice, claude-opus-5-5/);
+        assert.equal(api.calls.lastBody.model, "claude-opus-5-5");
+    } finally {
+        api.close();
         rmSync(site, { recursive: true, force: true });
     }
 });
