@@ -6,8 +6,13 @@
  *   "aiReviews": {
  *       "folder": "AI Reviews",
  *       "prompt": "Read https://example.com/llms.txt and ... Evaluate ...",
- *       "providers": ["Claude", "ChatGPT", "Gemini", "Grok"]
+ *       "providers": ["Claude", "ChatGPT", "Gemini", "Grok"],
+ *       "about": "How These Are Made"
  *   }
+ *
+ * "about" (optional) names a subfolder whose page explains how the reviews
+ * are made; it gets a card at the end of the grid and the prompt. Without
+ * it, the prompt goes on the section page.
  *
  * Each provider is a subfolder of the section. Known providers get their
  * company, app and prefilled-prompt link from PROVIDERS below; others, or
@@ -27,8 +32,10 @@
  * Replaced reviews live in <provider>/archive/<date>/, newest first.
  *
  * What the generator adds:
- *   section page   one card per provider (model and date), then the page's
- *                  own text (the policy), then the prompt
+ *   section page   one card per provider (model and date) and the about
+ *                  card, then the page's own text (and the prompt, when
+ *                  there's no about page)
+ *   about page     its own text, then the prompt
  *   review pages   a header: model, date, quoted stamp, "Ask <provider>
  *                  yourself", the original conversation, and the not-an-
  *                  endorsement line; then "Earlier reviews"
@@ -41,6 +48,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { parseMarkdown } from "./MarkdownParser.js";
+import { ContentCards } from "./ContentCards.js";
 
 const PROVIDERS = {
     Claude: { company: "Anthropic", app: "https://claude.ai/new", ask: "https://claude.ai/new?q={prompt}" },
@@ -65,6 +73,7 @@ export class AiReviews {
         this.siteRoot = siteRoot;
         this.folder = config.folder.replace(/\/+$/, "");
         this.prompt = config.prompt;
+        this.about = config.about ? config.about.replace(/\/+$/, "") : null;
         this.providers = (config.providers || Object.keys(PROVIDERS)).map(p => {
             const own = typeof p === "string" ? { name: p } : p;
             return { company: own.name, ...PROVIDERS[own.name], ...own };
@@ -87,6 +96,9 @@ export class AiReviews {
         if (parts.length === 0) {
             return { kind: "section" };
         }
+        if (parts.length === 1 && parts[0] === this.about) {
+            return { kind: "about" };
+        }
         const provider = this.providers.find(p => p.name === parts[0]);
         if (!provider) {
             return { kind: "other" };
@@ -105,7 +117,9 @@ export class AiReviews {
         const role = this.roleOf(pageDir);
         const content = json.content || [];
         if (role.kind === "section") {
-            json.content = [this.providerCards(), ...content, this.promptEntry()];
+            json.content = this.about ? [this.providerCards(), ...content] : [this.providerCards(), ...content, this.promptEntry()];
+        } else if (role.kind === "about") {
+            json.content = [...content, this.promptEntry()];
         } else if (role.kind === "review") {
             const earlier = this.archiveEntry(role.provider);
             json.content = [this.headerEntry(role.provider, json, false), ...content, ...(earlier ? [earlier] : [])];
@@ -124,7 +138,21 @@ export class AiReviews {
             }
             return { title: p.name, folder: p.name, subtitle: escapeHtml(describeModelAndDate(meta)), arrow: "Read" };
         });
-        return { type: "ContentCards", items, columns: this.providers.length === 4 ? 2 : undefined };
+        const about = this.aboutCard();
+        if (about) {
+            items.push(about);
+        }
+        return { type: "ContentCards", items, columns: this.providers.length % 2 === 0 ? 2 : undefined };
+    }
+
+    /** The card for the "how these are made" page, last in the grid; null without one. */
+    aboutCard () {
+        const dir = join(this.sectionDir(), this.about || "");
+        if (!this.about || !existsSync(join(dir, "_index.md")) || !existsSync(join(dir, "index.html"))) {
+            return null;
+        }
+        const meta = parseMarkdown(readFileSync(join(dir, "_index.md"), "utf-8"));
+        return { title: meta.title || this.about, folder: this.about, subtitle: ContentCards.cardSubtitle(meta), arrow: "Read" };
     }
 
     promptEntry () {

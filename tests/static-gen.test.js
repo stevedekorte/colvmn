@@ -141,3 +141,20 @@ test("aiReviews: provider cards, review headers with prefilled links, the archiv
         rmSync(site, { recursive: true, force: true });
     }
 });
+
+test("aiReviews about: its card ends the grid, and the prompt moves to its page", () => {
+    const site = makeSite({ aiReviews: { folder: "AI Reviews", prompt: "Evaluate it.", providers: ["Claude", "Grok"], about: "How" } });
+    try {
+        writePage(site, "AI Reviews", "# AI Reviews\n\nShort summary.\n");
+        writePage(site, "AI Reviews/How", "---\ncardSubtitle: The rules.\n---\n# How These Are Made\n\nThe rules.\n");
+        commitAll(site, "pages");
+        build(site);
+        const section = readFileSync(join(site, "AI Reviews", "index.html"), "utf-8");
+        assert.match(section, /<h3>Grok<\/h3>[\s\S]*<h3>How These Are Made<\/h3><p>The rules\.<\/p>/);
+        assert.doesNotMatch(section, /review-prompt/);
+        const about = readFileSync(join(site, "AI Reviews", "How", "index.html"), "utf-8");
+        assert.match(about, /class="review-prompt">Evaluate it\./);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
