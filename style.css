@@ -1073,10 +1073,15 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
 .review-model {
   font-weight: 600;
 }
-.review-stamp,
-.review-disclaimer {
+.review-note {
   color: #777;
   font-size: 13px;
+}
+.review-details {
+  color: #777;
+}
+.review-details p {
+  margin-bottom: 4px;
 }
 .review-links a {
   margin-right: 18px;
