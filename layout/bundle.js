@@ -314,12 +314,14 @@ function slideshowHtml (imgs) {
     }).join("");
     const optionClasses = SLIDESHOW_OPTIONS.filter(o => options.has(o)).map(o => ` ${o}`).join("");
     return `<div class="colvmn-slideshow${optionClasses}" role="region" aria-roledescription="carousel" aria-label="Images" tabindex="0">`
-        + `<div class="slideshow-frame">${slides}</div>`
+        + `<div class="slideshow-frame">${slides}`
+        + '<button class="slideshow-edge slideshow-edge-prev" type="button" tabindex="-1" aria-label="Previous image"><span>&lsaquo;</span></button>'
+        + '<button class="slideshow-edge slideshow-edge-next" type="button" tabindex="-1" aria-label="Next image"><span>&rsaquo;</span></button></div>'
         + '<div class="slideshow-controls"><button class="slideshow-btn slideshow-prev" type="button" aria-label="Previous image">&lsaquo;</button>'
         + `<span class="slideshow-count">1 / ${n}</span>`
         + '<button class="slideshow-btn slideshow-next" type="button" aria-label="Next image">&rsaquo;</button></div>'
         + '<p class="slideshow-live" aria-live="polite"></p>'
-        + "<noscript><style>.colvmn-slideshow .slideshow-frame{display:block}.colvmn-slideshow .slide{opacity:1;margin-bottom:20px}.colvmn-slideshow .slideshow-controls{display:none}</style></noscript>"
+        + "<noscript><style>.colvmn-slideshow .slideshow-frame{display:block}.colvmn-slideshow .slide{opacity:1;margin-bottom:20px}.colvmn-slideshow .slideshow-controls,.colvmn-slideshow .slideshow-edge{display:none}</style></noscript>"
         + "</div>";
 }
 
@@ -2370,9 +2372,13 @@ function initCollapsibles (doc = document) {
 // "Rendering model"), registered from layout.js like Lightbox.js:
 //
 // - previous and next buttons, with "n / total" between them;
+// - the image's sides: with a mouse, arrows appear at its left and right
+//   edges on hover, and a click there moves; on a touch screen, a tap on
+//   the left or right half moves (style.css sizes the zones);
 // - left and right arrow keys while the slideshow has focus;
 // - a swipe (finger or mouse drag) or a two-finger trackpad swipe moves either way;
-// - a click on the image enlarges it (Lightbox.js); a swipe never does;
+// - a click on the middle of the image enlarges it (Lightbox.js), with a
+//   mouse; a swipe never does;
 // - with .autoplay ({.slideshow .autoplay}), it advances by itself every few
 //   seconds while it's on screen, and pauses while the pointer is over it, it
 //   has focus, the tab is hidden, an image is enlarged, or the reader prefers
@@ -2427,6 +2433,9 @@ function initOne (root, win) {
 
     root.querySelector(".slideshow-prev").addEventListener("click", () => step(-1));
     root.querySelector(".slideshow-next").addEventListener("click", () => step(1));
+    // The image's own sides: arrows on hover; on touch screens, a tap on either half.
+    root.querySelector(".slideshow-edge-prev")?.addEventListener("click", () => step(-1));
+    root.querySelector(".slideshow-edge-next")?.addEventListener("click", () => step(1));
     root.addEventListener("keydown", e => {
         if (enlarged()) return;
         if (e.key === "ArrowLeft") { e.preventDefault(); step(-1); }

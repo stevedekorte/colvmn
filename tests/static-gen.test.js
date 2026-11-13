@@ -309,6 +309,7 @@ test("consecutive images marked {.slideshow} become one slideshow of zoomable sl
         assert.match(html, /<figure class="slide is-active" aria-roledescription="slide" aria-label="1 of 3"><img src="a\.jpg" alt="One" class="colvmn-zoomable-image"><\/figure>/);
         assert.match(html, /aria-label="3 of 3" aria-hidden="true"><img loading="lazy" src="c\.jpg" alt="Three" class="colvmn-zoomable-image">/);
         assert.match(html, /<span class="slideshow-count">1 \/ 3<\/span>/);
+        assert.match(html, /<button class="slideshow-edge slideshow-edge-prev" type="button" tabindex="-1" aria-label="Previous image">[\s\S]*<button class="slideshow-edge slideshow-edge-next"[^>]*>.*?<\/button><\/div><div class="slideshow-controls">/);   // the image's sides, inside the frame
         assert.match(html, /<p><img src="d\.jpg" alt="Alone"><\/p>/);
     } finally {
         rmSync(site, { recursive: true, force: true });

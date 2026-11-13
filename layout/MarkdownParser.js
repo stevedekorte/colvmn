@@ -308,12 +308,14 @@ export function slideshowHtml (imgs) {
     }).join("");
     const optionClasses = SLIDESHOW_OPTIONS.filter(o => options.has(o)).map(o => ` ${o}`).join("");
     return `<div class="colvmn-slideshow${optionClasses}" role="region" aria-roledescription="carousel" aria-label="Images" tabindex="0">`
-        + `<div class="slideshow-frame">${slides}</div>`
+        + `<div class="slideshow-frame">${slides}`
+        + '<button class="slideshow-edge slideshow-edge-prev" type="button" tabindex="-1" aria-label="Previous image"><span>&lsaquo;</span></button>'
+        + '<button class="slideshow-edge slideshow-edge-next" type="button" tabindex="-1" aria-label="Next image"><span>&rsaquo;</span></button></div>'
         + '<div class="slideshow-controls"><button class="slideshow-btn slideshow-prev" type="button" aria-label="Previous image">&lsaquo;</button>'
         + `<span class="slideshow-count">1 / ${n}</span>`
         + '<button class="slideshow-btn slideshow-next" type="button" aria-label="Next image">&rsaquo;</button></div>'
         + '<p class="slideshow-live" aria-live="polite"></p>'
-        + "<noscript><style>.colvmn-slideshow .slideshow-frame{display:block}.colvmn-slideshow .slide{opacity:1;margin-bottom:20px}.colvmn-slideshow .slideshow-controls{display:none}</style></noscript>"
+        + "<noscript><style>.colvmn-slideshow .slideshow-frame{display:block}.colvmn-slideshow .slide{opacity:1;margin-bottom:20px}.colvmn-slideshow .slideshow-controls,.colvmn-slideshow .slideshow-edge{display:none}</style></noscript>"
         + "</div>";
 }
 
