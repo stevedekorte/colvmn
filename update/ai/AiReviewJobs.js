@@ -1,8 +1,9 @@
 /**
  * The job colvmn adds when a site's colvmn.json has "aiReviews", with no
- * update file: <section>, running reviews.js daily when llms-full.txt has
- * changed, at most once per "every". Each run first chooses each provider's
- * latest top model, then reviews what is out of date; it publishes directly.
+ * update file: <section>, running reviews.js on the aiReviews "schedule"
+ * (monthly by default). Each run first chooses each provider's latest top
+ * model, then reviews only the providers whose docs or model changed; it
+ * publishes directly.
  * It is given the providers' keys that have a value: the standard names, or
  * those aiReviews' "keys" gives. Its state file sits in the section folder.
  */
@@ -36,9 +37,7 @@ export function aiReviewUpdateFiles (siteRoot, env = process.env) {
         script: join(HERE, "reviews.js"),
         problems,
         fields: {
-            schedule: "daily",
-            watch: ["llms-full.txt"],
-            minInterval: reviews.every,
+            schedule: reviews.schedule,
             run: "colvmn/update/ai/reviews.js",
             writes,
             publish: "direct",

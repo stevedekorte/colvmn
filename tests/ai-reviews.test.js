@@ -45,7 +45,7 @@ test("Claude's model choice: the JSON at the end of its answer, and only IDs fro
     assert.deepEqual(rejected, ["Grok: grok-9 isn't in its model list"]);
 });
 
-test("aiReviews adds one reviews job (direct, watching the docs), with the keys that have values", () => {
+test("aiReviews adds one reviews job (monthly, direct), with the keys that have values", () => {
     const site = makeSite({ folder: "AI Reviews", about: "Review Process" });
     try {
         let jobs = UpdateJobs.inSite(site, {});
@@ -56,8 +56,8 @@ test("aiReviews adds one reviews job (direct, watching the docs), with the keys 
         assert.deepEqual(reviews.problems(), []);
         assert.deepEqual(reviews.updateFile.secrets(), ["ANTHROPIC_API_KEY"]);
         assert.equal(reviews.updateFile.publish(), "direct");
-        assert.deepEqual(reviews.updateFile.watch(), ["llms-full.txt"]);
-        assert.equal(reviews.updateFile.minIntervalMs(), 30 * 86400e3);
+        assert.equal(reviews.updateFile.schedule(), "monthly");
+        assert.deepEqual(reviews.updateFile.watch(), []);
         assert.ok(reviews.updateFile.writes().includes("AI Reviews/Claude/**"));
         assert.ok(reviews.updateFile.writes().includes("AI Reviews/_models/**"));
         assert.ok(existsSync(reviews.updateFile.scriptPath()));
@@ -133,7 +133,7 @@ test("reviews.js: Claude chooses the model, --models stops there; then the revie
         assert.match(review, /^---\nmodelName: Claude Fable 5\.2\nmodel: claude-fable-5-2\nreviewed: \d{4}-\d{2}-\d{2}\nsummary: Clear docs, small ecosystem\.\nstamp: Site build: Example · 2026-11-12 · abc1234\ninputHash: [0-9a-f]{16}\n---\n# Claude\n\n## Strengths\n\nGood\.\n$/);
         assert.ok(existsSync(join(site, "AI Reviews", "Claude", "index.html")));
         assert.match(readFileSync(join(site, "AI Reviews", "_index.md"), "utf8"), /on \{date\}/);
-        assert.match(readFileSync(join(site, "AI Reviews", "Review Process", "_index.md"), "utf8"), /at most every 30 days/);
+        assert.match(readFileSync(join(site, "AI Reviews", "Review Process", "_index.md"), "utf8"), /Once a month, each provider's top model is checked/);
 
         r = await runReviews(site, api.url);
         assert.equal(r.status, 3, r.out);

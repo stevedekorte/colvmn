@@ -10,7 +10,7 @@
  *       "providers": ["Claude", "ChatGPT", "Gemini", "Grok"],
  *       "about": "Review Process",
  *       "homeCard": true,
- *       "every": "30d",
+ *       "schedule": "monthly",
  *       "keys": { "Claude": "CLAUDE_REVIEW_KEY" }
  *   }
  *
@@ -20,7 +20,10 @@
  * "about" names a subfolder whose page explains how the reviews are made: it
  * gets a card at the end of the grid and the prompt (without it, the prompt
  * goes on the section page). "homeCard" adds a card for the section to the
- * site's root page. "every" is the least time between reviews (default 30d).
+ * site's root page. "schedule" is how often the reviews job runs: "monthly"
+ * (the default), "weekly", "daily" or a cron string. Each run checks the
+ * models and re-reviews only what changed, so a run with nothing new costs
+ * only the model check.
  * Each provider's key is its standard name (ANTHROPIC_API_KEY, OPENAI_API_KEY,
  * GEMINI_API_KEY, XAI_API_KEY), shared with any other job that uses it;
  * "keys" names a separate one, to keep the reviews' spending apart.
@@ -80,7 +83,7 @@ export const ANSWER_FORMAT = "Start your answer with these two lines:\n"
 
 export const ARCHIVE = "archive";
 export const MODELS_FOLDER = "_models";
-const DEFAULT_EVERY = "30d";
+const DEFAULT_SCHEDULE = "monthly";
 
 export class AiReviews {
 
@@ -112,7 +115,7 @@ export class AiReviews {
         this.folder = config.folder.replace(/\/+$/, "");
         this.prompt = config.prompt || defaultPrompt(this.folder, site);
         this.homeCard = config.homeCard === true;
-        this.every = config.every || DEFAULT_EVERY;
+        this.schedule = config.schedule || DEFAULT_SCHEDULE;
         this.about = config.about ? config.about.replace(/\/+$/, "") : null;
         const keys = config.keys || {};
         this.providers = (config.providers || Object.keys(PROVIDERS)).map(p => {

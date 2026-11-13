@@ -37,7 +37,6 @@ import { askClaude, chooserPrompt, validChoices } from "./ModelChooser.js";
 import { archiveReview, defaultAboutMarkdown, defaultSectionMarkdown, frontmatterValue, inputHash, parseAnswer, reviewMarkdown, reviewMessage, writePage } from "./ReviewPages.js";
 
 const NOTHING_TO_DO = 3;
-const UNITS = { m: "minute", h: "hour", d: "day", w: "week" };
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 export function parseArgs (argv) {
@@ -188,13 +187,12 @@ function writeDefaultPages (reviews) {
     writePage(section, existsSync(join(section, "_index.md")) ? null : defaultSectionMarkdown(reviews.folder.split("/").pop()));
     if (reviews.about) {
         const about = join(section, reviews.about);
-        writePage(about, existsSync(join(about, "_index.md")) ? null : defaultAboutMarkdown(reviews.about, humanInterval(reviews.every)));
+        writePage(about, existsSync(join(about, "_index.md")) ? null : defaultAboutMarkdown(reviews.about, humanSchedule(reviews.schedule)));
     }
 }
 
-function humanInterval (every) {
-    const m = String(every).match(/^(\d+)\s*([mhdw])$/);
-    return m ? `${m[1]} ${UNITS[m[2]]}${m[1] === "1" ? "" : "s"}` : every;
+function humanSchedule (schedule) {
+    return { daily: "once a day", weekly: "once a week", monthly: "once a month" }[schedule] || "on a schedule";
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
