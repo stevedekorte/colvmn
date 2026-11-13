@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { parseAnswer, safeMarkdown, inputHash, normalizeHeadings } from "../update/ai/ReviewPages.js";
 import { parseChoice, validChoices } from "../update/ai/ModelChooser.js";
 import { UpdateJobs } from "../update/UpdateJobs.js";
+import { localDate } from "../update/ai/reviews.js";
 
 const AI = join(dirname(fileURLToPath(import.meta.url)), "..", "update", "ai");
 
@@ -252,4 +253,11 @@ test("a provider not chosen this run keeps Claude's last choice when it is still
         api.close();
         rmSync(site, { recursive: true, force: true });
     }
+});
+
+test("a review is dated in the machine's own time zone, not UTC's", () => {
+    // Late evening locally can already be tomorrow in UTC; the date must follow the local calendar.
+    const lateEvening = new Date(2026, 10, 12, 23, 30);
+    assert.equal(localDate(lateEvening), "2026-11-12");
+    assert.equal(localDate(new Date(2026, 0, 5, 0, 1)), "2026-01-05");
 });

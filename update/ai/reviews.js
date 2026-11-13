@@ -53,7 +53,13 @@ export function parseArgs (argv) {
     return options;
 }
 
-export async function main (argv = [], env = process.env, today = new Date().toISOString().slice(0, 10)) {
+/** A date as YYYY-MM-DD in the machine's own time zone (toISOString would give UTC's date). */
+export function localDate (date = new Date()) {
+    const pad = n => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+export async function main (argv = [], env = process.env, today = localDate()) {
     const options = parseArgs(argv);
     const siteRoot = env.COLVMN_SITE_ROOT || resolve(HERE, "..", "..", "..");
     const reviews = AiReviews.forSiteRoot(siteRoot);
