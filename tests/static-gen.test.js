@@ -134,6 +134,7 @@ test("aiReviews: provider cards, review headers with prefilled links, the archiv
         assert.doesNotMatch(claude.split("It is a framework.")[0], /Build stamp it quoted|not an endorsement/);
         assert.match(claude, /View the original conversation/);
         assert.match(claude, /not an endorsement by Anthropic/);
+        assert.match(claude, /class="review-header">[\s\S]*<nav class="toc"><ul><li><a href="#details">Details<\/a><\/li><li><a href="#earlier-reviews">Earlier reviews<\/a><\/li><\/ul><\/nav>/);   // a contents list under the header
         assert.match(claude, /class="review-verdict">A coherent naked-objects framework with a small community\.<\/p>/);   // the full verdict, at the top
         assert.match(claude, /Earlier reviews[\s\S]*archive\/2026-10-01\/index\.html/);
 

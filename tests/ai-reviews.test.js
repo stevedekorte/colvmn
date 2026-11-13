@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseAnswer, safeMarkdown, inputHash } from "../update/ai/ReviewPages.js";
+import { parseAnswer, safeMarkdown, inputHash, normalizeHeadings } from "../update/ai/ReviewPages.js";
 import { parseChoice, validChoices } from "../update/ai/ModelChooser.js";
 import { UpdateJobs } from "../update/UpdateJobs.js";
 
@@ -25,6 +25,9 @@ test("an answer gives its quoted stamp, verdict and review; HTML is escaped outs
     assert.match(a.body, /`a<b`/);
     assert.equal(parseAnswer("Build stamp: none\nVerdict: ok\nText").stamp, "");
     assert.equal(safeMarkdown("```\n<b>\n```"), "```\n<b>\n```");
+    assert.equal(normalizeHeadings("# STRVCT review\n\nIntro.\n\n### What it is\n\nText.\n\n#### Detail\n\n### Strengths"), "Intro.\n\n## What it is\n\nText.\n\n### Detail\n\n## Strengths");
+    assert.equal(normalizeHeadings("## A\n\nx\n\n## B"), "## A\n\nx\n\n## B", "already sectioned: unchanged");
+    assert.equal(normalizeHeadings("```\n# not a heading\n```\n### A\n### B"), "```\n# not a heading\n```\n## A\n## B");
     assert.notEqual(inputHash("a\nSite build: 1\n", "m", "p"), inputHash("a\nSite build: 1\n", "m2", "p"));
     assert.equal(inputHash("a\nSite build: 1\n", "m", "p"), inputHash("a\nSite build: 2\n", "m", "p"));   // the stamp line doesn't count
 });

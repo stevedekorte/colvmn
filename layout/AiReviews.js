@@ -222,10 +222,10 @@ export class AiReviews {
         } else if (role.kind === "review") {
             const earlier = this.archiveEntry(role.provider);
             const details = this.detailsEntry(role.provider, json);
-            json.content = [this.headerEntry(role.provider, json, false), ...content, ...[details, earlier].filter(Boolean)];
+            json.content = withContents([this.headerEntry(role.provider, json, false), ...content, ...[details, earlier].filter(Boolean)]);
         } else if (role.kind === "archived") {
             const details = this.detailsEntry(role.provider, json);
-            json.content = [this.headerEntry(role.provider, json, true), ...content, ...(details ? [details] : [])];
+            json.content = withContents([this.headerEntry(role.provider, json, true), ...content, ...(details ? [details] : [])]);
         }
     }
 
@@ -377,6 +377,17 @@ export class AiReviews {
 function describeModelAndDate (meta) {
     const model = meta.modelName || meta.model;
     return [model, meta.reviewed].filter(Boolean).join(" · ");
+}
+
+/**
+ * A review page's entries with a contents list after the header: every
+ * titled section, the review's own and Details and Earlier reviews, in place
+ * of the one the Markdown parser adds only for longer pages.
+ */
+function withContents (entries) {
+    const [header, ...rest] = entries.filter(e => e.type !== "ContentToc");
+    const titles = rest.filter(e => e.title).map(e => e.title);
+    return titles.length >= 2 ? [header, { type: "ContentToc", items: titles }, ...rest] : [header, ...rest];
 }
 
 /** The prompt as a quote, its lines kept. */

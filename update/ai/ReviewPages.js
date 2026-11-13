@@ -59,13 +59,51 @@ function unquote (s) {
 
 /**
  * A model's Markdown, made safe to publish: no raw HTML outside code (a page
- * must never run what a model wrote), and headings one level down when it
- * used a top-level one (the page's own title is the only h1).
+ * must never run what a model wrote), and its headings arranged for the page.
  */
 export function safeMarkdown (md) {
     const parts = md.split(/(```[\s\S]*?```|`[^`\n]*`)/);
     const escaped = parts.map((p, i) => i % 2 === 1 ? p : p.replace(/</g, "&lt;")).join("");
-    return /^# /m.test(escaped) ? escaped.replace(/^(#{1,5}) /gm, "#$1 ") : escaped;
+    return normalizeHeadings(escaped);
+}
+
+/**
+ * Headings as the page needs them: a lone title at the top is dropped (the
+ * page has its own), and the top level used becomes ## (the page's sections,
+ * which its contents list links to). Only heading levels change; no words.
+ */
+export function normalizeHeadings (md) {
+    const lines = md.split("\n");
+    let inFence = false;
+    const headings = [];
+    lines.forEach((line, i) => {
+        if (/^```/.test(line)) {
+            inFence = !inFence;
+        }
+        const m = !inFence && line.match(/^(#{1,6}) /);
+        if (m) {
+            headings.push({ i, level: m[1].length });
+        }
+    });
+    if (headings.length === 0) {
+        return md;
+    }
+    const first = headings[0];
+    const isLeadingTitle = lines.slice(0, first.i).every(l => l.trim() === "")
+        && headings.filter(h => h.level <= first.level).length === 1 && headings.length > 1;
+    if (isLeadingTitle) {
+        lines[first.i] = null;
+        if (lines[first.i + 1] !== undefined && lines[first.i + 1].trim() === "") {
+            lines[first.i + 1] = null;
+        }
+        headings.shift();
+    }
+    const shift = Math.min(...headings.map(h => h.level)) - 2;
+    headings.forEach(h => {
+        const level = Math.max(2, Math.min(6, h.level - shift));
+        lines[h.i] = "#".repeat(level) + lines[h.i].replace(/^#+/, "");
+    });
+    return lines.filter(l => l !== null).join("\n").trim();
 }
 
 /** One frontmatter line; values kept to one line. */
