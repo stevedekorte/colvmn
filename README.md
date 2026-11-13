@@ -146,7 +146,7 @@ A section of pages in which AI models review the site. colvmn renders the sectio
 
 Each provider is a subfolder of the section. The four above have their company, app and prefilled-prompt link built in; another is given as `{ "name", "company", "app", "ask" }`, where `ask` is a URL with `{prompt}` in it. A review is the provider folder's `_index.md`: frontmatter `modelName`, `model`, `reviewed` (the date), `stamp` (the build stamp the model quoted), `summary` (the model's own one-line summary, which the prompt should ask for; it is the card's text under the full model name) and `share` (a link to the original conversation, optional), and the review as its body. Replaced reviews go in `<provider>/archive/<date>/`.
 
-The generator adds one card per provider to the section page (and the about card), with the prompt after the page's own text or on the about page; a header to each review (model, date, quoted stamp, "Ask … yourself", the original conversation, and a not-an-endorsement line); and the list of earlier reviews. The whole section is left out of the llms files and the build stamp, so later reviews never read earlier ones.
+In the section page's subtitle, `{date}` becomes the latest review's date ("AI reviews of this site's content on {date}"; with no review yet, " on {date}" is dropped). The generator adds one card per provider to the section page (and the about card), with the prompt after the page's own text or on the about page; a header to each review (model, date, quoted stamp, "Ask … yourself", the original conversation, and a not-an-endorsement line); and the list of earlier reviews. The whole section is left out of the llms files and the build stamp, so later reviews never read earlier ones.
 
 ### Scheduled updates
 

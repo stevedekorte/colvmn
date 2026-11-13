@@ -34,7 +34,8 @@
  * Replaced reviews live in <provider>/archive/<date>/, newest first.
  *
  * What the generator adds:
- *   section page   one card per provider (model name, date, its summary) and the about
+ *   section page   {date} in its subtitle becomes the latest review's date;
+ *                  one card per provider (model name, date, its summary) and the about
  *                  card, then the page's own text (and the prompt, when
  *                  there's no about page)
  *   about page     its own text, then the prompt
@@ -119,6 +120,7 @@ export class AiReviews {
         const role = this.roleOf(pageDir);
         const content = json.content || [];
         if (role.kind === "section") {
+            json.subtitle = this.fillDate(json.subtitle);
             json.content = this.about ? [this.providerCards(), ...content] : [this.providerCards(), ...content, this.promptEntry()];
         } else if (role.kind === "about") {
             json.content = [...content, this.promptEntry()];
@@ -151,6 +153,20 @@ export class AiReviews {
             items.push(about);
         }
         return { type: "ContentCards", items, columns: this.providers.length % 2 === 0 ? 2 : undefined };
+    }
+
+    /** A section subtitle with {date} as the latest review's date; without a review, " on {date}" (or "{date}") is dropped. */
+    fillDate (text) {
+        if (typeof text !== "string" || !text.includes("{date}")) {
+            return text;
+        }
+        const dates = this.providers
+            .map(p => this.reviewMeta(join(this.sectionDir(), p.name)))
+            .filter(Boolean)
+            .map(meta => String(meta.reviewed))
+            .sort();
+        const latest = dates[dates.length - 1];
+        return latest ? text.replaceAll("{date}", escapeHtml(latest)) : text.replace(/\s*\bon \{date\}|\{date\}/g, "");
     }
 
     /** The card for the "how these are made" page, last in the grid; null without one. */
