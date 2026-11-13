@@ -133,6 +133,7 @@ test("aiReviews: provider cards, review headers with prefilled links, the archiv
         assert.doesNotMatch(claude.split("It is a framework.")[0], /Build stamp it quoted|not an endorsement/);
         assert.match(claude, /View the original conversation/);
         assert.match(claude, /not an endorsement by Anthropic/);
+        assert.match(claude, /class="review-verdict">A coherent naked-objects framework with a small community\.<\/p>/);   // the full verdict, at the top
         assert.match(claude, /Earlier reviews[\s\S]*archive\/2026-10-01\/index\.html/);
 
         const archived = read("AI Reviews/Claude/archive/2026-10-01");

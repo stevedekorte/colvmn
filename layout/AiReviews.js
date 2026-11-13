@@ -248,7 +248,7 @@ export class AiReviews {
             }
             return {
                 title: escapeHtml(meta.modelName || meta.model || p.name),
-                subtitle: escapeHtml(cardSummary(meta.summary || "")),
+                subtitle: escapeHtml(meta.summary || ""),
                 folder: p.name,
                 arrow: "Read"
             };
@@ -296,6 +296,9 @@ export class AiReviews {
     /** The top of a review: model and date, the links, and whether it's been replaced. */
     headerEntry (provider, meta, archived) {
         const lines = [`<p class="review-model">${escapeHtml(describeModelAndDate(meta) || provider.name)}</p>`];
+        if (meta.summary) {
+            lines.push(`<p class="review-verdict">${escapeHtml(meta.summary)}</p>`);
+        }
         if (!meta.reviewed) {
             lines.push("<p class=\"review-note\">Not reviewed yet.</p>");
         } else if (archived) {
@@ -371,16 +374,6 @@ export class AiReviews {
         const json = parseMarkdown(readFileSync(path, "utf-8"));
         return json.reviewed ? json : null;
     }
-}
-
-/** The model's own one-line summary, clipped at a word if it runs long for a card. */
-function cardSummary (text) {
-    const max = 140;
-    if (text.length <= max) {
-        return text;
-    }
-    const cut = text.slice(0, max);
-    return cut.slice(0, cut.lastIndexOf(" ")).replace(/[,;:.]$/, "") + "…";
 }
 
 function describeModelAndDate (meta) {
