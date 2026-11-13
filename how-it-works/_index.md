@@ -14,6 +14,8 @@ The generator also writes:
 
 When the optional `colvmn.json` at the site root sets `siteUrl`, canonical `<link>` tags and absolute sitemap entries are emitted. Its `llmsExclude` list, and a page's `llms: false`, leave pages out of the llms files; `buildStamp: true` adds a line naming the last commit that changed an included page.
 
+A folder with its own `colvmn/static-gen.js` is a **nested site**: a site of its own inside another, such as a project's docs. The enclosing site's build renders it as its own site, with its own `topTitle` and back-links, and keeps its pages out of the enclosing site's llms files and build stamp; they stay in the sitemap. Its colvmn must be the same version as the root's, or the build stops and says so.
+
 ## Generating
 
 Regenerate the static HTML, `sitemap.xml`, `llms.txt`, and `llms-full.txt` from the site root:

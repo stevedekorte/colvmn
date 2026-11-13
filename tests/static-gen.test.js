@@ -286,14 +286,15 @@ test("aiReviews homeCard: a card for the section joins the root page's last card
 test("a heading marked {.collapsed} builds a closed section that its heading opens; the marker stays out of the llms files", () => {
     const site = makeSite({});
     try {
-        writePage(site, "kept", "# Kept Page\n\nKept text.\n\n## Notes {.collapsed}\n\nHidden text.\n\n## Open\n\nShown text.\n");
+        writePage(site, "kept", "# Kept Page\n\nKept text.\n\n## Notes {.collapsed}\n\nHidden text.\n\n```markdown\n## Example {.collapsed}\n```\n\n## Open\n\nShown text.\n");
         const { llmsFull } = build(site);
         const html = readFileSync(join(site, "kept", "index.html"), "utf-8");
         assert.match(html, /<h2 id="notes" class="collapsible-head"><button type="button" class="collapsible-toggle" aria-expanded="false" aria-controls="notes-panel"><span class="collapsible-title">Notes<\/span>/);
         assert.match(html, /<noscript><style>#notes-panel\{[^<]*<\/style><\/noscript><div id="notes-panel" class="collapsible-panel"><div class="collapsible-inner"><div class="section"><div class="section-body"><p>Hidden text\.<\/p>/);
         assert.match(html, /<h2 id="open">Open<\/h2>/);
         assert.match(llmsFull, /^## Notes$/m);
-        assert.doesNotMatch(llmsFull, /\{\.collapsed\}/);
+        assert.doesNotMatch(llmsFull, /^## Notes \{\.collapsed\}/m);
+        assert.match(llmsFull, /^## Example \{\.collapsed\}$/m);   // an example in a code block keeps it
     } finally {
         rmSync(site, { recursive: true, force: true });
     }

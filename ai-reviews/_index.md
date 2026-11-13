@@ -1,27 +1,24 @@
 ---
 title: AI Reviews
-subtitle: Claude, ChatGPT, Gemini and Grok review your site, or any section of it, from its own docs. One setting per page and an API key; colvmn does the rest.
+subtitle: Any page can have Claude, ChatGPT, Gemini and Grok review it and everything below it, from its own docs. One setting on the page and an API key; colvmn does the rest.
 ---
 
-AI Reviews show what the major AI models make of a page and everything below it: the whole site from its root page, or one guide, tutorial or reference from its own page. Each model's first answer is published unedited, redone when those docs or the model change. colvmn finds the models, asks them, writes the pages and keeps the history.
+AI reviews belong to a page. A page that opts in gets reviews of its folder and everything below it: opt in the root page to review the whole site, or a guide, tutorial or reference to review just that. Each model's first answer is published unedited, next to the page, and redone when those docs or the model change. colvmn finds the models, asks them, writes the pages and keeps the history.
 
 ## Setting it up
 
-Add this to the site's `colvmn.json`:
-
-```json
-"aiReviews": {
-    "folder": "AI Reviews",
-    "homeCard": true
-}
-```
-
-Then opt in each page whose folder should be reviewed, in its frontmatter (or `"aiReviews": true` in its `_index.json`):
+Opt in each page whose folder should be reviewed, in its frontmatter (or `"aiReviews": true` in its `_index.json`):
 
 ```markdown
 ---
 aiReviews: true
 ---
+```
+
+And name the reviews folder once, in the site's `colvmn.json`:
+
+```json
+"aiReviews": { "folder": "AI Reviews" }
 ```
 
 The root is a page like any other: opt it in to review the whole site. Opting in isn't inherited, so a page under an opted-in page has reviews of its own only if it opts in too. Reviewing a folder of one short page says little; the root and a few big sections are where reviews are worth having.
@@ -46,7 +43,19 @@ A page's reviews cover its folder and everything below it, minus every reviews f
 - **The root** is reviewed from the site's `llms-full.txt`.
 - **Any other page** is reviewed from its own `llms-full.txt`, which the build writes next to it with only that folder's pages. With `buildStamp`, it carries its own stamp: the last commit that touched a page in that folder.
 
-A parent's review therefore also covers its opted-in children's content. Each review says which build it read, and each page's reviews sit with that page.
+A parent's review therefore also covers its opted-in children's content. Each review says which build it read, and each page's reviews sit with that page:
+
+```
+docs/Guide/
+    _index.md           aiReviews: true
+    llms-full.txt       this folder's pages, for its reviews
+    AI Reviews/
+        _index.md       the reviews page: one card per model
+        Claude/         the current review, and archive/
+        ChatGPT/
+        Gemini/
+        Grok/
+```
 
 ## What happens
 
@@ -61,10 +70,9 @@ The first time, each reviews page is written with default text. Edit it as you l
 
 ## The pages
 
-- **The page itself.** A footer link to its reviews: **AI reviews →**.
+- **The page itself.** A link to its reviews, **AI reviews →**, on the page's footer line, once the first review exists.
 - **The reviews page** (`<page>/AI Reviews/`). "AI reviews of this section's content on {date}", where `{date}` becomes the latest review's date. Then one card per model: its full name and its one-sentence verdict.
 - **A review page.** The model, date and verdict, the review, then **Details**, closed until clicked: the model ID, the build stamp the model quoted, the exact prompt with a link that opens it in that model's own app, and a line saying it isn't an endorsement by the provider. Then earlier reviews.
-- **The home page,** with `homeCard` and an opted-in root. A card for the root's reviews, added to the root page's last card grid.
 
 Every reviews folder is left out of `llms.txt` and every `llms-full.txt`, so a model reviewing the site never reads earlier reviews.
 
@@ -95,15 +103,15 @@ In `colvmn.json`'s `aiReviews`:
 | `folder` | The reviews subfolder's name in each opted-in folder. The only one required. |
 | `prompt` | The default prompt for every opted-in page. |
 | `providers` | Default `["Claude", "ChatGPT", "Gemini", "Grok"]`. `{ "name": "Claude", "model": "<id>" }` pins a model instead of having it chosen. Another provider is `{ "name", "company", "app", "ask" }` (`ask` is a URL with `{prompt}`); it can be shown, not produced. |
-| `homeCard` | `true` adds a card for the root's reviews to the root page. |
+| `homeCard` | `true` also adds a card for the root's reviews to the root page's last card grid. |
 | `schedule` | How often the job runs: `monthly` by default, or `weekly`, `daily` or a cron string. A run with nothing new costs only the model check. |
 | `keys` | A key name per provider, instead of its standard one: `{ "Claude": "CLAUDE_REVIEW_KEY" }`. |
 
-`about` is no longer used, since each review's Details show its prompt. The build warns while it is set, and while no page opts in.
+The build warns while `aiReviews` is set but no page opts in.
 
-## Moving from a site-wide section
+## From site-wide reviews
 
-A site set up before reviews were per page has its section at `AI Reviews/` in the root, which is where the root's reviews now live. Add `aiReviews: true` to the root page; the reviews, archives and URLs stay where they are. If `colvmn.json` sets `about`, remove it and delete that page and its folder.
+Before reviews were per page, a site had one section at `AI Reviews/` in its root. That is where the root's reviews live now, so opting in the root page keeps its reviews, archives and URLs. The old `about` setting and its Review Process page are gone, since each review's Details show its prompt; the build warns while `about` is set.
 
 ## Corrections
 

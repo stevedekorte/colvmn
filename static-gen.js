@@ -699,6 +699,16 @@ function readPageMeta (pageDir) {
     return null;
 }
 
+// A page's markdown for llms-full.txt: "## Title {.collapsed}" loses its
+// marker, except inside fenced code, where it is an example.
+function withoutCollapsedMarkers (markdown) {
+    let inFence = false;
+    return markdown.split("\n").map(line => {
+        if (/^\s*```/.test(line)) inFence = !inFence;
+        return inFence ? line : line.replace(/^(#{2,6} .*?)\s*\{\.collapsed\}[ \t]*$/, "$1");
+    }).join("\n");
+}
+
 function pageDisplayTitle (pageDir, meta) {
     if (meta && meta.json && meta.json.title) return meta.json.title;
     const relPath = relative(siteRoot, pageDir);
@@ -907,7 +917,7 @@ function generateLlmsFull (pages, scope = null) {
         out += `Source: ${url}\n\n`;
 
         if (meta.rawMarkdown) {
-            out += meta.rawMarkdown.trim().replace(/^(#{2,6} .*?)\s*\{\.collapsed\}[ \t]*$/gm, "$1") + "\n";
+            out += withoutCollapsedMarkers(meta.rawMarkdown.trim()) + "\n";
         } else {
             out += jsonPageToMarkdown(meta.json);
         }

@@ -21,6 +21,9 @@ The same top-level keys work in markdown frontmatter and at the top of `_index.j
 | `subtitle` | A tagline rendered just under the header. |
 | `content` | An array of content blocks. In JSON this is the body; in markdown frontmatter it replaces the body. |
 | `llms` | `false` leaves the page and everything under it out of `llms.txt` and `llms-full.txt`. It is still generated and in the sitemap. |
+| `aiReviews` | `true` has AI models review this page's folder (see [AI Reviews](../ai-reviews/index.html)). `prompt` sets its review prompt. Not inherited. |
+| `footerLinks` | `[{ "title": "…", "href": "…" }]`: links on one line at the left of the page footer, separated by middle dots. The AI reviews link joins them. |
+| `nextSectionLink` | `true` adds a footer link to the next sibling in the parent's cards, or up to the parent after the last one. |
 
 ## Content blocks
 
@@ -31,6 +34,8 @@ A block is an object with a `type` and its own fields. Any block may also carry 
 | `ContentText` | Headings, paragraphs, prose sections |
 | `ContentCards` | Grid of linked cards |
 | `ContentTable` | Tables with headers, rows, and an optional note |
+| `ContentImage` | One image |
+| `ContentSlideshow` | Images that crossfade in one frame |
 | `ContentUnorderedList` | Bulleted lists |
 | `ContentOrderedList` | Numbered lists |
 | `ContentKeyValue` | Key/value pairs |
@@ -38,7 +43,36 @@ A block is an object with a `type` and its own fields. Any block may also carry 
 | `ContentFAQ` | Question/answer entries |
 | `ContentToc` | Table of contents (usually generated automatically) |
 
-Markdown pages produce `ContentText` blocks automatically; the rest are written in JSON or a frontmatter `content` array. Images use markdown image syntax — append `{.colvmn-zoomable-image}` to make one open in a lightbox.
+Markdown pages produce `ContentText` blocks automatically; the rest are written in JSON or a frontmatter `content` array.
+
+## Images, slideshows and collapsed sections
+
+These need no JSON: markdown marks them with a Pandoc-style `{…}` suffix.
+
+**Zoomable images.** Append `{.colvmn-zoomable-image}` to an image to have a click open it full size:
+
+```markdown
+![Architecture](images/arch.svg){.colvmn-zoomable-image}
+```
+
+**Slideshows.** Mark consecutive images `{.slideshow}` to show them in one frame that crossfades between them:
+
+```markdown
+![Light cycles on the grid](images/cycles.jpg){.slideshow .autoplay}
+![The maze from above](images/maze.jpg){.slideshow}
+```
+
+With a mouse, arrows fade in at the image's left and right edges; on a touch screen, a tap on either half moves. Arrow keys, swipes and trackpad swipes work too, and a click on the middle enlarges the image. Below it, ‹ 1 / 2 › shows where you are. Two options, as classes on any of its images: `.autoplay` advances by itself every few seconds while it's on screen (pausing while you hover or interact), and `.no-controls` hides the ‹ 1 / 2 › line. Without JavaScript, and in print, the images are stacked.
+
+**Collapsed sections.** Mark a section's heading `{.collapsed}` to have it start closed:
+
+```markdown
+## Details {.collapsed}
+```
+
+The heading becomes a button with a plus that turns to a minus as the section slides open. A link to the section opens it. Without JavaScript, and in print, it shows open. In JSON, set `"collapsed": true` on a top-level `ContentText` block.
+
+Both markers are left out of `llms-full.txt`.
 
 ### ContentText
 
@@ -73,6 +107,21 @@ A grid of cards. `columns` is optional (it defaults to the item count, capped at
 - A bare string is a **folder card**; its title and subtitle are read from that subfolder's own `_index`.
 - An object with `folder` is a folder card with an explicit `title` and `subtitle`.
 - An object with `href` is a **link card** to any URL; `arrow` sets the call-to-action label (it defaults to "View").
+
+### ContentSlideshow
+
+The JSON form of a slideshow. `autoplay` (default `false`) advances by itself; `"controls": false` hides the ‹ 1 / 2 › line.
+
+```json
+{
+  "type": "ContentSlideshow",
+  "autoplay": true,
+  "images": [
+    { "src": "images/cycles.jpg", "alt": "Light cycles on the grid" },
+    { "src": "images/maze.jpg", "alt": "The maze from above" }
+  ]
+}
+```
 
 ### ContentTable
 

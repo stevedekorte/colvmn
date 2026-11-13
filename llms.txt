@@ -6,7 +6,7 @@ Site build: colvmn · 2026-11-13 · 7ff7970
 
 ## AI Reviews
 
-- [AI Reviews](/ai-reviews/): Claude, ChatGPT, Gemini and Grok review your site, or any section of it, from its own docs. One setting per page and an API key; colvmn does the rest.
+- [AI Reviews](/ai-reviews/): Any page can have Claude, ChatGPT, Gemini and Grok review it and everything below it, from its own docs. One setting on the page and an API key; colvmn does the rest.
 
 ## Authoring
 
