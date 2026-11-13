@@ -48,6 +48,8 @@ How it works:
 - `layout/ContentBase.js` — base class for content blocks (`computeHtml` = build markup; `postRender` = runtime behavior hook)
 - `layout/Content*.js` — content block renderers (Text, Cards, Table, Image, Timeline, Toc, KeyValue, UnorderedList, OrderedList)
 - `layout/MarkdownParser.js` — frontmatter + markdown to page JSON
+- `layout/ContentSlideshow.js` — the slideshow block for `_index.json` pages
+- `layout/Slideshow.js` — slideshow behavior (see "Slideshows")
 - `layout/Collapsible.js` — open/close behavior for collapsed sections (page-global, event delegation; see "Collapsed sections")
 - `layout/AiReviews.js` — AI reviews: `AiReviews` (the site's `colvmn.json` `aiReviews` settings and providers, and the pages that opt in with `aiReviews: true`) and `ReviewScope` (one opted-in page's folder: its prompt, its reviews folder, and what the generator adds: provider cards, review headers and details, archive lists, the footer link, the home card; reviews folders are out of every llms file). Build-time only, not bundled
 - `update.js` — the scheduled-updates runner: finds `_update.md` jobs, decides which are due (schedule or `on: push`, `watch`, `minInterval`), runs them, publishes (`direct` or `pr`), and emails a summary if `colvmn.json` asks
@@ -61,6 +63,7 @@ How it works:
 The markdown parser supports:
 - Standard markdown (headings, bold, italic, links, images, code blocks, lists)
 - Collapsed sections — `## Details {.collapsed}` (or `"collapsed": true` on a top-level `ContentText` in JSON) builds a section shown closed, whose heading opens it (see "Collapsed sections")
+- Slideshows — consecutive images marked `{.slideshow}` share one frame and crossfade (see "Slideshows")
 - Image attribute lists — a Pandoc-style `{…}` suffix on an image: `![alt](src){.class #id key=value}` (see "Zoomable images")
 - Tables (standard `| col | col |` pipe syntax)
 - Raw HTML blocks (passed through as-is)
@@ -78,6 +81,10 @@ It is progressive enhancement: the markup ships from the build, and the interact
 ## Collapsed sections
 
 A top-level section can start closed: mark its heading `## Details {.collapsed}` in markdown, or set `"collapsed": true` on its `ContentText` entry in `_index.json`. The heading becomes a button with a plus mark; clicking it slides the section open and the plus turns to a minus. A link to the section (a contents entry, say) or to anything inside it opens it. The markup ships from the build (`ContentText.collapsedHtml`); `layout/Collapsible.js` (`initCollapsibles`, wired in from `layout.js`) attaches the behavior. With no JS, a `<noscript>` style shows it open, and print shows it open. The marker is left out of `llms-full.txt`. AI review pages use it for their Details.
+
+## Slideshows
+
+Consecutive images marked `{.slideshow}` (`![Alt](a.jpg){.slideshow}`, in one paragraph or several in a row) become one slideshow: the images share one frame and crossfade slowly, with previous and next buttons and an "n / total" count below. Arrow keys (when it has focus), a swipe or a two-finger trackpad swipe move between them; a click enlarges the image (each slide is `colvmn-zoomable-image`). Options, as classes on any of its images: `.autoplay` advances by itself every 6.5 seconds while on screen (pausing on hover, focus, a hidden tab, an enlarged image or reduced motion), and `.no-controls` hides the arrows and count (keys, swipes and clicks still work). `{.slideshow .autoplay .no-controls}` is a hands-off slideshow. In `_index.json`, the same slideshow is a `ContentSlideshow` block: `{ "type": "ContentSlideshow", "autoplay": true, "controls": false, "images": [{ "src": "images/a.jpg", "alt": "…" }] }`. The markup ships from the build (`MarkdownParser.slideshowHtml`, also used by `layout/ContentSlideshow.js`); `layout/Slideshow.js` (`initSlideshows`, wired in from `layout.js` after `initLightbox`) attaches the behavior. Without JS, and in print, the images are stacked.
 
 ## Page Metadata
 

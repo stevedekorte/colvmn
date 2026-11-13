@@ -278,13 +278,65 @@ function parseBlocks (lines) {
     return blocks;
 }
 
+// A paragraph holding only images marked {.slideshow}.
+const SLIDESHOW_PARAGRAPH = /^(?:\s*<img\b[^>]*\bclass="(?:[^"]*\s)?slideshow(?:\s[^"]*)?"[^>]*>\s*)+$/;
+
+/**
+ * Consecutive images marked {.slideshow} (in one paragraph or several in a
+ * row) as one slideshow: the images crossfade in one frame, with previous and
+ * next buttons and a counter (layout/Slideshow.js). Each image is zoomable.
+ * Options, as classes on any of its images: .autoplay (advance by itself)
+ * and .no-controls (hide the arrows and count).
+ * Without JavaScript the noscript style shows them stacked.
+ */
+const SLIDESHOW_OPTIONS = ["autoplay", "no-controls"];
+
+export function slideshowHtml (imgs) {
+    const n = imgs.length;
+    // Options, as classes on any of its images: .autoplay advances by itself; .no-controls hides the arrows and count.
+    const options = new Set();
+    const slides = imgs.map((img, k) => {
+        let tag = img.replace(/\bclass="([^"]*)"/, (m, c) => {
+            const classes = c.split(/\s+/).filter(x => x && x !== "slideshow");
+            classes.filter(x => SLIDESHOW_OPTIONS.includes(x)).forEach(x => options.add(x));
+            return `class="${classes.filter(x => !SLIDESHOW_OPTIONS.includes(x)).concat("colvmn-zoomable-image").join(" ")}"`;
+        });
+        if (k > 0 && !/\bloading=/.test(tag)) tag = tag.replace(/^<img\b/, '<img loading="lazy"');
+        const active = k === 0 ? " is-active" : "";
+        const hidden = k === 0 ? "" : ' aria-hidden="true"';
+        return `<figure class="slide${active}" aria-roledescription="slide" aria-label="${k + 1} of ${n}"${hidden}>${tag}</figure>`;
+    }).join("");
+    const optionClasses = SLIDESHOW_OPTIONS.filter(o => options.has(o)).map(o => ` ${o}`).join("");
+    return `<div class="colvmn-slideshow${optionClasses}" role="region" aria-roledescription="carousel" aria-label="Images" tabindex="0">`
+        + `<div class="slideshow-frame">${slides}</div>`
+        + '<div class="slideshow-controls"><button class="slideshow-btn slideshow-prev" type="button" aria-label="Previous image">&lsaquo;</button>'
+        + `<span class="slideshow-count">1 / ${n}</span>`
+        + '<button class="slideshow-btn slideshow-next" type="button" aria-label="Next image">&rsaquo;</button></div>'
+        + '<p class="slideshow-live" aria-live="polite"></p>'
+        + "<noscript><style>.colvmn-slideshow .slideshow-frame{display:block}.colvmn-slideshow .slide{opacity:1;margin-bottom:20px}.colvmn-slideshow .slideshow-controls{display:none}</style></noscript>"
+        + "</div>";
+}
+
 function blocksToHtml (blocks) {
-    return blocks.map(b => {
+    // Gather consecutive slideshow paragraphs into one block first.
+    const grouped = [];
+    for (const b of blocks) {
+        if (b.type === "paragraph" && SLIDESHOW_PARAGRAPH.test(b.text)) {
+            const imgs = b.text.match(/<img\b[^>]*>/g);
+            const last = grouped[grouped.length - 1];
+            if (last && last.type === "slideshow") last.imgs.push(...imgs);
+            else grouped.push({ type: "slideshow", imgs });
+        } else {
+            grouped.push(b);
+        }
+    }
+    return grouped.map(b => {
         switch (b.type) {
             case "paragraph": return `<p>${b.text}</p>`;
             case "ul": return "<ul>" + b.items.map(i => `<li>${i}</li>`).join("") + "</ul>";
             case "ol": return (b.start === 1 ? "<ol>" : `<ol start="${b.start}">`) + b.items.map(i => `<li>${i}</li>`).join("") + "</ol>";
             case "html": return b.html;
+            case "slideshow": return slideshowHtml(b.imgs);
             case "heading": return `<h${b.level} id="${slugify(b.text)}">${inlineMarkdown(b.text)}</h${b.level}>`;
             default: return "";
         }

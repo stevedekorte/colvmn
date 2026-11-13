@@ -44,6 +44,7 @@ import { ContentToc } from "./layout/ContentToc.js";
 import { ContentFAQ } from "./layout/ContentFAQ.js";
 import { ContentClassDoc } from "./layout/ContentClassDoc.js";
 import { ContentComparisonTable } from "./layout/ContentComparisonTable.js";
+import { ContentSlideshow } from "./layout/ContentSlideshow.js";
 import { PageIndex } from "./layout/PageIndex.js";
 import { AiReviews } from "./layout/AiReviews.js";
 import { exposedSecretFiles, exposedMessage } from "./update/SecretFiles.js";
@@ -64,6 +65,7 @@ ContentBase.typeMap = {
     ContentFAQ,
     ContentClassDoc,
     ContentComparisonTable,
+    ContentSlideshow,
 };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -141,9 +143,11 @@ const BUNDLE_FILES = [
     "ContentFAQ.js",
     "ContentClassDoc.js",
     "ContentComparisonTable.js",
+    "ContentSlideshow.js",
     "PageIndex.js",
     "Lightbox.js",
     "Collapsible.js",
+    "Slideshow.js",
     "layout.js",
 ];
 
@@ -781,6 +785,8 @@ function contentEntryToMarkdown (entry, depth = 0) {
             const src = entry.src || entry.href || "";
             return src ? `![${alt}](${src})\n\n` : "";
         }
+        case "ContentSlideshow":
+            return (entry.images || []).filter(im => im.src).map(im => `![${im.alt || ""}](${im.src})\n\n`).join("");
         case "ContentToc":
             return "";
         default:

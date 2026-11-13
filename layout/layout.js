@@ -11,9 +11,11 @@ import { ContentToc } from "./ContentToc.js";
 import { ContentFAQ } from "./ContentFAQ.js";
 import { ContentClassDoc } from "./ContentClassDoc.js";
 import { ContentComparisonTable } from "./ContentComparisonTable.js";
+import { ContentSlideshow } from "./ContentSlideshow.js";
 import { PageIndex } from "./PageIndex.js";
 import { initLightbox } from "./Lightbox.js";
 import { initCollapsibles } from "./Collapsible.js";
+import { initSlideshows } from "./Slideshow.js";
 
 ContentBase.typeMap = {
     ContentText,
@@ -28,6 +30,7 @@ ContentBase.typeMap = {
     ContentFAQ,
     ContentClassDoc,
     ContentComparisonTable,
+    ContentSlideshow,
 };
 
 // Browser bootstrap. PageIndex.init() runs the runtime pass (loadPage + render);
@@ -39,4 +42,5 @@ document.addEventListener("DOMContentLoaded", () => {
     new PageIndex().init();
     initLightbox();
     initCollapsibles();
+    initSlideshows();   // after initLightbox: it leaves only the shown slide focusable
 });

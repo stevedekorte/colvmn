@@ -988,6 +988,92 @@ p code, li code, p tt, li tt {
   .collapsible-toggle, .collapsible-mark, .collapsible-mark::after, .collapsible-panel { transition: none; }
 }
 
+/* Slideshows (consecutive images marked {.slideshow}): the images share one
+   frame and crossfade slowly; previous, count and next sit centered below.
+   layout/Slideshow.js moves between them. */
+.colvmn-slideshow {
+  margin: 20px 0;
+  outline: none;
+}
+.slideshow-frame {
+  display: grid;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.colvmn-slideshow:focus-visible .slideshow-frame {
+  outline: 1px solid #2a2a2a;
+  outline-offset: 4px;
+}
+.slideshow-frame .slide {
+  grid-area: 1 / 1;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 1.8s ease-in-out;
+}
+.slideshow-frame .slide.is-active {
+  opacity: 1;
+  z-index: 1;
+}
+.slideshow-frame .slide img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  -webkit-user-drag: none;
+}
+.slideshow-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-top: 6px;
+}
+.colvmn-slideshow.single .slideshow-controls,
+.colvmn-slideshow.no-controls .slideshow-controls {
+  display: none;
+}
+.slideshow-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  width: 24px;
+  height: 32px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  color: #555;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.slideshow-btn:hover {
+  color: #2a2a2a;
+}
+.slideshow-btn:focus-visible {
+  outline: 1px solid #2a2a2a;
+  outline-offset: 2px;
+}
+.slideshow-count {
+  font-size: 13px;
+  color: #555;
+  font-variant-numeric: tabular-nums;
+}
+.slideshow-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .slideshow-frame .slide { transition: none; }
+}
+
 /* Print */
 @media print {
   body { background: none; }
@@ -1006,6 +1092,9 @@ p code, li code, p tt, li tt {
   .page-footer { display: none; }
   .collapsible-panel { grid-template-rows: 1fr; visibility: visible; opacity: 1; }
   .collapsible-mark { display: none; }
+  .slideshow-frame { display: block; }
+  .slideshow-frame .slide { opacity: 1; margin-bottom: 12px; break-inside: avoid; }
+  .slideshow-controls { display: none; }
 }
 
 /* ClassDoc — language-agnostic class/proto/struct documentation */

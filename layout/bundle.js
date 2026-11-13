@@ -284,13 +284,65 @@ function parseBlocks (lines) {
     return blocks;
 }
 
+// A paragraph holding only images marked {.slideshow}.
+const SLIDESHOW_PARAGRAPH = /^(?:\s*<img\b[^>]*\bclass="(?:[^"]*\s)?slideshow(?:\s[^"]*)?"[^>]*>\s*)+$/;
+
+/**
+ * Consecutive images marked {.slideshow} (in one paragraph or several in a
+ * row) as one slideshow: the images crossfade in one frame, with previous and
+ * next buttons and a counter (layout/Slideshow.js). Each image is zoomable.
+ * Options, as classes on any of its images: .autoplay (advance by itself)
+ * and .no-controls (hide the arrows and count).
+ * Without JavaScript the noscript style shows them stacked.
+ */
+const SLIDESHOW_OPTIONS = ["autoplay", "no-controls"];
+
+function slideshowHtml (imgs) {
+    const n = imgs.length;
+    // Options, as classes on any of its images: .autoplay advances by itself; .no-controls hides the arrows and count.
+    const options = new Set();
+    const slides = imgs.map((img, k) => {
+        let tag = img.replace(/\bclass="([^"]*)"/, (m, c) => {
+            const classes = c.split(/\s+/).filter(x => x && x !== "slideshow");
+            classes.filter(x => SLIDESHOW_OPTIONS.includes(x)).forEach(x => options.add(x));
+            return `class="${classes.filter(x => !SLIDESHOW_OPTIONS.includes(x)).concat("colvmn-zoomable-image").join(" ")}"`;
+        });
+        if (k > 0 && !/\bloading=/.test(tag)) tag = tag.replace(/^<img\b/, '<img loading="lazy"');
+        const active = k === 0 ? " is-active" : "";
+        const hidden = k === 0 ? "" : ' aria-hidden="true"';
+        return `<figure class="slide${active}" aria-roledescription="slide" aria-label="${k + 1} of ${n}"${hidden}>${tag}</figure>`;
+    }).join("");
+    const optionClasses = SLIDESHOW_OPTIONS.filter(o => options.has(o)).map(o => ` ${o}`).join("");
+    return `<div class="colvmn-slideshow${optionClasses}" role="region" aria-roledescription="carousel" aria-label="Images" tabindex="0">`
+        + `<div class="slideshow-frame">${slides}</div>`
+        + '<div class="slideshow-controls"><button class="slideshow-btn slideshow-prev" type="button" aria-label="Previous image">&lsaquo;</button>'
+        + `<span class="slideshow-count">1 / ${n}</span>`
+        + '<button class="slideshow-btn slideshow-next" type="button" aria-label="Next image">&rsaquo;</button></div>'
+        + '<p class="slideshow-live" aria-live="polite"></p>'
+        + "<noscript><style>.colvmn-slideshow .slideshow-frame{display:block}.colvmn-slideshow .slide{opacity:1;margin-bottom:20px}.colvmn-slideshow .slideshow-controls{display:none}</style></noscript>"
+        + "</div>";
+}
+
 function blocksToHtml (blocks) {
-    return blocks.map(b => {
+    // Gather consecutive slideshow paragraphs into one block first.
+    const grouped = [];
+    for (const b of blocks) {
+        if (b.type === "paragraph" && SLIDESHOW_PARAGRAPH.test(b.text)) {
+            const imgs = b.text.match(/<img\b[^>]*>/g);
+            const last = grouped[grouped.length - 1];
+            if (last && last.type === "slideshow") last.imgs.push(...imgs);
+            else grouped.push({ type: "slideshow", imgs });
+        } else {
+            grouped.push(b);
+        }
+    }
+    return grouped.map(b => {
         switch (b.type) {
             case "paragraph": return `<p>${b.text}</p>`;
             case "ul": return "<ul>" + b.items.map(i => `<li>${i}</li>`).join("") + "</ul>";
             case "ol": return (b.start === 1 ? "<ol>" : `<ol start="${b.start}">`) + b.items.map(i => `<li>${i}</li>`).join("") + "</ol>";
             case "html": return b.html;
+            case "slideshow": return slideshowHtml(b.imgs);
             case "heading": return `<h${b.level} id="${slugify(b.text)}">${inlineMarkdown(b.text)}</h${b.level}>`;
             default: return "";
         }
@@ -1773,6 +1825,31 @@ class ContentComparisonTable extends ContentBase {
 }
 
 
+// ===== ContentSlideshow.js =====
+
+
+// A slideshow in an _index.json page, the same one markdown builds from
+// images marked {.slideshow}:
+//   { "type": "ContentSlideshow", "autoplay": true, "controls": false,
+//     "images": [{ "src": "images/a.jpg", "alt": "…" }, …] }
+// "autoplay" (default false) advances by itself; "controls": false hides the
+// arrows and count. Behavior: layout/Slideshow.js.
+
+const escapeAttr = s => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+
+class ContentSlideshow extends ContentBase {
+    computeHtml () {
+        const images = this.json.images || [];
+        if (images.length === 0) return "";
+        const options = [this.json.autoplay ? "autoplay" : "", this.json.controls === false ? "no-controls" : ""].filter(Boolean);
+        const imgs = images.map((im, k) => `<img src="${escapeAttr(im.src)}" alt="${escapeAttr(im.alt)}" class="${["slideshow", ...(k === 0 ? options : [])].join(" ")}">`);
+        let html = "";
+        if (this.json.title) html += `<h2>${this.json.title}</h2>`;
+        return html + slideshowHtml(imgs);
+    }
+}
+
+
 // ===== PageIndex.js =====
 
 
@@ -2286,7 +2363,127 @@ function initCollapsibles (doc = document) {
 }
 
 
+// ===== Slideshow.js =====
+// Slideshows: consecutive images marked {.slideshow} in markdown, built by
+// MarkdownParser.slideshowHtml as one .colvmn-slideshow. The images crossfade
+// slowly in one frame. This attaches the behavior (see colvmn/CLAUDE.md,
+// "Rendering model"), registered from layout.js like Lightbox.js:
+//
+// - previous and next buttons, with "n / total" between them;
+// - left and right arrow keys while the slideshow has focus;
+// - a swipe (finger or mouse drag) or a two-finger trackpad swipe moves either way;
+// - a click on the image enlarges it (Lightbox.js); a swipe never does;
+// - with .autoplay ({.slideshow .autoplay}), it advances by itself every few
+//   seconds while it's on screen, and pauses while the pointer is over it, it
+//   has focus, the tab is hidden, an image is enlarged, or the reader prefers
+//   reduced motion;
+// - .no-controls hides the buttons and count (CSS); the rest still works.
+
+const DWELL = 6500;
+
+function initOne (root, win) {
+    const slides = [...root.querySelectorAll(".slide")];
+    if (slides.length < 2) {
+        root.classList.add("single");
+        return;
+    }
+    const counter = root.querySelector(".slideshow-count");
+    const live = root.querySelector(".slideshow-live");
+    const frame = root.querySelector(".slideshow-frame");
+    const reduce = win.matchMedia && win.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const doc = root.ownerDocument;
+    const autoplay = root.classList.contains("autoplay");
+    let i = 0, timer = null, hovering = false, visible = false;
+
+    const show = (n, announce) => {
+        i = (n + slides.length) % slides.length;
+        slides.forEach((s, k) => {
+            const on = k === i;
+            s.classList.toggle("is-active", on);
+            if (on) s.removeAttribute("aria-hidden");
+            else s.setAttribute("aria-hidden", "true");
+            // Only the shown image takes focus (Lightbox makes zoomable images focusable).
+            const img = s.querySelector("img");
+            if (img) img.setAttribute("tabindex", on ? "0" : "-1");
+        });
+        // Start loading the next image before it's needed.
+        const next = slides[(i + 1) % slides.length].querySelector("img[loading=lazy]");
+        if (next) next.loading = "eager";
+        if (counter) counter.textContent = `${i + 1} / ${slides.length}`;
+        if (announce && live) {
+            const alt = slides[i].querySelector("img")?.alt;
+            live.textContent = `${alt ? alt + ", " : ""}image ${i + 1} of ${slides.length}`;
+        }
+    };
+
+    const enlarged = () => doc.body.classList.contains("colvmn-lightbox-active");
+    const stop = () => { clearInterval(timer); timer = null; };
+    const play = () => {
+        stop();
+        if (!autoplay || reduce || hovering || !visible || doc.hidden) return;
+        timer = setInterval(() => { if (!enlarged()) show(i + 1, false); }, DWELL);
+    };
+    const step = d => { show(i + d, true); play(); };
+
+    root.querySelector(".slideshow-prev").addEventListener("click", () => step(-1));
+    root.querySelector(".slideshow-next").addEventListener("click", () => step(1));
+    root.addEventListener("keydown", e => {
+        if (enlarged()) return;
+        if (e.key === "ArrowLeft") { e.preventDefault(); step(-1); }
+        if (e.key === "ArrowRight") { e.preventDefault(); step(1); }
+    });
+
+    // Pause while someone is looking closely.
+    root.addEventListener("pointerenter", e => { if (e.pointerType === "mouse") { hovering = true; stop(); } });
+    root.addEventListener("pointerleave", () => { hovering = false; play(); });
+    root.addEventListener("focusin", () => { hovering = true; stop(); });
+    root.addEventListener("focusout", e => { if (!root.contains(e.relatedTarget)) { hovering = false; play(); } });
+    doc.addEventListener("visibilitychange", play);
+
+    // A swipe moves either way; the click that ends it doesn't enlarge.
+    let x0 = null, y0 = 0, swiped = false;
+    frame.addEventListener("pointerdown", e => { x0 = e.clientX; y0 = e.clientY; swiped = false; });
+    frame.addEventListener("pointerup", e => {
+        if (x0 === null) return;
+        const dx = e.clientX - x0, dy = e.clientY - y0;
+        x0 = null;
+        if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { swiped = true; step(dx < 0 ? 1 : -1); }
+    });
+    frame.addEventListener("pointercancel", () => { x0 = null; });
+    frame.addEventListener("click", e => {
+        if (swiped) { swiped = false; e.stopPropagation(); e.preventDefault(); }
+    }, true);
+    frame.addEventListener("dragstart", e => e.preventDefault());
+
+    // A two-finger trackpad swipe: one step per gesture.
+    let acc = 0, quietUntil = 0, idle = null;
+    frame.addEventListener("wheel", e => {
+        if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+        e.preventDefault(); // keep the browser's back/forward gesture out of it
+        clearTimeout(idle);
+        idle = setTimeout(() => { acc = 0; }, 220);
+        if (win.performance.now() < quietUntil) return;
+        acc += e.deltaX;
+        if (Math.abs(acc) > 60) { step(acc > 0 ? 1 : -1); acc = 0; quietUntil = win.performance.now() + 700; }
+    }, { passive: false });
+
+    // Only advance while on screen.
+    if (win.IntersectionObserver) {
+        new win.IntersectionObserver(([en]) => { visible = en.isIntersecting; play(); }, { threshold: 0.25 }).observe(root);
+    }
+
+    show(0, false);
+}
+
+function initSlideshows (doc = document) {
+    if (typeof doc === "undefined" || !doc.body) return;
+    doc.querySelectorAll(".colvmn-slideshow").forEach(root => initOne(root, doc.defaultView));
+}
+
+
 // ===== layout.js =====
+
+
 
 
 
@@ -2316,6 +2513,7 @@ ContentBase.typeMap = {
     ContentFAQ,
     ContentClassDoc,
     ContentComparisonTable,
+    ContentSlideshow,
 };
 
 // Browser bootstrap. PageIndex.init() runs the runtime pass (loadPage + render);
@@ -2327,6 +2525,7 @@ document.addEventListener("DOMContentLoaded", () => {
     new PageIndex().init();
     initLightbox();
     initCollapsibles();
+    initSlideshows();   // after initLightbox: it leaves only the shown slide focusable
 });
 
 })();

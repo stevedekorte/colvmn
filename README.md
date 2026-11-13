@@ -94,6 +94,31 @@ Mark a section's heading to have it start closed; clicking the heading opens it,
 
 In `_index.json`, set `"collapsed": true` on a top-level `ContentText` entry. A link to the section opens it. Without JavaScript, and in print, it shows open. AI review pages use it for their Details.
 
+### Slideshows — `{.slideshow}`
+
+Mark consecutive images to show them as one slideshow that fades between them:
+
+```markdown
+![Light cycles](images/light-cycles.jpg){.slideshow}
+![The maze](images/maze.jpg){.slideshow}
+```
+
+Below the image are previous and next buttons and a count. Arrow keys, swipes and trackpad swipes move between images, and a click enlarges one.
+
+Two options, as classes on any of the images:
+
+- `.autoplay` advances by itself every few seconds while on screen, pausing while you hover or interact.
+- `.no-controls` hides the buttons and count.
+
+`![Light cycles](images/light-cycles.jpg){.slideshow .autoplay .no-controls}` makes a hands-off slideshow.
+
+In `_index.json`, use a `ContentSlideshow` block:
+
+```json
+{ "type": "ContentSlideshow", "autoplay": true, "controls": false,
+  "images": [{ "src": "images/light-cycles.jpg", "alt": "Light cycles" }, { "src": "images/maze.jpg", "alt": "The maze" }] }
+``` Without JavaScript, and in print, the images are stacked.
+
 ### Zoomable images — `colvmn-zoomable-image`
 
 Give any image the class `colvmn-zoomable-image` to make it click-to-enlarge. Clicking the image (or focusing it and pressing Enter) opens a full-viewport overlay; clicking the overlay or pressing Escape closes it.
