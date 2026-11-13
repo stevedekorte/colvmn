@@ -1,6 +1,6 @@
 # colvmn — Full Documentation
 
-Site build: colvmn · 2026-11-13 · 7ff7970
+Site build: colvmn · 2026-11-13 · 8a3c744
 
 colvmn (pronounced column) is a tiny layout engine for static sites. Pages are described by an _index.md with YAML frontmatter, or an _index.json. The engine renders each page to static HTML at build time and to live DOM in the browser, so content is visible to JavaScript-free crawlers and to readers with JavaScript enabled.
 
