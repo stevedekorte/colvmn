@@ -105,7 +105,7 @@ The first time, each reviews page is written with default text. Edit it as you l
 
 ## The pages
 
-- **The page itself.** A footer link to its reviews: "AI reviews of this section", or "AI reviews of this site" on the root.
+- **The page itself.** A footer link to its reviews: **AI reviews →**.
 - **The reviews page** (`<page>/AI Reviews/`). "AI reviews of this section's content on {date}", where `{date}` becomes the latest review's date. Then one card per model: its full name and its one-sentence verdict. Then the prompt.
 - **A review page.** The model, date and verdict, the review, then **Details**: the model ID, the build stamp the model quoted, the exact prompt with a link that opens it in that model's own app, and a line saying it isn't an endorsement by the provider. Then earlier reviews.
 - **The home page,** with `homeCard` and an opted-in root. A card for the root's reviews, added to the root page's last card grid.

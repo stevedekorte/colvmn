@@ -1129,8 +1129,7 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
 .footer-links {
   margin-right: auto;
   color: #999;
-  font-size: 14px;
-  letter-spacing: 0.3px;
+  font-size: 13px;
 }
 
 .footer-links a {
@@ -1140,6 +1139,11 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
 }
 
 .footer-links a:hover {
+  color: #2a2a2a;
+}
+
+/* Bold footer links (the AI reviews link) look like the page's own bold text links, e.g. "Read the paper →". */
+.footer-links strong {
   color: #2a2a2a;
 }
 

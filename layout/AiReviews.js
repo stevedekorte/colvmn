@@ -235,7 +235,7 @@ export class ReviewScope {
         }
         return {
             href: `${this.folder.split("/").map(encodeURIComponent).join("/")}/index.html`,
-            label: this.isRoot ? "AI reviews of this site" : "AI reviews of this section"
+            label: "<strong>AI reviews →</strong>"
         };
     }
 

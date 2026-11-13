@@ -64,7 +64,7 @@ The model choice (`_models/models.json`) is made once per run and shared by ever
 
 ## The footer
 
-Each opted-in page gets a footer link, **AI reviews of this section**, to its reviews folder. It goes in the existing page footer, beside the optional next-section link. Pages under it don't inherit the link.
+Each opted-in page gets a footer link, **AI reviews →** (bold, like a page's own bold text links), to its reviews folder. It goes in the existing page footer, beside the optional next-section link. Pages under it don't inherit the link.
 
 `homeCard: true` stays as an option for the root page, which also gets a card for its reviews.
 

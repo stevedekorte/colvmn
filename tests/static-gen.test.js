@@ -203,10 +203,10 @@ test("aiReviews: a page that opts in gets a footer link once its reviews page ex
     try {
         optIn(site, ".");
         commitAll(site, "pages");
-        assert.doesNotMatch(build(site).rootHtml, /AI reviews of this site/, "no reviews page yet");
+        assert.doesNotMatch(build(site).rootHtml, /AI reviews →/, "no reviews page yet");
         writePage(site, "AI Reviews", "# AI Reviews\n\nAI reviews of this site's content on {date}\n");
-        assert.match(build(site).rootHtml, /<div class="page-footer"><span class="footer-links"><a href="AI%20Reviews\/index\.html">AI reviews of this site<\/a><\/span><\/div>/);
-        assert.doesNotMatch(readFileSync(join(site, "kept", "index.html"), "utf-8"), /AI reviews of this/);
+        assert.match(build(site).rootHtml, /<div class="page-footer"><span class="footer-links"><a href="AI%20Reviews\/index\.html"><strong>AI reviews →<\/strong><\/a><\/span><\/div>/);
+        assert.doesNotMatch(readFileSync(join(site, "kept", "index.html"), "utf-8"), /AI reviews →/);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }
@@ -238,8 +238,8 @@ test("aiReviews: a section that opts in gets its own reviews, footer link, and l
         }
 
         const guide = readFileSync(join(site, "guide", "index.html"), "utf-8");
-        assert.match(guide, /<a href="AI%20Reviews\/index\.html">AI reviews of this section<\/a>/);
-        assert.doesNotMatch(readFileSync(join(site, "guide", "lesson", "index.html"), "utf-8"), /AI reviews of this/, "not inherited");
+        assert.match(guide, /<a href="AI%20Reviews\/index\.html"><strong>AI reviews →<\/strong><\/a>/);
+        assert.doesNotMatch(readFileSync(join(site, "guide", "lesson", "index.html"), "utf-8"), /AI reviews →/, "not inherited");
 
         const section = readFileSync(join(site, "guide", "AI Reviews", "index.html"), "utf-8");
         assert.match(section, /<h3>Claude Fable 5\.2<\/h3><p>Just the guide\.<\/p>/);
@@ -258,7 +258,7 @@ test("footerLinks and the AI reviews link share one footer line, separated by mi
         writeFileSync(join(site, "_index.json"), JSON.stringify({ topTitle: "Example", title: "Example", aiReviews: true, footerLinks: [{ title: "llms.txt", href: "llms.txt" }, { title: "llms-full.txt", href: "llms-full.txt" }], content: [] }));
         writePage(site, "AI Reviews", "# AI Reviews\n\nAI reviews of this site's content on {date}\n");
         commitAll(site, "pages");
-        assert.match(build(site).rootHtml, /<div class="page-footer"><span class="footer-links"><a href="llms\.txt">llms\.txt<\/a><span class="footer-sep"> &middot; <\/span><a href="llms-full\.txt">llms-full\.txt<\/a><span class="footer-sep"> &middot; <\/span><a href="AI%20Reviews\/index\.html">AI reviews of this site<\/a><\/span><\/div>/);
+        assert.match(build(site).rootHtml, /<div class="page-footer"><span class="footer-links"><a href="llms\.txt">llms\.txt<\/a><span class="footer-sep"> &middot; <\/span><a href="llms-full\.txt">llms-full\.txt<\/a><span class="footer-sep"> &middot; <\/span><a href="AI%20Reviews\/index\.html"><strong>AI reviews →<\/strong><\/a><\/span><\/div>/);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }
