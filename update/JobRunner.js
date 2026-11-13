@@ -7,7 +7,8 @@
  * the runner's environment reaches it.
  *
  * A prompt job runs Claude Code headless (`claude -p --bare`) in the site
- * root, with the runner's ANTHROPIC_API_KEY and nothing else from its
+ * root, with the runner's ANTHROPIC_API_KEY (the environment variable, else
+ * _credentials/ANTHROPIC_API_KEY.secret.txt) and nothing else from its
  * environment, no shell, edit access only to the job's `writes`, and the
  * job's budget as a hard stop (--max-budget-usd). Its cost is recorded.
  * COLVMN_CLAUDE overrides the command (tests use a stand-in).
@@ -90,8 +91,8 @@ export class JobRunner {
     refusal (job, credentialProblems) {
         const f = job.updateFile;
         const problems = [...job.problems(), ...credentialProblems];
-        if (f.kind() === "prompt" && !this.env.ANTHROPIC_API_KEY) {
-            problems.push("prompt jobs need ANTHROPIC_API_KEY in the runner's environment (the runner's own key, not a job credential)");
+        if (f.kind() === "prompt" && !this.runnerKey()) {
+            problems.push("prompt jobs need the runner's ANTHROPIC_API_KEY: set the environment variable or add _credentials/ANTHROPIC_API_KEY.secret.txt");
         }
         if (f.scriptPath() && !existsSync(f.scriptPath())) {
             problems.push(`no script at ${f.fields.run}`);
@@ -118,7 +119,7 @@ export class JobRunner {
     runPrompt (job) {
         const r = spawnSync(this.env.COLVMN_CLAUDE || "claude", this.promptArgs(job), {
             cwd: this.siteRoot,
-            env: { ...this.baseEnv(), ANTHROPIC_API_KEY: this.env.ANTHROPIC_API_KEY },
+            env: { ...this.baseEnv(), ANTHROPIC_API_KEY: this.runnerKey() },
             encoding: "utf8",
             timeout: this.timeoutMs,
             maxBuffer: 64 * 1024 * 1024
@@ -137,6 +138,12 @@ export class JobRunner {
             return { status: 1, cost, error: `Claude Code stopped: ${report.subtype || "error"}` };
         }
         return { status: 0, cost };
+    }
+
+    /** The runner's own Claude key, for prompt jobs: the environment variable, else the site root's secret file. */
+    runnerKey () {
+        const r = this.credentials.resolve("ANTHROPIC_API_KEY", this.siteRoot);
+        return r.problem ? null : r.value;
     }
 
     promptArgs (job) {

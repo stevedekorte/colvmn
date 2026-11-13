@@ -7,7 +7,8 @@
  * guess before the reviews job uses it. A built-in job: the runner adds it
  * when colvmn.json has "aiReviews" (see UpdateJobs.js).
  *
- * Gets the review keys it has (CLAUDE_REVIEW_KEY, ...) and COLVMN_SITE_ROOT.
+ * Gets the providers' keys it has (ANTHROPIC_API_KEY, ..., or the names
+ * aiReviews' "keys" gives) and COLVMN_SITE_ROOT.
  * A provider without a key is left as it is. A provider entry in colvmn.json
  * with "model" pins that model instead of looking.
  * Exits 0 when models.json changed, 3 when nothing did, 1 when every

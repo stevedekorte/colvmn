@@ -52,13 +52,12 @@ jobs:
       - name: Run due jobs
         env:
           GH_TOKEN: ${{ github.token }}                         # gh pr create
-          # The runner's own key, for prompt jobs:
+          # The runner's own key, for prompt jobs (and AI Reviews' Claude):
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # AI Reviews (colvmn.json "aiReviews"), one per provider:
-          # CLAUDE_REVIEW_KEY: ${{ secrets.CLAUDE_REVIEW_KEY }}
-          # OPENAI_REVIEW_KEY: ${{ secrets.OPENAI_REVIEW_KEY }}
-          # GEMINI_REVIEW_KEY: ${{ secrets.GEMINI_REVIEW_KEY }}
-          # XAI_REVIEW_KEY: ${{ secrets.XAI_REVIEW_KEY }}
+          # The other providers' standard keys, for AI Reviews (and any job that lists them):
+          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
           # Each credential a job lists, by name (described in _credentials/):
           # STRIPE_READ_KEY: ${{ secrets.STRIPE_READ_KEY }}
           # Email notifications, if colvmn.json turns them on:

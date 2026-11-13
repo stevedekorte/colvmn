@@ -8,26 +8,30 @@
  * `secrets:`.
  *
  * The value comes from the environment variable of the same name when it is
- * set (e.g. GitHub Actions secrets), else from `_credentials/<NAME>.secret`
- * beside the description (kept encrypted in git; a file still locked by
- * git-crypt counts as missing). A description may check the value's format:
+ * set (e.g. GitHub Actions secrets), else from `_credentials/<NAME>.secret.txt`
+ * beside the description (kept out of git, or encrypted with git-crypt; a file
+ * still locked counts as missing). A description may check the value's format:
  *
  *   { "about": "Stripe restricted key, read-only", "pattern": "^rk_" }
  *   { "about": "GCP service account", "format": "json" }
  *
- * colvmn describes the AI Reviews keys itself (CLAUDE_REVIEW_KEY,
- * OPENAI_REVIEW_KEY, GEMINI_REVIEW_KEY, XAI_REVIEW_KEY), so they need only a
- * value. Problems name the credential and never include its value.
+ * colvmn describes the providers' standard API keys itself (ANTHROPIC_API_KEY,
+ * OPENAI_API_KEY, GEMINI_API_KEY, XAI_API_KEY), and any other key names the
+ * site's aiReviews "keys" setting gives, so they need only a value, as if
+ * described at the site root. A site's own description of the same name
+ * wins. Problems name the credential and never include its value.
  */
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
-import { PROVIDERS } from "../layout/AiReviews.js";
+import { AiReviews, PROVIDERS } from "../layout/AiReviews.js";
 
 const FOLDER = "_credentials";
 
-/** Credentials colvmn describes itself: the AI Reviews keys. A site's own description of the same name wins. */
-const BUILT_IN = Object.fromEntries(Object.entries(PROVIDERS).map(([name, p]) => [p.key, { about: `${name} API key for AI Reviews; give it a low spend limit` }]));
+const SECRET_SUFFIX = ".secret.txt";
+
+/** The standard API key names colvmn describes itself, for any job that lists them. */
+const STANDARD_KEYS = Object.fromEntries(Object.values(PROVIDERS).map(p => [p.key, { about: `${p.company} API key` }]));
 const GIT_CRYPT_HEADER = Buffer.from("\0GITCRYPT");
 
 export class Credentials {
@@ -35,6 +39,7 @@ export class Credentials {
     constructor (siteRoot, env = process.env) {
         this.siteRoot = siteRoot;
         this.env = env;
+        this.builtIn = { ...STANDARD_KEYS, ...aiReviewKeys(siteRoot) };
     }
 
     /**
@@ -66,7 +71,7 @@ export class Credentials {
         }
         const value = this.valueFor(name, found.dir);
         if (value === null) {
-            return { problem: `credential ${name} has no value: set the ${name} environment variable or add ${FOLDER}/${name}.secret (unlocked)` };
+            return { problem: `credential ${name} has no value: set the ${name} environment variable or add ${FOLDER}/${name}${SECRET_SUFFIX} (unlocked)` };
         }
         const formatProblem = checkFormat(name, value, found.description);
         return formatProblem ? { problem: formatProblem } : { value };
@@ -86,14 +91,14 @@ export class Credentials {
                 break;
             }
         }
-        return BUILT_IN[name] ? { dir: this.siteRoot, path: "(built in)", description: BUILT_IN[name] } : null;
+        return this.builtIn[name] ? { dir: this.siteRoot, path: "(built in)", description: this.builtIn[name] } : null;
     }
 
     valueFor (name, dir) {
         if (this.env[name]) {
             return this.env[name];
         }
-        const path = join(dir, FOLDER, `${name}.secret`);
+        const path = join(dir, FOLDER, `${name}${SECRET_SUFFIX}`);
         if (!existsSync(path)) {
             return null;
         }
@@ -103,6 +108,16 @@ export class Credentials {
         }
         const text = bytes.toString("utf8").trim();
         return text === "" ? null : text;
+    }
+}
+
+/** The key names a site's aiReviews "keys" setting gives, described like the standard ones. */
+function aiReviewKeys (siteRoot) {
+    try {
+        const reviews = siteRoot ? AiReviews.forSiteRoot(siteRoot) : null;
+        return reviews ? Object.fromEntries(reviews.producible().map(p => [p.key, { about: `${p.company} API key for AI Reviews` }])) : {};
+    } catch {
+        return {};
     }
 }
 

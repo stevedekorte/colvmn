@@ -208,14 +208,14 @@ test("credentials: the nearest description wins, blocked refuses, and a job list
     });
 });
 
-test("credentials: values from .secret files, unless locked by git-crypt; formats are checked", () => {
+test("credentials: values from .secret.txt files, unless locked by git-crypt; formats are checked", () => {
     withRepo({
         "_credentials/STRIPE_KEY.json": "{ \"pattern\": \"^rk_\" }",
-        "_credentials/STRIPE_KEY.secret": "rk_live_abcdef\n",
+        "_credentials/STRIPE_KEY.secret.txt": "rk_live_abcdef\n",
         "_credentials/SERVICE.json": "{ \"format\": \"json\" }",
-        "_credentials/SERVICE.secret": "not json",
+        "_credentials/SERVICE.secret.txt": "not json",
         "_credentials/LOCKED.json": "{}",
-        "_credentials/LOCKED.secret": "\u0000GITCRYPT\u0000ciphertext",
+        "_credentials/LOCKED.secret.txt": "\u0000GITCRYPT\u0000ciphertext",
         "Job/_update.md": JOB
     }, (root) => {
         const creds = new Credentials(root, {});
@@ -308,7 +308,7 @@ test("a prompt job that hits its budget fails, keeps nothing, and reports its co
     withRepo({ "Job/_update.md": PROMPT_JOB, "Job/_index.md": "# Old\n" }, (root) => {
         const job = UpdateJobs.inSite(root).inFolder("Job");
         const noKey = new JobRunner({ siteRoot: root, git: new Git(root), env: { PATH: process.env.PATH } }).run(job);
-        assert.match(noKey.message, /need ANTHROPIC_API_KEY/);
+        assert.match(noKey.message, /need the runner's ANTHROPIC_API_KEY/);
         const env = { PATH: process.env.PATH, ANTHROPIC_API_KEY: "k", COLVMN_CLAUDE: fakeClaude(root, { fail: true }) };
         const r = new JobRunner({ siteRoot: root, git: new Git(root), env }).run(job);
         assert.equal(r.result, "failed");

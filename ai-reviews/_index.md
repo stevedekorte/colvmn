@@ -17,16 +17,16 @@ Add this to the site's `colvmn.json`:
 }
 ```
 
-Then give the runner at least one key, as an environment variable or in `_credentials/NAME.secret`, and run it on a schedule (see [Scheduled Updates](../scheduled-updates/index.html)):
+Then give the runner at least one key, as an environment variable or in `_credentials/NAME.secret.txt` at the site root, and run it on a schedule (see [Scheduled Updates](../scheduled-updates/index.html)). The keys are the providers' standard ones, shared with any other job that uses them:
 
 | Key | Provider |
 | --- | --- |
-| `CLAUDE_REVIEW_KEY` | Anthropic |
-| `OPENAI_REVIEW_KEY` | OpenAI |
-| `GEMINI_REVIEW_KEY` | Google |
-| `XAI_REVIEW_KEY` | xAI |
+| `ANTHROPIC_API_KEY` | Anthropic |
+| `OPENAI_API_KEY` | OpenAI |
+| `GEMINI_API_KEY` | Google |
+| `XAI_API_KEY` | xAI |
 
-Give each key a low spend limit in its provider's console. A review costs well under a dollar. A provider without a key is skipped, and its card says it hasn't been reviewed yet.
+To keep the reviews' spending apart, give them keys of their own with `keys`: `"keys": { "Claude": "CLAUDE_REVIEW_KEY" }`. A review costs well under a dollar. A provider without a key is skipped, and its card says it hasn't been reviewed yet.
 
 ## What happens
 
@@ -62,6 +62,7 @@ colvmn adds two lines asking the answer to begin with the build stamp the model 
 | `about` | A subfolder explaining how the reviews are made. It gets the prompt and a card at the end of the grid. |
 | `homeCard` | `true` adds a card for the section to the root page. |
 | `every` | The least time between reviews: `30d` by default. |
+| `keys` | A key name per provider, instead of its standard one: `{ "Claude": "CLAUDE_REVIEW_KEY" }`. |
 
 ## Corrections
 

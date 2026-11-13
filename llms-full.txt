@@ -61,16 +61,16 @@ Add this to the site's `colvmn.json`:
 }
 ```
 
-Then give the runner at least one key, as an environment variable or in `_credentials/NAME.secret`, and run it on a schedule (see [Scheduled Updates](../scheduled-updates/index.html)):
+Then give the runner at least one key, as an environment variable or in `_credentials/NAME.secret.txt` at the site root, and run it on a schedule (see [Scheduled Updates](../scheduled-updates/index.html)). The keys are the providers' standard ones, shared with any other job that uses them:
 
 | Key | Provider |
 | --- | --- |
-| `CLAUDE_REVIEW_KEY` | Anthropic |
-| `OPENAI_REVIEW_KEY` | OpenAI |
-| `GEMINI_REVIEW_KEY` | Google |
-| `XAI_REVIEW_KEY` | xAI |
+| `ANTHROPIC_API_KEY` | Anthropic |
+| `OPENAI_API_KEY` | OpenAI |
+| `GEMINI_API_KEY` | Google |
+| `XAI_API_KEY` | xAI |
 
-Give each key a low spend limit in its provider's console. A review costs well under a dollar. A provider without a key is skipped, and its card says it hasn't been reviewed yet.
+To keep the reviews' spending apart, give them keys of their own with `keys`: `"keys": { "Claude": "CLAUDE_REVIEW_KEY" }`. A review costs well under a dollar. A provider without a key is skipped, and its card says it hasn't been reviewed yet.
 
 ## What happens
 
@@ -106,6 +106,7 @@ colvmn adds two lines asking the answer to begin with the build stamp the model 
 | `about` | A subfolder explaining how the reviews are made. It gets the prompt and a card at the end of the grid. |
 | `homeCard` | `true` adds a card for the section to the root page. |
 | `every` | The least time between reviews: `30d` by default. |
+| `keys` | A key name per provider, instead of its standard one: `{ "Claude": "CLAUDE_REVIEW_KEY" }`. |
 
 ## Corrections
 
@@ -401,7 +402,9 @@ A credential is described once, by a file named after it, in a `_credentials` fo
 
 saved as `_credentials/STRIPE_READ_KEY.json`. The nearest description wins; `{ "blocked": true }` refuses the credential to everything below it. Being described is not being given: a job gets only what it lists in `secrets`.
 
-The value comes from the environment variable of the same name when it is set (for example a GitHub Actions secret), else from `_credentials/STRIPE_READ_KEY.secret` beside the description, kept encrypted in git with git-crypt. A description can check the value's format with `pattern` (a regular expression) or `"format": "json"`. Problems name the credential, never its value.
+The value comes from the environment variable of the same name when it is set (for example a GitHub Actions secret), else from `_credentials/STRIPE_READ_KEY.secret.txt` beside the description, kept out of git (`.gitignore`) or encrypted in it with git-crypt. A description can check the value's format with `pattern` (a regular expression) or `"format": "json"`. Problems name the credential, never its value.
+
+colvmn describes the AI providers' standard keys itself: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` and `XAI_API_KEY`. Any job can list them in `secrets` with no description file; they need only a value. `ANTHROPIC_API_KEY` is also the runner's own key for prompt jobs.
 
 Keep every key read-only and narrowly scoped, so the worst a leak exposes is figures that were headed for the site anyway.
 

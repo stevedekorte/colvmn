@@ -10,7 +10,8 @@
  *       "providers": ["Claude", "ChatGPT", "Gemini", "Grok"],
  *       "about": "Review Process",
  *       "homeCard": true,
- *       "every": "30d"
+ *       "every": "30d",
+ *       "keys": { "Claude": "CLAUDE_REVIEW_KEY" }
  *   }
  *
  * Only "folder" is needed. "prompt" defaults to one built from the site's
@@ -20,9 +21,12 @@
  * gets a card at the end of the grid and the prompt (without it, the prompt
  * goes on the section page). "homeCard" adds a card for the section to the
  * site's root page. "every" is the least time between reviews (default 30d).
+ * Each provider's key is its standard name (ANTHROPIC_API_KEY, OPENAI_API_KEY,
+ * GEMINI_API_KEY, XAI_API_KEY), shared with any other job that uses it;
+ * "keys" names a separate one, to keep the reviews' spending apart.
  *
  * Each provider is a subfolder of the section. The four built in have their
- * company, app, prefilled-prompt link and API key name below; another is
+ * company, app, prefilled-prompt link and standard API key name below; another is
  * given as { "name", "company", "app", "ask" } and can be shown but not
  * produced. A provider entry may pin a model: { "name": "Claude",
  * "model": "<API model ID>" }.
@@ -62,10 +66,10 @@ import { parseMarkdown } from "./MarkdownParser.js";
 import { ContentCards } from "./ContentCards.js";
 
 export const PROVIDERS = {
-    Claude: { company: "Anthropic", app: "https://claude.ai/new", ask: "https://claude.ai/new?q={prompt}", key: "CLAUDE_REVIEW_KEY" },
-    ChatGPT: { company: "OpenAI", app: "https://chatgpt.com/", ask: "https://chatgpt.com/?q={prompt}", key: "OPENAI_REVIEW_KEY" },
-    Gemini: { company: "Google", app: "https://gemini.google.com/app", key: "GEMINI_REVIEW_KEY" },
-    Grok: { company: "xAI", app: "https://grok.com/", ask: "https://grok.com/?q={prompt}", key: "XAI_REVIEW_KEY" },
+    Claude: { company: "Anthropic", app: "https://claude.ai/new", ask: "https://claude.ai/new?q={prompt}", key: "ANTHROPIC_API_KEY" },
+    ChatGPT: { company: "OpenAI", app: "https://chatgpt.com/", ask: "https://chatgpt.com/?q={prompt}", key: "OPENAI_API_KEY" },
+    Gemini: { company: "Google", app: "https://gemini.google.com/app", key: "GEMINI_API_KEY" },
+    Grok: { company: "xAI", app: "https://grok.com/", ask: "https://grok.com/?q={prompt}", key: "XAI_API_KEY" },
 };
 
 /** Added to every prompt: colvmn reads these two lines from the answer. */
@@ -110,9 +114,14 @@ export class AiReviews {
         this.homeCard = config.homeCard === true;
         this.every = config.every || DEFAULT_EVERY;
         this.about = config.about ? config.about.replace(/\/+$/, "") : null;
+        const keys = config.keys || {};
         this.providers = (config.providers || Object.keys(PROVIDERS)).map(p => {
             const own = typeof p === "string" ? { name: p } : p;
-            return { company: own.name, ...PROVIDERS[own.name], ...own };
+            const provider = { company: own.name, ...PROVIDERS[own.name], ...own };
+            if (keys[provider.name] && PROVIDERS[provider.name]) {
+                provider.key = keys[provider.name];
+            }
+            return provider;
         });
     }
 

@@ -84,7 +84,9 @@ A credential is described once, by a file named after it, in a `_credentials` fo
 
 saved as `_credentials/STRIPE_READ_KEY.json`. The nearest description wins; `{ "blocked": true }` refuses the credential to everything below it. Being described is not being given: a job gets only what it lists in `secrets`.
 
-The value comes from the environment variable of the same name when it is set (for example a GitHub Actions secret), else from `_credentials/STRIPE_READ_KEY.secret` beside the description, kept encrypted in git with git-crypt. A description can check the value's format with `pattern` (a regular expression) or `"format": "json"`. Problems name the credential, never its value.
+The value comes from the environment variable of the same name when it is set (for example a GitHub Actions secret), else from `_credentials/STRIPE_READ_KEY.secret.txt` beside the description, kept out of git (`.gitignore`) or encrypted in it with git-crypt. A description can check the value's format with `pattern` (a regular expression) or `"format": "json"`. Problems name the credential, never its value.
+
+colvmn describes the AI providers' standard keys itself: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` and `XAI_API_KEY`. Any job can list them in `secrets` with no description file; they need only a value. `ANTHROPIC_API_KEY` is also the runner's own key for prompt jobs.
 
 Keep every key read-only and narrowly scoped, so the worst a leak exposes is figures that were headed for the site anyway.
 

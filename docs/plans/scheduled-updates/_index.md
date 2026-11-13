@@ -80,12 +80,12 @@ Each credential is described by a file named after it, `_credentials/<NAME>.json
 
 ### Values: encrypted in the repo, decryptable only by the runner
 
-The value sits next to its description, `_credentials/<NAME>.secret`, encrypted with **git-crypt under a key of its own** for the site (`git-crypt init -k <site>`; `.gitattributes`: `_credentials/*.secret filter=git-crypt-<site> diff=git-crypt-<site>`).
+The value sits next to its description, `_credentials/<NAME>.secret.txt`, encrypted with **git-crypt under a key of its own** for the site (`git-crypt init -k <site>`; `.gitattributes`: `_credentials/*.secret.txt filter=git-crypt-<site> diff=git-crypt-<site>`).
 
 - **GitHub holds only ciphertext.** A copy of the repo, or a breach at GitHub, exposes nothing.
 - **The key is held only by the runner machine** (its runner user), plus **one offline backup**. It is not any key developers share.
-- **Adding or rotating a key is drag and drop on the runner machine:** save the file the service gives you as `_credentials/<NAME>.secret` in the runner's unlocked checkout and commit it. git-crypt encrypts it on commit. The runner checks the file's format when it loads it (a Stripe key starts with `rk_`, a service-account file parses) and reports a bad one by name, without printing it.
-- **Editors don't see the plain text:** it exists only in the runner user's checkout. Developers' checkouts stay locked, so `.secret` files there are ciphertext.
+- **Adding or rotating a key is drag and drop on the runner machine:** save the file the service gives you as `_credentials/<NAME>.secret.txt` in the runner's unlocked checkout and commit it. git-crypt encrypts it on commit. The runner checks the file's format when it loads it (a Stripe key starts with `rk_`, a service-account file parses) and reports a bad one by name, without printing it.
+- **Editors don't see the plain text:** it exists only in the runner user's checkout. Developers' checkouts stay locked, so `.secret.txt` files there are ciphertext.
 - **Rotation means revoking the old key at the service**, not just replacing the file: old ciphertext stays in git history.
 - Values may also come from environment variables when present (e.g. GitHub Actions secrets).
 
@@ -186,7 +186,7 @@ A site can ask the runner to send an email after jobs run. Off by default. Set i
 - Update-file parsing (frontmatter with lists). **(done, step 1)**
 - Script jobs: run with only their listed credentials, as environment variables. **(done, step 2)**
 - Prompt jobs: Claude Code headless, restricted tools, budget stop, reported cost. **(done, step 4)**: `claude -p --bare` in the site root with the runner's `ANTHROPIC_API_KEY` only, `--permission-mode dontAsk`, read and web tools plus `Edit`/`Write` limited to `writes`, `Bash` denied, `--max-budget-usd`; default model `claude-sonnet-5-5`.
-- Credentials: look-up from folder to root, `blocked`, `secrets:` lists, prompt jobs refused credentials, value loading from `.secret` files (or from environment variables when present; the variable wins), format checks (`pattern`, `format: json`). **(done, step 3)**
+- Credentials: look-up from folder to root, `blocked`, `secrets:` lists, prompt jobs refused credentials, value loading from `.secret.txt` files (or from environment variables when present; the variable wins), format checks (`pattern`, `format: json`). **(done, step 3)**
 - Checks after a run: `writes` **(done, step 2)**, leaked values **(done, step 3)**.
 - Publishing: `direct` **(done, step 2)** and `pr` **(done, step 3)**: a branch per job, `colvmn-update/<folder>`; with `--push` it is pushed and a PR opened with `gh`; while the branch exists the job waits rather than open another.
 - Page footer: last update and its cost. (Not built: the cost is in `_update.state.json` and in notifications.)

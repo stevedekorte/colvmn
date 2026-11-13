@@ -8,7 +8,8 @@
  *                       changed, at most once per "every": the reviews,
  *                       published directly
  *
- * Each is given the review keys that have a value. Their state files sit in
+ * Each is given the providers' keys that have a value: the standard names,
+ * or those aiReviews' "keys" gives. Their state files sit in
  * those folders like any job's.
  */
 
@@ -29,7 +30,7 @@ export function aiReviewUpdateFiles (siteRoot, env = process.env) {
     const credentials = new Credentials(siteRoot, env);
     const names = reviews.producible().map(p => p.key);
     const keys = names.filter(k => !credentials.resolve(k, reviews.sectionDir()).problem);
-    const problems = keys.length ? [] : [`no AI Reviews key has a value: set one of ${names.join(", ")}`];
+    const problems = keys.length ? [] : [`no AI provider key has a value: set one of ${names.join(", ")}`];
     const section = reviews.folder;
     const models = UpdateFile.builtIn({
         siteRoot,

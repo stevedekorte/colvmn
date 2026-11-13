@@ -35,17 +35,17 @@
     <dict>
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
-        <!-- AI Reviews (colvmn.json "aiReviews"): one per provider, each with a low spend limit -->
-        <key>CLAUDE_REVIEW_KEY</key>
+        <!-- The providers' standard keys: prompt jobs (Anthropic), AI Reviews,
+             and any script job that lists them. A key named in aiReviews'
+             "keys" setting goes here too. -->
+        <key>ANTHROPIC_API_KEY</key>
         <string></string>
-        <key>OPENAI_REVIEW_KEY</key>
+        <key>OPENAI_API_KEY</key>
         <string></string>
-        <key>GEMINI_REVIEW_KEY</key>
+        <key>GEMINI_API_KEY</key>
         <string></string>
-        <key>XAI_REVIEW_KEY</key>
+        <key>XAI_API_KEY</key>
         <string></string>
-        <!-- Prompt jobs: the runner's own Claude key -->
-        <!-- <key>ANTHROPIC_API_KEY</key><string></string> -->
         <!-- Email notifications, if colvmn.json turns them on -->
         <!-- <key>NOTIFY_EMAIL_TO</key><string></string> -->
         <!-- <key>NOTIFY_EMAIL_FROM</key><string></string> -->

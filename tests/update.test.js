@@ -176,7 +176,7 @@ test("--dry-run lists the jobs; --folder picks one; without --dry-run nothing ru
         "Competition/_update.md": COMPETITION,
         "Usage/_update.md": USAGE,
         "_credentials/GCP_PROD_READER.json": "{}",
-        "_credentials/GCP_PROD_READER.secret": "service-account-json"
+        "_credentials/GCP_PROD_READER.secret.txt": "service-account-json"
     }, (root) => {
         const out = [];
         const log = console.log;

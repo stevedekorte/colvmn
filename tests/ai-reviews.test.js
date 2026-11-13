@@ -67,13 +67,13 @@ test("aiReviews adds a models job (pr) and a reviews job (direct, watching the d
     try {
         let jobs = UpdateJobs.inSite(site, {});
         assert.deepEqual(jobs.all().map(j => j.folderName()), ["AI Reviews/_models", "AI Reviews"]);
-        assert.match(jobs.all()[0].problems().join(), /no AI Reviews key has a value/);
+        assert.match(jobs.all()[0].problems().join(), /no AI provider key has a value/);
 
-        jobs = UpdateJobs.inSite(site, { CLAUDE_REVIEW_KEY: "sk-test-123456" });
+        jobs = UpdateJobs.inSite(site, { ANTHROPIC_API_KEY: "sk-test-123456" });
         const [models, reviews] = jobs.all();
         assert.deepEqual(models.problems(), []);
         assert.equal(models.updateFile.publish(), "pr");
-        assert.deepEqual(models.updateFile.secrets(), ["CLAUDE_REVIEW_KEY"]);
+        assert.deepEqual(models.updateFile.secrets(), ["ANTHROPIC_API_KEY"]);
         assert.equal(reviews.updateFile.publish(), "direct");
         assert.deepEqual(reviews.updateFile.watch(), ["llms-full.txt", "AI Reviews/_models/models.json"]);
         assert.equal(reviews.updateFile.minIntervalMs(), 30 * 86400e3);
@@ -112,7 +112,7 @@ async function fakeClaude (answer) {
 function runScript (name, site, base) {
     return new Promise(resolve => {
         const child = spawn(process.execPath, [join(AI, name)], {
-            env: { PATH: process.env.PATH, COLVMN_SITE_ROOT: site, CLAUDE_REVIEW_KEY: "sk-test-123456", COLVMN_AI_BASE_CLAUDE: base },
+            env: { PATH: process.env.PATH, COLVMN_SITE_ROOT: site, ANTHROPIC_API_KEY: "sk-test-123456", COLVMN_AI_BASE_CLAUDE: base },
             stdio: ["ignore", "pipe", "pipe"]
         });
         let out = "";
@@ -168,7 +168,7 @@ test("reviews.js with a key the provider rejects: nothing is written, and it fai
         mkdirSync(join(site, "AI Reviews", "_models"), { recursive: true });
         writeFileSync(join(site, "AI Reviews", "_models", "models.json"), JSON.stringify({ Claude: { id: "claude-fable-5-2", name: "Claude Fable 5.2" } }));
         const r = await new Promise(resolve => {
-            const child = spawn(process.execPath, [join(AI, "reviews.js")], { env: { PATH: process.env.PATH, COLVMN_SITE_ROOT: site, CLAUDE_REVIEW_KEY: "sk-wrong-key-000", COLVMN_AI_BASE_CLAUDE: api.url } });
+            const child = spawn(process.execPath, [join(AI, "reviews.js")], { env: { PATH: process.env.PATH, COLVMN_SITE_ROOT: site, ANTHROPIC_API_KEY: "sk-wrong-key-000", COLVMN_AI_BASE_CLAUDE: api.url } });
             let out = "";
             child.stdout.on("data", c => { out += c; });
             child.on("close", status => resolve({ status, out }));
@@ -195,7 +195,7 @@ function git (site, ...args) {
 function runUpdate (site, args, base) {
     return new Promise(resolve => {
         const child = spawn(process.execPath, [join(AI, "..", "..", "update.js"), site, ...args], {
-            env: { PATH: process.env.PATH, HOME: process.env.HOME, CLAUDE_REVIEW_KEY: "sk-test-123456", COLVMN_AI_BASE_CLAUDE: base, GIT_AUTHOR_NAME: "T", GIT_AUTHOR_EMAIL: "t@example.com", GIT_COMMITTER_NAME: "T", GIT_COMMITTER_EMAIL: "t@example.com" }
+            env: { PATH: process.env.PATH, HOME: process.env.HOME, ANTHROPIC_API_KEY: "sk-test-123456", COLVMN_AI_BASE_CLAUDE: base, GIT_AUTHOR_NAME: "T", GIT_AUTHOR_EMAIL: "t@example.com", GIT_COMMITTER_NAME: "T", GIT_COMMITTER_EMAIL: "t@example.com" }
         });
         let out = "";
         child.stdout.on("data", c => { out += c; });
@@ -225,6 +225,19 @@ test("through the runner: the models job opens a PR branch; merged, the reviews 
         assert.equal(api.calls.reviews, 1);
     } finally {
         api.close();
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
+test("keys: the standard names by default, a site's own names with aiReviews keys, values from .secret.txt files", () => {
+    const site = makeSite({ folder: "AI Reviews", providers: ["Claude", "ChatGPT"], keys: { Claude: "CLAUDE_REVIEW_KEY" } });
+    try {
+        mkdirSync(join(site, "_credentials"));
+        writeFileSync(join(site, "_credentials", "CLAUDE_REVIEW_KEY.secret.txt"), "sk-review-123456\n");
+        const [models] = UpdateJobs.inSite(site, { OPENAI_API_KEY: "sk-openai-123456", ANTHROPIC_API_KEY: "sk-runner-123456" }).all();
+        assert.deepEqual(models.updateFile.secrets(), ["CLAUDE_REVIEW_KEY", "OPENAI_API_KEY"], "Claude uses its own key, not the runner's");
+        assert.deepEqual(models.problems(), []);
+    } finally {
         rmSync(site, { recursive: true, force: true });
     }
 });
