@@ -1,33 +1,39 @@
 /**
  * AI Reviews: a section of pages in which AI models review the site, set up
- * by colvmn.json's "aiReviews". Used by static-gen.js only (not bundled for
- * the browser, which doesn't re-render statically generated pages).
+ * by colvmn.json's "aiReviews". colvmn both produces the reviews (two built-in
+ * update jobs, see update/ai/) and renders them (here, from static-gen.js;
+ * not bundled for the browser, which doesn't re-render built pages).
  *
  *   "aiReviews": {
  *       "folder": "AI Reviews",
  *       "prompt": "Read https://example.com/llms.txt and ... Evaluate ...",
  *       "providers": ["Claude", "ChatGPT", "Gemini", "Grok"],
- *       "about": "Review Process"
+ *       "about": "Review Process",
+ *       "homeCard": true,
+ *       "every": "30d"
  *   }
  *
- * "about" (optional) names a subfolder whose page explains how the reviews
- * are made; it gets a card at the end of the grid and the prompt. Without
- * it, the prompt goes on the section page.
+ * Only "folder" is needed. "prompt" defaults to one built from the site's
+ * siteUrl and name; colvmn adds the answer format to it (ANSWER_FORMAT),
+ * because it reads the quoted build stamp and the verdict from the answer.
+ * "about" names a subfolder whose page explains how the reviews are made: it
+ * gets a card at the end of the grid and the prompt (without it, the prompt
+ * goes on the section page). "homeCard" adds a card for the section to the
+ * site's root page. "every" is the least time between reviews (default 30d).
  *
- * Each provider is a subfolder of the section. Known providers get their
- * company, app and prefilled-prompt link from PROVIDERS below; others, or
- * overrides, are given as objects: { "name": "Mistral", "company": "Mistral AI",
- * "app": "https://chat.mistral.ai", "ask": "https://chat.mistral.ai/chat?q={prompt}" }.
+ * Each provider is a subfolder of the section. The four built in have their
+ * company, app, prefilled-prompt link and API key name below; another is
+ * given as { "name", "company", "app", "ask" } and can be shown but not
+ * produced. A provider entry may pin a model: { "name": "Claude",
+ * "model": "<API model ID>" }.
  *
- * A review is a provider folder's _index.md, written by the site's own
- * reviews job. colvmn knows nothing about producing one; it reads these
- * frontmatter fields:
+ * A review is a provider folder's _index.md, frontmatter:
  *
- *   modelName   "Claude Opus 5.5"      model       "claude-opus-5-5"
- *   reviewed    "2026-11-20"           stamp       the build stamp the model quoted
- *   summary     the model's own one-line summary of its review (the prompt
- *               asks for one), shown on its card under the full model name
+ *   modelName   the full model name     model       the API model ID
+ *   reviewed    the date                stamp       the build stamp the model quoted
+ *   summary     the model's own one-sentence verdict, shown on its card
  *   share       a link to the original conversation, when there is one
+ *   inputHash   what the review was made from (docs, model, prompt)
  *
  * and the body is the review, published as written. A hand-written
  * "## Author's note" section after it is shown like any other section.
@@ -35,8 +41,8 @@
  *
  * What the generator adds:
  *   section page   {date} in its subtitle becomes the latest review's date;
- *                  one card per provider (model name and its summary) and the about
- *                  card, then the page's own text (and the prompt, when
+ *                  one card per provider (model name and its verdict) and the
+ *                  about card, then the page's own text (and the prompt, when
  *                  there's no about page)
  *   about page     its own text, then the prompt
  *   review pages   a header: model, date, "Ask <provider> yourself" and the
@@ -44,6 +50,7 @@
  *                  ID, quoted stamp, the prompt, the not-an-endorsement line);
  *                  then "Earlier reviews"
  *   archive pages  the same header, and a link to the current review
+ *   root page      with homeCard, a card for the section
  *
  * The whole section is left out of llms.txt and llms-full.txt (and so out of
  * the build stamp): later reviews mustn't read earlier ones.
@@ -54,29 +61,54 @@ import { join, relative, sep } from "node:path";
 import { parseMarkdown } from "./MarkdownParser.js";
 import { ContentCards } from "./ContentCards.js";
 
-const PROVIDERS = {
-    Claude: { company: "Anthropic", app: "https://claude.ai/new", ask: "https://claude.ai/new?q={prompt}" },
-    ChatGPT: { company: "OpenAI", app: "https://chatgpt.com/", ask: "https://chatgpt.com/?q={prompt}" },
-    Gemini: { company: "Google", app: "https://gemini.google.com/app" },
-    Grok: { company: "xAI", app: "https://grok.com/", ask: "https://grok.com/?q={prompt}" },
+export const PROVIDERS = {
+    Claude: { company: "Anthropic", app: "https://claude.ai/new", ask: "https://claude.ai/new?q={prompt}", key: "CLAUDE_REVIEW_KEY" },
+    ChatGPT: { company: "OpenAI", app: "https://chatgpt.com/", ask: "https://chatgpt.com/?q={prompt}", key: "OPENAI_REVIEW_KEY" },
+    Gemini: { company: "Google", app: "https://gemini.google.com/app", key: "GEMINI_REVIEW_KEY" },
+    Grok: { company: "xAI", app: "https://grok.com/", ask: "https://grok.com/?q={prompt}", key: "XAI_REVIEW_KEY" },
 };
 
-const ARCHIVE = "archive";
+/** Added to every prompt: colvmn reads these two lines from the answer. */
+export const ANSWER_FORMAT = "Start your answer with these two lines:\n"
+    + "Build stamp: <the site build stamp you saw, quoted exactly, or \"none\">\n"
+    + "Verdict: <your verdict in one sentence of at most 20 words>\n"
+    + "Then write the review in Markdown.";
+
+export const ARCHIVE = "archive";
+export const MODELS_FOLDER = "_models";
+const DEFAULT_EVERY = "30d";
 
 export class AiReviews {
 
     /** The section for a site's config, or null when it has none. */
-    static forConfig (siteRoot, config) {
-        if (!config || !config.folder || !config.prompt) {
+    static forConfig (siteRoot, config, site = {}) {
+        if (!config || !config.folder) {
             return null;
         }
-        return new AiReviews(siteRoot, config);
+        return new AiReviews(siteRoot, config, site);
     }
 
-    constructor (siteRoot, config) {
+    /** The section for the site whose root this is, from its own colvmn.json, or null. */
+    static forSiteRoot (siteRoot) {
+        const path = join(siteRoot, "colvmn.json");
+        if (!existsSync(path)) {
+            return null;
+        }
+        const json = JSON.parse(readFileSync(path, "utf-8"));
+        return AiReviews.forConfig(siteRoot, json.aiReviews, { siteUrl: json.siteUrl, title: siteTitle(siteRoot) });
+    }
+
+    /**
+     * @param {string} siteRoot
+     * @param {Object} config - colvmn.json's aiReviews
+     * @param {{ siteUrl?: string, title?: string }} site - for the default prompt
+     */
+    constructor (siteRoot, config, site = {}) {
         this.siteRoot = siteRoot;
         this.folder = config.folder.replace(/\/+$/, "");
-        this.prompt = config.prompt;
+        this.prompt = config.prompt || defaultPrompt(this.folder, site);
+        this.homeCard = config.homeCard === true;
+        this.every = config.every || DEFAULT_EVERY;
         this.about = config.about ? config.about.replace(/\/+$/, "") : null;
         this.providers = (config.providers || Object.keys(PROVIDERS)).map(p => {
             const own = typeof p === "string" ? { name: p } : p;
@@ -86,6 +118,53 @@ export class AiReviews {
 
     sectionDir () {
         return join(this.siteRoot, this.folder);
+    }
+
+    /** The prompt as sent and shown: the site's, then the answer format. */
+    fullPrompt () {
+        return `${this.prompt}\n\n${ANSWER_FORMAT}`;
+    }
+
+    /** The providers colvmn can produce reviews for (an API adapter and a key name). */
+    producible () {
+        return this.providers.filter(p => p.key);
+    }
+
+    modelsPath () {
+        return join(this.sectionDir(), MODELS_FOLDER, "models.json");
+    }
+
+    /** A home-page card for the section, added to the root page's last card grid (mutates json). */
+    decorateHome (json) {
+        const meta = this.pageMeta(this.sectionDir());
+        if (!this.homeCard || !meta) {
+            return;
+        }
+        const content = json.content || (json.content = []);
+        let cards = [...content].reverse().find(c => c.type === "ContentCards");
+        if (!cards) {
+            cards = { type: "ContentCards", items: [] };
+            content.push(cards);
+        }
+        cards.items = cards.items || [];
+        const linked = cards.items.some(i => (typeof i === "string" ? i : i.folder) === this.folder);
+        if (!linked) {
+            cards.items.push({
+                title: escapeHtml(meta.title || this.folder),
+                folder: this.folder,
+                subtitle: meta.cardSubtitle || "What AI models make of this site.",
+                arrow: "Read"
+            });
+        }
+    }
+
+    /** A page folder's parsed _index.md, or null when it isn't a page. */
+    pageMeta (dir) {
+        const path = join(dir, "_index.md");
+        if (!existsSync(path) || !existsSync(join(dir, "index.html"))) {
+            return null;
+        }
+        return parseMarkdown(readFileSync(path, "utf-8"));
     }
 
     /** Whether a page folder is in the section (so out of the llms files). */
@@ -198,7 +277,7 @@ export class AiReviews {
 
     promptEntry () {
         const body = "<p>Every model is given the same prompt. You can ask it yourself:</p>"
-            + `<blockquote class="review-prompt">${escapeHtml(this.prompt)}</blockquote>`
+            + promptHtml(this.fullPrompt())
             + "<p>Answers vary with the account, plan and settings they're asked from.</p>";
         return { type: "ContentText", title: "The prompt", body };
     }
@@ -242,7 +321,7 @@ export class AiReviews {
             `<p>Model: ${escapeHtml(model)}</p>`,
             `<p>Reviewed: ${escapeHtml(meta.reviewed)}</p>`,
             `<p>${meta.stamp ? `Build stamp it quoted: ${escapeHtml(meta.stamp)}` : "It didn't quote the site's build stamp."}</p>`,
-            `<p>The prompt:</p><blockquote class="review-prompt">${escapeHtml(this.prompt)}</blockquote>`,
+            `<p>The prompt:</p>${promptHtml(this.fullPrompt())}`,
             `<p>Generated by ${escapeHtml(name)} on ${escapeHtml(meta.reviewed)}; not an endorsement by ${escapeHtml(provider.company)}.</p>`
         ];
         return { type: "ContentText", title: "Details", body: `<div class="review-details">${rows.join("")}</div>` };
@@ -251,7 +330,7 @@ export class AiReviews {
     /** The prefilled-prompt link, or the app when there's no prefill. */
     askLink (provider) {
         if (provider.ask) {
-            return provider.ask.replace("{prompt}", encodeURIComponent(this.prompt));
+            return provider.ask.replace("{prompt}", encodeURIComponent(this.fullPrompt()));
         }
         return provider.app || null;
     }
@@ -300,6 +379,31 @@ function describeModelAndDate (meta) {
     return [model, meta.reviewed].filter(Boolean).join(" · ");
 }
 
-function escapeHtml (s) {
+/** The prompt as a quote, its lines kept. */
+function promptHtml (prompt) {
+    return `<blockquote class="review-prompt">${escapeHtml(prompt).split("\n").join("<br>")}</blockquote>`;
+}
+
+function defaultPrompt (folder, site) {
+    const url = site.siteUrl && site.siteUrl !== "/" ? site.siteUrl.replace(/\/?$/, "/") : null;
+    const name = site.title || "this site's subject";
+    const read = url ? `Read ${url}llms.txt and the pages it links.` : "Read this site's llms.txt and the pages it links.";
+    return `${read} Ignore the "${folder}" section. Evaluate ${name}: what it is, its strengths, its weaknesses and risks, who should and shouldn't use it, and how it compares to alternatives.`;
+}
+
+/** The site's name: its root page's topTitle or title. */
+function siteTitle (siteRoot) {
+    for (const name of ["_index.json", "_index.md"]) {
+        const path = join(siteRoot, name);
+        if (existsSync(path)) {
+            const text = readFileSync(path, "utf-8");
+            const json = name.endsWith(".json") ? JSON.parse(text) : parseMarkdown(text);
+            return json.topTitle || json.title || null;
+        }
+    }
+    return null;
+}
+
+export function escapeHtml (s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }

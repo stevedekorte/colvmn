@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  colvmn scheduled updates on your own Mac, with launchd. See colvmn's
+  "Scheduled Updates" page.
+
+  1. Use a checkout of the site that you don't edit in (the runner refuses
+     to start on uncommitted changes), with gh logged in if any job
+     publishes as a pull request.
+  2. Copy this to ~/Library/LaunchAgents/net.colvmn.updates.<site>.plist,
+     replace SITE_ROOT, LOG_FILE and the Label's <site>, and fill in the
+     keys your jobs use. Delete the ones you don't. Keys live only in this
+     file, outside the repo: chmod 600 it.
+  3. launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/net.colvmn.updates.<site>.plist
+     Run it now:  launchctl kickstart gui/$(id -u)/net.colvmn.updates.<site>
+     Stop it:     launchctl bootout gui/$(id -u)/net.colvmn.updates.<site>
+
+  Once a day it pulls, runs the scheduled jobs that are due, then the
+  on: push jobs whose watched paths changed since they last ran, and pushes
+  what they commit. A run missed while the Mac slept happens when it wakes.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>net.colvmn.updates.SITE</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/zsh</string>
+        <string>-c</string>
+        <string>cd "SITE_ROOT" &amp;&amp; git pull --ff-only -q &amp;&amp; git submodule update --init -q &amp;&amp; { node colvmn/update.js --push; node colvmn/update.js --on push --push; }</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <!-- AI Reviews (colvmn.json "aiReviews"): one per provider, each with a low spend limit -->
+        <key>CLAUDE_REVIEW_KEY</key>
+        <string></string>
+        <key>OPENAI_REVIEW_KEY</key>
+        <string></string>
+        <key>GEMINI_REVIEW_KEY</key>
+        <string></string>
+        <key>XAI_REVIEW_KEY</key>
+        <string></string>
+        <!-- Prompt jobs: the runner's own Claude key -->
+        <!-- <key>ANTHROPIC_API_KEY</key><string></string> -->
+        <!-- Email notifications, if colvmn.json turns them on -->
+        <!-- <key>NOTIFY_EMAIL_TO</key><string></string> -->
+        <!-- <key>NOTIFY_EMAIL_FROM</key><string></string> -->
+        <!-- <key>RESEND_API_KEY</key><string></string> -->
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>7</integer>
+        <key>Minute</key>
+        <integer>17</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>LOG_FILE</string>
+    <key>StandardErrorPath</key>
+    <string>LOG_FILE</string>
+</dict>
+</plist>

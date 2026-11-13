@@ -131,22 +131,21 @@ A site without its own `colvmn.json` uses the nearest one in a folder above it, 
 
 #### AI reviews — `aiReviews`
 
-A section of pages in which AI models review the site. colvmn renders the section; producing the reviews is the site's own job (typically a scheduled script that calls each provider's API).
+A section in which AI models review the site, produced and rendered by colvmn. A site needs only this setting and at least one API key:
 
 ```json
 "aiReviews": {
   "folder": "AI Reviews",
-  "prompt": "Read https://example.com/llms.txt and the pages it links. Evaluate ...",
-  "providers": ["Claude", "ChatGPT", "Gemini", "Grok"],
-  "about": "Review Process"
+  "about": "Review Process",
+  "homeCard": true
 }
 ```
 
-`about` (optional) is a subfolder whose page explains how the reviews are made. It gets a full-width card at the end of the provider grid, and the prompt is shown on it; the section page then needs only a short summary. Without it, the prompt goes on the section page.
+With it, the update runner adds two jobs of its own (no `_update.md` needed): a daily **models** job that finds each provider's latest top model and opens a pull request updating `<folder>/_models/models.json`, so a person confirms the choice; and a **reviews** job that, when `llms-full.txt` or `models.json` has changed (at most once per `every`, default `30d`), sends each confirmed model the prompt with `llms-full.txt` attached and commits its answer as written. The keys are `CLAUDE_REVIEW_KEY`, `OPENAI_REVIEW_KEY`, `GEMINI_REVIEW_KEY` and `XAI_REVIEW_KEY`, from the environment or `_credentials/NAME.secret`; a provider without a key is skipped and shown as not reviewed yet.
 
-Each provider is a subfolder of the section. The four above have their company, app and prefilled-prompt link built in; another is given as `{ "name", "company", "app", "ask" }`, where `ask` is a URL with `{prompt}` in it. A review is the provider folder's `_index.md`: frontmatter `modelName`, `model`, `reviewed` (the date), `stamp` (the build stamp the model quoted), `summary` (the model's own one-line summary, which the prompt should ask for; it is the card's text under the full model name; the cards carry no dates, which are on the review pages) and `share` (a link to the original conversation, optional), and the review as its body. Replaced reviews go in `<provider>/archive/<date>/`.
+Other settings: `prompt` (default: read the site's `llms.txt`, ignore this section, evaluate the site's subject; colvmn adds lines asking for the build stamp and a one-sentence verdict, which it reads from the answer), `providers` (default the four; another is `{ "name", "company", "app", "ask" }` and is shown but not produced; `{ "name": "Claude", "model": "<id>" }` pins a model), `about` (a subfolder explaining the process, with a card at the end of the grid and the prompt), `homeCard` (a card for the section on the root page) and `every`.
 
-In the section page's subtitle, `{date}` becomes the latest review's date ("AI reviews of this site's content on {date}"; with no review yet, " on {date}" is dropped). The generator adds one card per provider to the section page (and the about card), with the prompt after the page's own text or on the about page; a header to each review (model, date, "Ask … yourself", the original conversation) and, after it, a Details section (model ID, quoted stamp, the prompt, a not-an-endorsement line); and the list of earlier reviews. The whole section is left out of the llms files and the build stamp, so later reviews never read earlier ones.
+The section page, the about page and the review pages are written with default text the first time; edit any of them, and an `## Author's note` after a review is kept until that review is replaced. A review page's frontmatter: `modelName`, `model`, `reviewed`, `summary` (the verdict, shown on its card), `stamp` (the build stamp the model quoted), `share` (optional link to an original conversation), `inputHash`. Replaced reviews move to `<provider>/archive/<date>/`. `{date}` in the section page's subtitle becomes the latest review's date. The whole section is left out of the llms files and the build stamp, so later reviews never read earlier ones.
 
 ### Scheduled updates
 

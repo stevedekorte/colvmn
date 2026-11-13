@@ -31,7 +31,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { matchesAnyGlob } from "./Glob.js";
 import { Credentials } from "./Credentials.js";
@@ -101,6 +101,7 @@ export class JobRunner {
 
     /** The script's exit status (a timeout or a crash counts as failure, 1). */
     runScript (job, values) {
+        mkdirSync(job.updateFile.folder(), { recursive: true });   // a built-in job's folder may not exist yet
         const r = spawnSync(process.execPath, [job.updateFile.scriptPath()], {
             cwd: job.updateFile.folder(),
             env: this.scriptEnv(job, values),
@@ -161,6 +162,10 @@ export class JobRunner {
             if (this.env[name] !== undefined) {
                 env[name] = this.env[name];
             }
+        }
+        // AI Reviews API addresses, when replaced (tests point them at a local stand-in)
+        for (const name of Object.keys(this.env).filter(n => n.startsWith("COLVMN_AI_BASE_"))) {
+            env[name] = this.env[name];
         }
         return env;
     }

@@ -15,13 +15,19 @@
  *   { "about": "Stripe restricted key, read-only", "pattern": "^rk_" }
  *   { "about": "GCP service account", "format": "json" }
  *
- * Problems name the credential and never include its value.
+ * colvmn describes the AI Reviews keys itself (CLAUDE_REVIEW_KEY,
+ * OPENAI_REVIEW_KEY, GEMINI_REVIEW_KEY, XAI_REVIEW_KEY), so they need only a
+ * value. Problems name the credential and never include its value.
  */
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
+import { PROVIDERS } from "../layout/AiReviews.js";
 
 const FOLDER = "_credentials";
+
+/** Credentials colvmn describes itself: the AI Reviews keys. A site's own description of the same name wins. */
+const BUILT_IN = Object.fromEntries(Object.entries(PROVIDERS).map(([name, p]) => [p.key, { about: `${name} API key for AI Reviews; give it a low spend limit` }]));
 const GIT_CRYPT_HEADER = Buffer.from("\0GITCRYPT");
 
 export class Credentials {
@@ -66,7 +72,10 @@ export class Credentials {
         return formatProblem ? { problem: formatProblem } : { value };
     }
 
-    /** The nearest description at or above a folder, or null. */
+    /**
+     * The nearest description at or above a folder, else colvmn's own (the
+     * AI review keys), as if at the site root; or null.
+     */
     descriptionFor (name, folder) {
         for (let dir = folder; ; dir = dirname(dir)) {
             const path = join(dir, FOLDER, `${name}.json`);
@@ -74,9 +83,10 @@ export class Credentials {
                 return { dir, path, description: readDescription(path) };
             }
             if (dir === this.siteRoot || !dir.startsWith(this.siteRoot + sep)) {
-                return null;
+                break;
             }
         }
+        return BUILT_IN[name] ? { dir: this.siteRoot, path: "(built in)", description: BUILT_IN[name] } : null;
     }
 
     valueFor (name, dir) {

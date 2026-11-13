@@ -1,6 +1,7 @@
 /**
  * The update jobs of a site: every folder under the site root that has an
- * `_update.md`, with when each last ran and whether it is due.
+ * `_update.md`, plus the AI Reviews jobs colvmn adds when colvmn.json asks
+ * (ai/AiReviewJobs.js), with when each last ran and whether it is due.
  *
  * A job's last run is kept next to its update file, in
  * `_update.state.json`, and committed with the run's changes, so the
@@ -11,6 +12,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { UpdateFile, UPDATE_FILE_NAME } from "./UpdateFile.js";
 import { Schedule } from "./Schedule.js";
+import { aiReviewUpdateFiles } from "./ai/AiReviewJobs.js";
 
 export const STATE_FILE_NAME = "_update.state.json";
 
@@ -148,8 +150,9 @@ export class UpdateJobs {
      * @param {string} siteRoot - absolute path
      * @returns {UpdateJobs}
      */
-    static inSite (siteRoot) {
-        return new UpdateJobs(siteRoot, findUpdateFiles(siteRoot).map(p => new UpdateJob(UpdateFile.fromPath(p, siteRoot))));
+    static inSite (siteRoot, env = process.env) {
+        const files = [...findUpdateFiles(siteRoot).map(p => UpdateFile.fromPath(p, siteRoot)), ...aiReviewUpdateFiles(siteRoot, env)];
+        return new UpdateJobs(siteRoot, files.map(f => new UpdateJob(f)));
     }
 
     constructor (siteRoot, jobs) {

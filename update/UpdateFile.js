@@ -40,12 +40,31 @@ export class UpdateFile {
         return new UpdateFile(readFileSync(filePath, "utf8"), filePath, siteRoot);
     }
 
+    /**
+     * A job colvmn adds itself (see ai/AiReviewJobs.js), with no file: its
+     * settings, its folder and the script it runs, absolute.
+     * @param {{ fields: Object, folder: string, siteRoot: string, script: string, problems?: string[] }} spec
+     */
+    static builtIn ({ fields, folder, siteRoot, script, problems = [] }) {
+        const f = new UpdateFile("", join(folder, UPDATE_FILE_NAME), siteRoot);
+        f.fields = fields;
+        f.builtInScript = script;
+        f.builtInProblems = problems;
+        return f;
+    }
+
     constructor (text, filePath, siteRoot) {
         this.filePath = filePath;
         this.siteRoot = siteRoot;
         const { fields, body } = parseUpdateMarkdown(text);
         this.fields = fields;
         this.body = body;
+        this.builtInScript = null;
+        this.builtInProblems = [];
+    }
+
+    isBuiltIn () {
+        return this.builtInScript !== null;
     }
 
     /** The job's folder, absolute. */
@@ -126,6 +145,9 @@ export class UpdateFile {
 
     /** The script a script job runs, absolute, or null for a prompt job. */
     scriptPath () {
+        if (this.builtInScript) {
+            return this.builtInScript;
+        }
         return this.fields.run ? join(this.folder(), this.fields.run) : null;
     }
 
@@ -144,6 +166,7 @@ export class UpdateFile {
      */
     problems () {
         return [
+            ...this.builtInProblems,
             ...this.unknownKeyProblems(),
             ...this.scheduleProblems(),
             ...this.minIntervalProblems(),

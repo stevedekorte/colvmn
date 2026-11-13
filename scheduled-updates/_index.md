@@ -98,7 +98,13 @@ node colvmn/update.js --folder Competition   # run one job now, due or not
 node colvmn/update.js --push                 # ... and push the commits and open pull requests
 ```
 
-To run on a schedule, copy `colvmn/update/workflow-template.yml` to `.github/workflows/` in the site's repo and add the secrets it names. It runs the due jobs daily and the push jobs on each push. Commits pushed with the workflow's own token don't start new runs, so the runner's commits can't trigger it again. Jobs that need credentials kept on your own machine can run on a self-hosted runner instead.
+To run on a schedule on your own Mac, copy `colvmn/update/launchd-template.plist` to `~/Library/LaunchAgents/`, fill in the site's path and the keys, and load it with `launchctl` (the file says how). Once a day it pulls, runs the due jobs and the push jobs whose watched paths changed, and pushes what they commit. Give it a checkout you don't edit in, since the runner won't start on uncommitted changes. The keys stay in that file, outside the repo.
+
+To run on GitHub Actions instead, copy `colvmn/update/workflow-template.yml` to `.github/workflows/` in the site's repo and add the secrets it names. It runs the due jobs daily and the push jobs on each push. Commits pushed with the workflow's own token don't start new runs, so the runner's commits can't trigger it again.
+
+## Built-in jobs
+
+A site whose `colvmn.json` has `aiReviews` gets two jobs without writing any update file: one keeps track of each AI provider's top model, the other has those models review the site. See [AI Reviews](../ai-reviews/index.html).
 
 ## Notifications
 

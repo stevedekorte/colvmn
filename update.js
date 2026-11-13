@@ -17,11 +17,13 @@
  *   node colvmn/update.js --dry-run --now 2026-11-10T07:30:00Z   # as if at another time
  *   node colvmn/update.js --dry-run --json          # the same, as JSON
  *
- * Script jobs run and publish (publish: direct commits here; publish: pr
- * commits on a branch, and --push pushes it and opens the PR). Prompt jobs
- * are not built yet; such jobs are reported as failed. The runner
- * refuses to start on a working tree with uncommitted changes. See
- * update/JobRunner.js for what a script gets and how its exit status is read.
+ * Jobs run and publish (publish: direct commits here; publish: pr commits
+ * on a branch, and --push pushes it and opens the PR). A site whose
+ * colvmn.json has "aiReviews" also gets two built-in jobs (update/ai/). The
+ * runner refuses to start on a working tree with uncommitted changes. See
+ * update/JobRunner.js for what a job gets and how its exit status is read.
+ * To run on a schedule: update/launchd-template.plist (your own Mac) or
+ * update/workflow-template.yml (GitHub Actions).
  */
 
 import { dirname, resolve } from "node:path";

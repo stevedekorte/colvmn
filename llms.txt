@@ -2,6 +2,10 @@
 
 > A minimal static-site layout engine.
 
+## AI Reviews
+
+- [AI Reviews](/ai-reviews/): Claude, ChatGPT, Gemini and Grok review your site from its own docs. One setting and an API key; colvmn does the rest.
+
 ## Authoring
 
 - [Authoring](/authoring/)

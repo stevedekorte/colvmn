@@ -330,9 +330,14 @@ async function generatePage (pageDir) {
     }
 
     // An AI Reviews page gets its generated parts (cards, review header,
-    // archive list), resolved like the page's own content.
-    if (aiReviews && aiReviews.contains(pageDir)) {
-        aiReviews.decorate(pageDir, page.json);
+    // archive list), and the root page its home card, resolved like the
+    // page's own content.
+    if (aiReviews && (aiReviews.contains(pageDir) || pageDir === localRoot)) {
+        if (pageDir === localRoot) {
+            aiReviews.decorateHome(page.json);
+        } else {
+            aiReviews.decorate(pageDir, page.json);
+        }
         page.children = page.json.content.map(c => ContentBase.fromJson(c, 0));
         await Promise.all(page.children.map(c => c.resolve()));
     }
@@ -938,7 +943,7 @@ function siteConfigFor (localRoot) {
         analyticsHtml,
         buildStamp: own.buildStamp === true,
         llmsExclude: Array.isArray(own.llmsExclude) ? own.llmsExclude : [],
-        aiReviews: AiReviews.forConfig(localRoot, own.aiReviews),
+        aiReviews: own.aiReviews ? AiReviews.forSiteRoot(localRoot) : null,
     };
     siteConfigCache.set(localRoot, config);
     return config;

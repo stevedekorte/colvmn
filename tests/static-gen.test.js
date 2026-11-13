@@ -9,6 +9,7 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { ANSWER_FORMAT } from "../layout/AiReviews.js";
 
 const staticGen = join(dirname(fileURLToPath(import.meta.url)), "..", "static-gen.js");
 
@@ -125,7 +126,8 @@ test("aiReviews: provider cards, review headers with prefilled links, the archiv
         assert.match(section, /class="review-prompt">Read https:\/\/example\.com\/llms\.txt &amp; evaluate it\./);
 
         const claude = read("AI Reviews/Claude");
-        assert.match(claude, new RegExp(`href="https://claude\\.ai/new\\?q=${encodeURIComponent(prompt).replace(/[.?*()]/g, "\\$&")}"`));
+        const askUrl = "https://claude.ai/new?q=" + encodeURIComponent(`${prompt}\n\n${ANSWER_FORMAT}`);
+        assert.ok(claude.includes(`href="${askUrl.replace(/&/g, "&amp;")}"`), "the prefilled link carries the prompt and the answer format");
         // Model, date and links on top; the technical details after the review.
         assert.match(claude, /class="review-header">[\s\S]*Ask Claude yourself[\s\S]*It is a framework\.[\s\S]*Details[\s\S]*Build stamp it quoted: Site build: Example · 2026-11-19 · abc1234[\s\S]*Earlier reviews/);
         assert.doesNotMatch(claude.split("It is a framework.")[0], /Build stamp it quoted|not an endorsement/);
@@ -158,6 +160,21 @@ test("aiReviews about: its card ends the grid, and the prompt moves to its page"
         assert.match(section, /AI reviews of this site(&#39;|')s content<\/p>/);   // no review yet
         const about = readFileSync(join(site, "AI Reviews", "How", "index.html"), "utf-8");
         assert.match(about, /class="review-prompt">Evaluate it\./);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
+test("aiReviews homeCard: a card for the section joins the root page's last card grid, once the section exists", () => {
+    const site = makeSite({ aiReviews: { folder: "AI Reviews", homeCard: true } });
+    try {
+        writeFileSync(join(site, "_index.json"), JSON.stringify({ topTitle: "Example", title: "Example", content: [{ type: "ContentCards", items: [{ folder: "kept", title: "Kept" }] }] }));
+        commitAll(site, "pages");
+        assert.doesNotMatch(build(site).rootHtml, /<h3>AI Reviews<\/h3>/, "no section page yet");
+        writePage(site, "AI Reviews", "---\ncardSubtitle: What four models make of it.\n---\n# AI Reviews\n\nAI reviews of this site's content on {date}\n");
+        const { rootHtml, llmsFull } = build(site);
+        assert.match(rootHtml, /<h3>Kept<\/h3>[\s\S]*<a class="card[^"]*" href="AI%20Reviews\/index\.html"><h3>AI Reviews<\/h3><p>What four models make of it\.<\/p>/);
+        assert.doesNotMatch(llmsFull, /What four models/);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }
