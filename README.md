@@ -138,7 +138,7 @@ A section of pages in which AI models review the site. colvmn renders the sectio
   "folder": "AI Reviews",
   "prompt": "Read https://example.com/llms.txt and the pages it links. Evaluate ...",
   "providers": ["Claude", "ChatGPT", "Gemini", "Grok"],
-  "about": "How These Are Made"
+  "about": "Review Process"
 }
 ```
 

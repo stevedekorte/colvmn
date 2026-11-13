@@ -7,7 +7,7 @@
  *       "folder": "AI Reviews",
  *       "prompt": "Read https://example.com/llms.txt and ... Evaluate ...",
  *       "providers": ["Claude", "ChatGPT", "Gemini", "Grok"],
- *       "about": "How These Are Made"
+ *       "about": "Review Process"
  *   }
  *
  * "about" (optional) names a subfolder whose page explains how the reviews
