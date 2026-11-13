@@ -86,7 +86,7 @@ The first time, the section page and the about page are written with default tex
 ## The pages
 
 - **The section page.** "AI reviews of this site's content on {date}", where `{date}` becomes the latest review's date. Then one card per model: its full name and its one-sentence verdict. Then a card for the about page.
-- **A review page.** The model and date, a link that opens the same prompt in that model's own app, the review, then **Details**: the model ID, the build stamp the model quoted, the exact prompt, and a line saying it isn't an endorsement by the provider. Then earlier reviews.
+- **A review page.** The model, date and verdict, the review, then **Details**: the model ID, the build stamp the model quoted, the exact prompt with a link that opens it in that model's own app, and a line saying it isn't an endorsement by the provider. Then earlier reviews.
 - **The about page.** How the reviews are made, then the prompt.
 - **The home page,** with `homeCard`. A card for the section, added to the root page's last card grid.
 

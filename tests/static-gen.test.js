@@ -129,7 +129,8 @@ test("aiReviews: provider cards, review headers with prefilled links, the archiv
         const askUrl = "https://claude.ai/new?q=" + encodeURIComponent(`${prompt}\n\n${ANSWER_FORMAT}`);
         assert.ok(claude.includes(`href="${askUrl.replace(/&/g, "&amp;")}"`), "the prefilled link carries the prompt and the answer format");
         // Model, date and links on top; the technical details after the review.
-        assert.match(claude, /class="review-header">[\s\S]*Ask Claude yourself[\s\S]*It is a framework\.[\s\S]*Details[\s\S]*Build stamp it quoted: Site build: Example · 2026-11-19 · abc1234[\s\S]*Earlier reviews/);
+        // Model, date and verdict on top; the details and the links to try it after the review.
+        assert.match(claude, /class="review-header">[\s\S]*It is a framework\.[\s\S]*Details[\s\S]*Build stamp it quoted: Site build: Example · 2026-11-19 · abc1234[\s\S]*Ask Claude yourself[\s\S]*View the original conversation[\s\S]*Earlier reviews/);
         assert.doesNotMatch(claude.split("It is a framework.")[0], /Build stamp it quoted|not an endorsement/);
         assert.match(claude, /View the original conversation/);
         assert.match(claude, /not an endorsement by Anthropic/);
