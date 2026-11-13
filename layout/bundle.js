@@ -1775,6 +1775,7 @@ class PageIndex {
         this.isRoot = false;
         this.parentTitle = null;
         this.children = [];
+        this.reviewsLink = null;
     }
 
     // Browser entry point. Always runs loadPage() + render() on DOMContentLoaded.
@@ -2025,15 +2026,22 @@ class PageIndex {
         // Content
         const contentHtml = this.children.map(c => c.computeHtml()).join("");
 
-        // Optional next-section footer link (opt-in via "nextSectionLink": true)
-        let footerHtml = "";
+        // Footer links: the page's AI reviews (set by static-gen for a page
+        // that opts in to them), and the optional next-section link (opt-in
+        // via "nextSectionLink": true).
+        const footerLinks = [];
+        if (this.reviewsLink) {
+            const { href, label } = this.reviewsLink;
+            footerLinks.push(`<a class="reviews-link" href="${href}">${label}</a>`);
+        }
         if (this.nextLink) {
             const { kind, title, href } = this.nextLink;
             const label = kind === "up"
                 ? `&uarr; ${title}`
                 : `${title} &rarr;`;
-            footerHtml = `<div class="page-footer"><a class="next-link" href="${href}">${label}</a></div>`;
+            footerLinks.push(`<a class="next-link" href="${href}">${label}</a>`);
         }
+        const footerHtml = footerLinks.length ? `<div class="page-footer">${footerLinks.join("")}</div>` : "";
 
         const dotsHtml = ContentBase.completionDots(this.json.completion);
 

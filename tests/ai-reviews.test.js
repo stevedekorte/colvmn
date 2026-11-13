@@ -33,10 +33,10 @@ test("an answer gives its quoted stamp, verdict and review; HTML is escaped outs
     assert.equal(inputHash("a\nSite build: 1\n", "m", "p"), inputHash("a\nSite build: 2\n", "m", "p"));   // the stamp line doesn't count
 });
 
-function makeSite (aiReviews) {
+function makeSite (aiReviews, rootOptsIn = true) {
     const site = mkdtempSync(join(tmpdir(), "colvmn-ai-"));
     writeFileSync(join(site, "colvmn.json"), JSON.stringify({ siteUrl: "https://example.com/", aiReviews }));
-    writeFileSync(join(site, "_index.md"), "---\ntopTitle: Example\n---\n# Example\n\nRoot.\n");
+    writeFileSync(join(site, "_index.md"), `---\ntopTitle: Example\n${rootOptsIn ? "aiReviews: true\n" : ""}---\n# Example\n\nRoot.\n`);
     writeFileSync(join(site, "llms-full.txt"), "# Example\n\nSite build: Example · 2026-11-12 · abc1234\n\nThe docs.\n");
     return site;
 }
@@ -50,7 +50,7 @@ test("Claude's model choice: the JSON at the end of its answer, and only IDs fro
 });
 
 test("aiReviews adds one reviews job (monthly, direct), with the keys that have values", () => {
-    const site = makeSite({ folder: "AI Reviews", about: "Review Process" });
+    const site = makeSite({ folder: "AI Reviews" });
     try {
         let jobs = UpdateJobs.inSite(site, {});
         assert.deepEqual(jobs.all().map(j => j.folderName()), ["AI Reviews"]);
@@ -117,7 +117,7 @@ function runReviews (site, base, args = [], key = "sk-test-123456") {
 }
 
 test("reviews.js: Claude chooses the model, --models stops there; then the review is written, skipped when nothing changed, archived when the docs change", async () => {
-    const site = makeSite({ folder: "AI Reviews", about: "Review Process", providers: ["Claude", "Gemini"] });
+    const site = makeSite({ folder: "AI Reviews", providers: ["Claude", "Gemini"] });
     const api = await fakeClaude("Build stamp: Site build: Example · 2026-11-12 · abc1234\nVerdict: Clear docs, small ecosystem.\n\n## Strengths\n\nGood.\n");
     try {
         let r = await runReviews(site, api.url, ["--models"]);
@@ -137,7 +137,7 @@ test("reviews.js: Claude chooses the model, --models stops there; then the revie
         assert.match(review, /^---\nmodelName: Claude Fable 5\.2\nmodel: claude-fable-5-2\nreviewed: \d{4}-\d{2}-\d{2}\nsummary: Clear docs, small ecosystem\.\nstamp: Site build: Example · 2026-11-12 · abc1234\ninputHash: [0-9a-f]{16}\n---\n# Claude\n\n## Strengths\n\nGood\.\n$/);
         assert.ok(existsSync(join(site, "AI Reviews", "Claude", "index.html")));
         assert.match(readFileSync(join(site, "AI Reviews", "_index.md"), "utf8"), /on \{date\}/);
-        assert.match(readFileSync(join(site, "AI Reviews", "Review Process", "_index.md"), "utf8"), /Once a month, each provider's top model is checked/);
+        assert.ok(!existsSync(join(site, "AI Reviews", "Review Process")), "no about page any more");
 
         r = await runReviews(site, api.url);
         assert.equal(r.status, 3, r.out);
@@ -260,4 +260,59 @@ test("a review is dated in the machine's own time zone, not UTC's", () => {
     const lateEvening = new Date(2026, 10, 12, 23, 30);
     assert.equal(localDate(lateEvening), "2026-11-12");
     assert.equal(localDate(new Date(2026, 0, 5, 0, 1)), "2026-01-05");
+});
+
+test("the job: one per site, writing every opted-in page's reviews folder; without an opted-in page it says so", () => {
+    let site = makeSite({ folder: "AI Reviews", providers: ["Claude"] });
+    try {
+        mkdirSync(join(site, "docs", "Guide"), { recursive: true });
+        writeFileSync(join(site, "docs", "Guide", "_index.md"), "---\naiReviews: true\n---\n# Guide\n\nText.\n");
+        const [reviews] = UpdateJobs.inSite(site, { ANTHROPIC_API_KEY: "sk-test-123456" }).all();
+        assert.deepEqual(reviews.updateFile.writes(), ["AI Reviews/_models/**", "AI Reviews/*", "AI Reviews/Claude/**", "docs/Guide/AI Reviews/*", "docs/Guide/AI Reviews/Claude/**"]);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+    site = makeSite({ folder: "AI Reviews", providers: ["Claude"] }, false);
+    try {
+        const [reviews] = UpdateJobs.inSite(site, { ANTHROPIC_API_KEY: "sk-test-123456" }).all();
+        assert.match(reviews.problems().join(), /no page opts in/);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
+test("reviews.js: a section is reviewed from its own llms-full.txt with its own prompt; --scope picks one page", async () => {
+    const site = makeSite({ folder: "AI Reviews", providers: ["Claude"] });
+    const api = await fakeClaude("Build stamp: Site build: Example › Guide · 2026-11-12 · abc1234\nVerdict: A clear guide.\n\nGood.\n");
+    try {
+        mkdirSync(join(site, "docs", "Guide"), { recursive: true });
+        writeFileSync(join(site, "docs", "Guide", "_index.md"), "---\naiReviews: true\n---\n# Guide\n\nText.\n");
+        writeFileSync(join(site, "docs", "Guide", "llms-full.txt"), "# Example: Guide\n\nSite build: Example › Guide · 2026-11-12 · abc1234\n\nThe guide only.\n");
+
+        let r = await runReviews(site, api.url, ["--scope", "docs/Guide"]);
+        assert.equal(r.status, 0, r.out);
+        assert.equal(api.calls.reviews, 1, "only the guide");
+        assert.match(r.out, /docs\/Guide: Claude: reviewed by claude-fable-5-2/);
+        const sent = api.calls.lastBody.messages[0].content;
+        assert.match(sent, /^Read https:\/\/example\.com\/docs\/Guide\/llms-full\.txt\. Evaluate the "Guide" section of Example:/);
+        assert.match(sent, /this section's llms-full\.txt[\s\S]*The guide only\./);
+        assert.doesNotMatch(sent, /The docs\./);
+        assert.match(readFileSync(join(site, "docs", "Guide", "AI Reviews", "Claude", "_index.md"), "utf8"), /summary: A clear guide\./);
+        assert.match(readFileSync(join(site, "docs", "Guide", "AI Reviews", "_index.md"), "utf8"), /this section's content on \{date\}/);
+        assert.ok(!existsSync(join(site, "AI Reviews", "Claude")), "the root wasn't reviewed");
+        assert.ok(existsSync(join(site, "AI Reviews", "_models", "models.json")), "the model choice is shared, at the root");
+
+        r = await runReviews(site, api.url);
+        assert.equal(r.status, 0, r.out);
+        assert.equal(api.calls.reviews, 2, "the root now; the guide is up to date");
+        assert.match(r.out, /docs\/Guide: Claude: up to date/);
+        assert.match(readFileSync(join(site, "AI Reviews", "_index.md"), "utf8"), /this site's content on \{date\}/);
+
+        r = await runReviews(site, api.url, ["--scope", "nowhere"]);
+        assert.equal(r.status, 1);
+        assert.match(r.out, /no opted-in page at nowhere; the opted-in pages are: \., docs\/Guide/);
+    } finally {
+        api.close();
+        rmSync(site, { recursive: true, force: true });
+    }
 });

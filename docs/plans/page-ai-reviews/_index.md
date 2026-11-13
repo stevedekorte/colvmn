@@ -3,7 +3,7 @@ subtitle: Any page can opt in to AI reviews of its own folder and everything bel
 ---
 # Page AI Reviews
 
-> Status (2026-11-13): **planned**, not started. Agreed with Steve 2026-11-13, including dropping the Review Process page. Builds on the site-level AI Reviews (`layout/AiReviews.js`, `update/ai/`), which it replaces: the site root becomes one opted-in page among others.
+> Status (2026-11-13): **built** (on `main`): opt-in pages, per-page prompts, reviews folders inside opted-in folders, per-scope `llms-full.txt` and build stamps, the footer link, the shared model choice, `--scope`, and the warnings. Io is the first site moved over. Agreed with Steve 2026-11-13, including dropping the Review Process page. Builds on the site-level AI Reviews (`layout/AiReviews.js`, `update/ai/`), which it replaces: the site root becomes one opted-in page among others.
 
 ## Why
 

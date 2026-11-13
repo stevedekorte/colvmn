@@ -332,16 +332,19 @@ async function generatePage (pageDir) {
 
     // An AI Reviews page gets its generated parts (cards, review header,
     // archive list), and the root page its home card, resolved like the
-    // page's own content.
-    if (aiReviews && (aiReviews.contains(pageDir) || pageDir === localRoot)) {
+    // page's own content. An opted-in page gets a footer link to its reviews.
+    const reviewScope = aiReviews && aiReviews.scopeContaining(pageDir);
+    if (aiReviews && (reviewScope || pageDir === localRoot)) {
         if (pageDir === localRoot) {
             aiReviews.decorateHome(page.json);
         } else {
-            aiReviews.decorate(pageDir, page.json);
+            reviewScope.decorate(pageDir, page.json);
         }
         page.children = page.json.content.map(c => ContentBase.fromJson(c, 0));
         await Promise.all(page.children.map(c => c.resolve()));
     }
+    const ownScope = aiReviews && aiReviews.scopeAt(pageDir);
+    page.reviewsLink = ownScope ? ownScope.footerLink() : null;
 
     let pageHtml = page.computePageHtml();
     const docTitle = page.computeDocumentTitle();
@@ -543,7 +546,7 @@ function matchesLlmsExclude (relPath, patterns) {
 // it or any page folder above it says "llms": false.
 function isExcludedFromLlms (pageDir, patterns) {
     const { aiReviews } = siteConfigFor(localRootFor(pageDir));
-    if (aiReviews && aiReviews.contains(pageDir)) return true;
+    if (aiReviews && aiReviews.scopeContaining(pageDir)) return true;
     const relPath = relative(siteRoot, pageDir);
     if (relPath && matchesLlmsExclude(relPath, patterns)) return true;
     let dir = pageDir;
@@ -564,8 +567,11 @@ function isExcludedFromLlms (pageDir, patterns) {
 // sources, minus excluded pages. Rebuilding without such a change leaves the
 // stamp as it was, so a job that commits only generated output, or only
 // excluded pages, never moves it. Null outside a git repo.
-function computeBuildStamp (excludedPages, siteTitle) {
-    const specs = [":(glob)**/_index.md", ":(glob)**/_index.json"];
+// With a scope (an opted-in page's folder), only pages in that folder count.
+function computeBuildStamp (excludedPages, siteTitle, scopeDir = siteRoot) {
+    const scope = relative(siteRoot, scopeDir).split(sep).filter(Boolean).join("/").replace(/[*?[\]\\]/g, c => "\\" + c);
+    const prefix = scope ? `${scope}/` : "";
+    const specs = [`:(glob)${prefix}**/_index.md`, `:(glob)${prefix}**/_index.json`];
     for (const p of excludedPages) {
         specs.push(`:(exclude)${relative(siteRoot, p).split(sep).join("/")}`);
     }
@@ -854,22 +860,28 @@ function rootFirstParagraph () {
     return "";
 }
 
-function generateLlmsFull (pages) {
+// The site's llms-full.txt; with a scope ({ dir, title, stamp }), one
+// section's: its pages only, under its own title and build stamp.
+function generateLlmsFull (pages, scope = null) {
     const rootMeta = readPageMeta(siteRoot);
     const rootJson = rootMeta ? rootMeta.json : {};
     const rootTitle = rootJson.topTitle || rootJson.title || "Site";
+    const top = scope ? scope.dir : siteRoot;
 
     const sorted = [...pages].sort((a, b) => {
-        if (a === siteRoot) return -1;
-        if (b === siteRoot) return 1;
+        if (a === top) return -1;
+        if (b === top) return 1;
         return relative(siteRoot, a).localeCompare(relative(siteRoot, b));
     });
 
-    let out = `# ${rootTitle} — Full Documentation\n\n`;
-    if (siteBuildStamp) out += `${siteBuildStamp}\n\n`;
-    const summary = rootFirstParagraph();
+    const stamp = scope ? scope.stamp : siteBuildStamp;
+    let out = scope ? `# ${rootTitle}: ${scope.title} — Full Documentation\n\n` : `# ${rootTitle} — Full Documentation\n\n`;
+    if (stamp) out += `${stamp}\n\n`;
+    const summary = scope ? "" : rootFirstParagraph();
     if (summary) out += `${summary}\n\n`;
-    out += "See also: /llms.txt (curated index) and /sitemap.xml.\n\n";
+    out += scope
+        ? `This is one section of the site: /${pageUrlPath(scope.dir)} and the pages under it. See also: /llms.txt (the whole site's index).\n\n`
+        : "See also: /llms.txt (curated index) and /sitemap.xml.\n\n";
 
     for (const pageDir of sorted) {
         const meta = readPageMeta(pageDir);
@@ -955,7 +967,7 @@ function siteConfigFor (localRoot) {
 // ---------------------------------------------------------------------------
 
 async function main () {
-    const { siteUrl, buildStamp, llmsExclude } = siteConfigFor(siteRoot);
+    const { siteUrl, buildStamp, llmsExclude, aiReviews } = siteConfigFor(siteRoot);
 
     // The site root must itself be a page. A siteRoot resolved one level too
     // high still finds every page below it, but none of them is ever isRoot,
@@ -1033,6 +1045,19 @@ async function main () {
     const llmsFull = generateLlmsFull(llmsPages);
     writeFileSync(join(siteRoot, "llms-full.txt"), llmsFull);
     console.log("  generated: llms-full.txt");
+
+    // Each opted-in page other than the root gets its own llms-full.txt, with
+    // its own build stamp: what its AI reviews are made from.
+    if (aiReviews) {
+        aiReviews.warnings().forEach(w => console.warn(`  warning: ${w}`));
+        for (const scope of aiReviews.scopes().filter(s => !s.isRoot)) {
+            const scopePages = llmsPages.filter(p => p === scope.dir || p.startsWith(scope.dir + sep));
+            const title = scope.title();
+            const stamp = buildStamp ? computeBuildStamp(excludedPages, `${rootLabel} › ${title}`, scope.dir) : null;
+            writeFileSync(scope.llmsFullPath(), generateLlmsFull(scopePages, { dir: scope.dir, title, stamp }));
+            console.log(`  generated: ${relative(siteRoot, scope.llmsFullPath())}${stamp ? ` (${stamp})` : ""}`);
+        }
+    }
 
     console.log(`Static gen: done (${pages.length} pages).`);
 }

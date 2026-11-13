@@ -2,19 +2,23 @@
 
 /**
  * The AI Reviews job. Each run first finds each provider's latest top model,
- * then asks the ones whose review is out of date to review the site, and
- * publishes each answer as written.
+ * then, for each opted-in page ("aiReviews": true), asks the ones whose
+ * review of that page's folder is out of date to review it, and publishes
+ * each answer as written.
  *
  * 1. Models. For each provider with a key, its API's model list; then Claude,
  *    with web search, chooses the top one from each list (ModelChooser.js).
- *    The choice is recorded in <section>/_models/models.json. A provider
- *    entry in colvmn.json with "model" pins it instead.
- * 2. Reviews. A review is made from llms-full.txt (stamp line aside), the
- *    model and the prompt; a provider whose current review was made from the
- *    same is skipped, at no cost. Otherwise its model is sent the prompt with
- *    llms-full.txt attached, the answer is read (build stamp, verdict,
- *    review), the current review moves to the archive and the new one is
- *    written. One provider failing doesn't stop the others.
+ *    The choice is made once per run, shared by every page, and recorded in
+ *    <folder>/_models/models.json at the site root. A provider entry in
+ *    colvmn.json with "model" pins it instead.
+ * 2. Reviews, page by page. A review is made from the page's llms-full.txt
+ *    (the site's for the root, <page>/llms-full.txt otherwise; stamp line
+ *    aside), the model and the page's prompt; a provider whose current
+ *    review was made from the same is skipped, at no cost. Otherwise its
+ *    model is sent the prompt with that llms-full.txt attached, the answer is
+ *    read (build stamp, verdict, review), the current review moves to the
+ *    archive and the new one is written. One provider or page failing
+ *    doesn't stop the others.
  *
  * As a built-in job the runner gives it the keys and commits what it
  * writes. It can also be run by hand from the site root, reading the keys
@@ -22,30 +26,33 @@
  *
  *   node colvmn/update/ai/reviews.js --models          # only choose the models, and show them
  *   node colvmn/update/ai/reviews.js --only Gemini     # one provider (writes; commit it yourself)
+ *   node colvmn/update/ai/reviews.js --scope docs/Guide   # one opted-in page ("." for the root)
  *
  * Exits 0 when it wrote something, 3 when nothing changed (no trace), 1 when
  * nothing was written and something failed.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { AiReviews } from "../../layout/AiReviews.js";
 import { Credentials } from "../Credentials.js";
 import { providerFor } from "./Providers.js";
 import { askClaude, chooserPrompt, validChoices } from "./ModelChooser.js";
-import { archiveReview, defaultAboutMarkdown, defaultSectionMarkdown, frontmatterValue, inputHash, parseAnswer, reviewMarkdown, reviewMessage, writePage } from "./ReviewPages.js";
+import { archiveReview, defaultSectionMarkdown, frontmatterValue, inputHash, parseAnswer, reviewMarkdown, reviewMessage, writePage } from "./ReviewPages.js";
 
 const NOTHING_TO_DO = 3;
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 export function parseArgs (argv) {
-    const options = { modelsOnly: false, only: null };
+    const options = { modelsOnly: false, only: null, scope: null };
     for (let i = 0; i < argv.length; i++) {
         if (argv[i] === "--models") {
             options.modelsOnly = true;
         } else if (argv[i] === "--only") {
             options.only = argv[++i].split(",");
+        } else if (argv[i] === "--scope") {
+            options.scope = argv[++i].replace(/^\.\/?|\/+$/g, "");
         } else {
             throw new Error(`unknown option ${argv[i]}`);
         }
@@ -67,6 +74,15 @@ export async function main (argv = [], env = process.env, today = localDate()) {
         console.log(`no aiReviews in ${siteRoot}/colvmn.json`);
         return 1;
     }
+    const scopes = reviews.scopes().filter(s => options.scope === null || s.rel === options.scope);
+    if (reviews.scopes().length === 0) {
+        console.log("no page opts in to AI reviews: add \"aiReviews\": true to the root page, or to any page whose folder should be reviewed");
+        return NOTHING_TO_DO;
+    }
+    if (scopes.length === 0) {
+        console.log(`no opted-in page at ${options.scope}; the opted-in pages are: ${reviews.scopes().map(s => s.rel || ".").join(", ")}`);
+        return 1;
+    }
     const credentials = new Credentials(siteRoot, env);
     const keyOf = p => env[p.key] || credentials.resolve(p.key, siteRoot).value || null;
     const providers = reviews.producible().filter(p => keyOf(p) && providerFor(p.name, env) && (!options.only || options.only.includes(p.name)));
@@ -80,23 +96,31 @@ export async function main (argv = [], env = process.env, today = localDate()) {
     if (options.modelsOnly) {
         return 0;
     }
-    const llmsPath = join(siteRoot, "llms-full.txt");
-    if (!existsSync(llmsPath)) {
-        console.log("no llms-full.txt; build the site first");
-        return 1;
-    }
-    const llmsFull = readFileSync(llmsPath, "utf8");
     const due = providers.filter(p => models[p.name]);
-    const outcomes = await Promise.all(due.map(p => reviewOne(reviews, p, models[p.name], llmsFull, keyOf(p), env, today)));
-    outcomes.forEach(o => console.log(`${o.provider}: ${o.message}`));
-    const written = outcomes.filter(o => o.written).length;
-    if (written > 0) {
-        writeDefaultPages(reviews);
+    let written = 0, failed = false;
+    for (const scope of scopes) {
+        // The root's lines read as before; another page's are prefixed with its path.
+        const tag = scope.isRoot ? "" : `${scope.rel}: `;
+        const llmsPath = scope.llmsFullPath();
+        if (!existsSync(llmsPath)) {
+            console.log(`${tag}no ${relative(siteRoot, llmsPath)}; build the site first`);
+            failed = true;
+            continue;
+        }
+        const llmsFull = readFileSync(llmsPath, "utf8");
+        const outcomes = await Promise.all(due.map(p => reviewOne(scope, p, models[p.name], llmsFull, keyOf(p), env, today)));
+        outcomes.forEach(o => console.log(`${tag}${o.provider}: ${o.message}`));
+        const wroteHere = outcomes.filter(o => o.written).length;
+        if (wroteHere > 0) {
+            writeDefaultPage(scope);
+        }
+        written += wroteHere;
+        failed = failed || outcomes.some(o => o.failed);
     }
     if (written > 0 || wroteModels) {
         return 0;
     }
-    return outcomes.some(o => o.failed) ? 1 : NOTHING_TO_DO;
+    return failed ? 1 : NOTHING_TO_DO;
 }
 
 /**
@@ -165,15 +189,15 @@ function recordModels (reviews, models) {
     return true;
 }
 
-async function reviewOne (reviews, provider, model, llmsFull, key, env, today) {
-    const dir = join(reviews.sectionDir(), provider.name);
-    const hash = inputHash(llmsFull, model.id, reviews.fullPrompt());
+async function reviewOne (scope, provider, model, llmsFull, key, env, today) {
+    const dir = join(scope.sectionDir(), provider.name);
+    const hash = inputHash(llmsFull, model.id, scope.fullPrompt());
     const currentPath = join(dir, "_index.md");
     if (existsSync(currentPath) && frontmatterValue(readFileSync(currentPath, "utf8"), "inputHash") === hash) {
         return { provider: provider.name, message: "up to date" };
     }
     try {
-        const answer = await providerFor(provider.name, env).review(key, model.id, reviewMessage(reviews.fullPrompt(), llmsFull));
+        const answer = await providerFor(provider.name, env).review(key, model.id, reviewMessage(scope.fullPrompt(), llmsFull, scope.isRoot));
         const parsed = parseAnswer(answer.text);
         if (!parsed.body) {
             throw new Error(`${model.id} gave an empty answer`);
@@ -187,18 +211,10 @@ async function reviewOne (reviews, provider, model, llmsFull, key, env, today) {
     }
 }
 
-/** The section and about pages, when the site hasn't written its own. */
-function writeDefaultPages (reviews) {
-    const section = reviews.sectionDir();
-    writePage(section, existsSync(join(section, "_index.md")) ? null : defaultSectionMarkdown(reviews.folder.split("/").pop()));
-    if (reviews.about) {
-        const about = join(section, reviews.about);
-        writePage(about, existsSync(join(about, "_index.md")) ? null : defaultAboutMarkdown(reviews.about, humanSchedule(reviews.schedule)));
-    }
-}
-
-function humanSchedule (schedule) {
-    return { daily: "once a day", weekly: "once a week", monthly: "once a month" }[schedule] || "on a schedule";
+/** A scope's reviews page, when the site hasn't written its own. */
+function writeDefaultPage (scope) {
+    const section = scope.sectionDir();
+    writePage(section, existsSync(join(section, "_index.md")) ? null : defaultSectionMarkdown(scope.folder.split("/").pop(), scope.isRoot));
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

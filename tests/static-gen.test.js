@@ -24,6 +24,15 @@ function writePage (site, folder, markdown) {
     writeFileSync(join(dir, "index.html"), "");
 }
 
+/** Opts a page in to AI reviews, keeping its title and text. */
+function optIn (site, folder, title = null, extra = "") {
+    const path = join(site, folder, "_index.md");
+    const text = readFileSync(path, "utf-8");
+    const body = text.replace(/^---\n([\s\S]*?)\n---\n/, "");
+    const head = (text.match(/^---\n([\s\S]*?)\n---\n/) || [null, ""])[1];
+    writeFileSync(path, `---\n${head ? head + "\n" : ""}aiReviews: true\n${extra}---\n${title ? body.replace(/^# .*/, `# ${title}`) : body}`);
+}
+
 function commitAll (site, message) {
     git(site, "add", "-A");
     git(site, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "-m", message);
@@ -111,6 +120,7 @@ test("aiReviews: provider cards, review headers with prefilled links, the archiv
     const prompt = "Read https://example.com/llms.txt & evaluate it.";
     const site = makeSite({ buildStamp: true, aiReviews: { folder: "AI Reviews", prompt, providers: ["Claude", "Gemini"] } });
     try {
+        optIn(site, ".");
         writePage(site, "AI Reviews", "# AI Reviews\n\nAI reviews of this site's content on {date}\n\n## How they're made\n\nThe first answer is published.\n");
         writePage(site, "AI Reviews/Claude", "---\nmodelName: Claude Opus 5.5\nreviewed: 2026-11-20\nsummary: A coherent naked-objects framework with a small community.\nstamp: Site build: Example · 2026-11-19 · abc1234\nshare: https://claude.ai/share/xyz\n---\n# Claude\n\nIt is a framework.\n");
         writePage(site, "AI Reviews/Claude/archive/2026-10-01", "---\nmodelName: Claude Opus 5\nreviewed: 2026-10-01\n---\n# Claude\n\nAn older review.\n");
@@ -150,19 +160,54 @@ test("aiReviews: provider cards, review headers with prefilled links, the archiv
     }
 });
 
-test("aiReviews about: its card ends the grid, and the prompt moves to its page", () => {
-    const site = makeSite({ aiReviews: { folder: "AI Reviews", prompt: "Evaluate it.", providers: ["Claude", "Grok"], about: "How" } });
+test("aiReviews: a page that opts in gets a footer link once its reviews page exists; other pages don't", () => {
+    const site = makeSite({ aiReviews: { folder: "AI Reviews", providers: ["Claude"] } });
     try {
-        writePage(site, "AI Reviews", "# AI Reviews\n\nAI reviews of this site's content on {date}\n");
-        writePage(site, "AI Reviews/How", "---\ncardSubtitle: The rules.\n---\n# How These Are Made\n\nThe rules.\n");
+        optIn(site, ".");
         commitAll(site, "pages");
-        build(site);
-        const section = readFileSync(join(site, "AI Reviews", "index.html"), "utf-8");
-        assert.match(section, /<h3>Grok<\/h3>[\s\S]*<h3>How These Are Made<\/h3><p>The rules\.<\/p>/);
-        assert.doesNotMatch(section, /review-prompt/);
-        assert.match(section, /AI reviews of this site(&#39;|')s content<\/p>/);   // no review yet
-        const about = readFileSync(join(site, "AI Reviews", "How", "index.html"), "utf-8");
-        assert.match(about, /class="review-prompt">Evaluate it\./);
+        assert.doesNotMatch(build(site).rootHtml, /reviews-link/, "no reviews page yet");
+        writePage(site, "AI Reviews", "# AI Reviews\n\nAI reviews of this site's content on {date}\n");
+        assert.match(build(site).rootHtml, /<div class="page-footer"><a class="reviews-link" href="AI%20Reviews\/index\.html">AI reviews of this site<\/a><\/div>/);
+        assert.doesNotMatch(readFileSync(join(site, "kept", "index.html"), "utf-8"), /reviews-link/);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
+test("aiReviews: a section that opts in gets its own reviews, footer link, and llms-full.txt with its own stamp; no reviews folder reaches any llms file", () => {
+    const site = makeSite({ buildStamp: true, aiReviews: { folder: "AI Reviews", providers: ["Claude"] } });
+    try {
+        optIn(site, ".");
+        optIn(site, "guide", "Guide", "prompt: Is this guide clear?\n");
+        writePage(site, "guide/lesson", "# Lesson\n\nLesson text.\n");
+        writePage(site, "AI Reviews", "# AI Reviews\n\nAI reviews of this site's content on {date}\n");
+        writePage(site, "AI Reviews/Claude", "---\nmodelName: Claude Fable 5.2\nreviewed: 2026-11-12\nsummary: The whole site.\n---\n# Claude\n\nRoot review text.\n");
+        writePage(site, "guide/AI Reviews", "# AI Reviews\n\nAI reviews of this section's content on {date}\n");
+        writePage(site, "guide/AI Reviews/Claude", "---\nmodelName: Claude Fable 5.2\nreviewed: 2026-11-11\nsummary: Just the guide.\n---\n# Claude\n\nGuide review text.\n");
+        const guideCommit = commitAll(site, "pages");
+        writeFileSync(join(site, "kept", "_index.md"), "# Kept Page\n\nEdited outside the guide.\n");
+        const keptCommit = commitAll(site, "kept edit");
+
+        const { llms, llmsFull } = build(site);
+        const scoped = readFileSync(join(site, "guide", "llms-full.txt"), "utf-8");
+        assert.match(scoped, /^# Example: Guide — Full Documentation/);
+        assert.match(scoped, new RegExp(`Site build: Example › Guide · \\d{4}-\\d{2}-\\d{2} · ${guideCommit}`), "the guide's stamp ignores commits outside it");
+        assert.match(llmsFull, new RegExp(`· ${keptCommit}`));
+        assert.match(scoped, /Guide text\.[\s\S]*Lesson text\./);
+        assert.doesNotMatch(scoped, /Kept text|The root page|Edited outside/);
+        for (const text of [llms, llmsFull, scoped]) {
+            assert.doesNotMatch(text, /review text|Just the guide|The whole site/);
+        }
+
+        const guide = readFileSync(join(site, "guide", "index.html"), "utf-8");
+        assert.match(guide, /<a class="reviews-link" href="AI%20Reviews\/index\.html">AI reviews of this section<\/a>/);
+        assert.doesNotMatch(readFileSync(join(site, "guide", "lesson", "index.html"), "utf-8"), /reviews-link/, "not inherited");
+
+        const section = readFileSync(join(site, "guide", "AI Reviews", "index.html"), "utf-8");
+        assert.match(section, /<h3>Claude Fable 5\.2<\/h3><p>Just the guide\.<\/p>/);
+        assert.match(section, /AI reviews of this section(&#39;|')s content on 2026-11-11/);
+        assert.match(section, /class="review-prompt">Is this guide clear\?/);
+        assert.match(readFileSync(join(site, "AI Reviews", "index.html"), "utf-8"), /<p>The whole site\.<\/p>/);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }
@@ -171,7 +216,8 @@ test("aiReviews about: its card ends the grid, and the prompt moves to its page"
 test("aiReviews homeCard: a card for the section joins the root page's last card grid, once the section exists", () => {
     const site = makeSite({ aiReviews: { folder: "AI Reviews", homeCard: true } });
     try {
-        writeFileSync(join(site, "_index.json"), JSON.stringify({ topTitle: "Example", title: "Example", content: [{ type: "ContentCards", items: [{ folder: "kept", title: "Kept" }] }] }));
+        rmSync(join(site, "_index.md"));
+        writeFileSync(join(site, "_index.json"), JSON.stringify({ topTitle: "Example", title: "Example", aiReviews: true, content: [{ type: "ContentCards", items: [{ folder: "kept", title: "Kept" }] }] }));
         commitAll(site, "pages");
         assert.doesNotMatch(build(site).rootHtml, /<h3>AI Reviews<\/h3>/, "no section page yet");
         writePage(site, "AI Reviews", "---\ncardSubtitle: What four models make of it.\n---\n# AI Reviews\n\nAI reviews of this site's content on {date}\n");

@@ -1,38 +1,44 @@
 /**
- * AI Reviews: a section of pages in which AI models review the site, set up
- * by colvmn.json's "aiReviews". colvmn both produces the reviews (a built-in
- * update job, see update/ai/reviews.js) and renders them (here, from static-gen.js;
- * not bundled for the browser, which doesn't re-render built pages).
+ * AI Reviews: pages in which AI models review a page's folder and everything
+ * below it. A page opts in with "aiReviews": true (in its _index.json, or its
+ * _index.md frontmatter); its reviews live in a subfolder of its own folder
+ * and are linked from its footer. colvmn both produces the reviews (a
+ * built-in update job, see update/ai/reviews.js) and renders them (here, from
+ * static-gen.js; not bundled for the browser, which doesn't re-render built
+ * pages). The site's settings are in colvmn.json:
  *
  *   "aiReviews": {
  *       "folder": "AI Reviews",
- *       "prompt": "Read https://example.com/llms.txt and ... Evaluate ...",
+ *       "prompt": "...the default prompt for every opted-in page...",
  *       "providers": ["Claude", "ChatGPT", "Gemini", "Grok"],
- *       "about": "Review Process",
  *       "homeCard": true,
  *       "schedule": "monthly",
  *       "keys": { "Claude": "CLAUDE_REVIEW_KEY" }
  *   }
  *
- * Only "folder" is needed. "prompt" defaults to one built from the site's
- * siteUrl and name; colvmn adds the answer format to it (ANSWER_FORMAT),
- * because it reads the quoted build stamp and the verdict from the answer.
- * "about" names a subfolder whose page explains how the reviews are made: it
- * gets a card at the end of the grid and the prompt (without it, the prompt
- * goes on the section page). "homeCard" adds a card for the section to the
- * site's root page. "schedule" is how often the reviews job runs: "monthly"
- * (the default), "weekly", "daily" or a cron string. Each run checks the
- * models and re-reviews only what changed, so a run with nothing new costs
- * only the model check.
+ * Only "folder" is needed: the name of the reviews subfolder in each
+ * opted-in folder. A page's own "prompt" wins over the site's, which wins
+ * over a default "Evaluate" prompt with the page as its subject; colvmn adds
+ * the answer format to it (ANSWER_FORMAT), because it reads the quoted build
+ * stamp and the verdict from the answer. "homeCard" adds a card for the
+ * root's reviews to the root page, when the root opts in. "schedule" is how
+ * often the reviews job runs: "monthly" (the default), "weekly", "daily" or a
+ * cron string. Each run checks the models once and re-reviews only the
+ * scopes whose content, model or prompt changed.
  * Each provider's key is its standard name (ANTHROPIC_API_KEY, OPENAI_API_KEY,
  * GEMINI_API_KEY, XAI_API_KEY), shared with any other job that uses it;
  * "keys" names a separate one, to keep the reviews' spending apart.
  *
- * Each provider is a subfolder of the section. The four built in have their
- * company, app, prefilled-prompt link and standard API key name below; another is
- * given as { "name", "company", "app", "ask" } and can be shown but not
- * produced. A provider entry may pin a model: { "name": "Claude",
- * "model": "<API model ID>" }.
+ * A scope is an opted-in page's folder and everything below it, minus every
+ * reviews folder in it. Its content is the site's llms-full.txt for the root,
+ * and <scope>/llms-full.txt (built by static-gen.js) for any other page.
+ *
+ * Each provider is a subfolder of a scope's reviews folder. The four built in
+ * have their company, app, prefilled-prompt link and standard API key name
+ * below; another is given as { "name", "company", "app", "ask" } and can be
+ * shown but not produced. A provider entry may pin a model: { "name":
+ * "Claude", "model": "<API model ID>" }. The models chosen are shared by
+ * every scope, recorded in <site>/<folder>/_models/models.json.
  *
  * A review is a provider folder's _index.md, frontmatter:
  *
@@ -47,26 +53,24 @@
  * Replaced reviews live in <provider>/archive/<date>/, newest first.
  *
  * What the generator adds:
- *   section page   {date} in its subtitle becomes the latest review's date;
- *                  one card per provider (model name and its verdict) and the
- *                  about card, then the page's own text (and the prompt, when
- *                  there's no about page)
- *   about page     its own text, then the prompt
+ *   reviews page   {date} in its subtitle becomes the latest review's date;
+ *                  one card per provider (model name and its verdict), then
+ *                  the page's own text and the prompt
  *   review pages   a header: model, date and verdict; after the review,
  *                  "Details" (model ID, quoted stamp, the prompt, "Ask
  *                  <provider> yourself" and the original conversation, the
  *                  not-an-endorsement line); then "Earlier reviews"
  *   archive pages  the same header, and a link to the current review
- *   root page      with homeCard, a card for the section
+ *   opted-in page  a footer link to its reviews
+ *   root page      with homeCard, a card for the root's reviews
  *
- * The whole section is left out of llms.txt and llms-full.txt (and so out of
- * the build stamp): later reviews mustn't read earlier ones.
+ * Every reviews folder is left out of llms.txt and llms-full.txt (and so out
+ * of the build stamps and every scope's content): no review reads another.
  */
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { parseMarkdown } from "./MarkdownParser.js";
-import { ContentCards } from "./ContentCards.js";
 
 export const PROVIDERS = {
     Claude: { company: "Anthropic", app: "https://claude.ai/new", ask: "https://claude.ai/new?q={prompt}", key: "ANTHROPIC_API_KEY" },
@@ -87,7 +91,7 @@ const DEFAULT_SCHEDULE = "monthly";
 
 export class AiReviews {
 
-    /** The section for a site's config, or null when it has none. */
+    /** The site's AI reviews for its config, or null when it has none. */
     static forConfig (siteRoot, config, site = {}) {
         if (!config || !config.folder) {
             return null;
@@ -95,7 +99,7 @@ export class AiReviews {
         return new AiReviews(siteRoot, config, site);
     }
 
-    /** The section for the site whose root this is, from its own colvmn.json, or null. */
+    /** The site's AI reviews, from its own colvmn.json, or null. */
     static forSiteRoot (siteRoot) {
         const path = join(siteRoot, "colvmn.json");
         if (!existsSync(path)) {
@@ -108,15 +112,16 @@ export class AiReviews {
     /**
      * @param {string} siteRoot
      * @param {Object} config - colvmn.json's aiReviews
-     * @param {{ siteUrl?: string, title?: string }} site - for the default prompt
+     * @param {{ siteUrl?: string, title?: string }} site - for the default prompts
      */
     constructor (siteRoot, config, site = {}) {
         this.siteRoot = siteRoot;
+        this.site = site;
         this.folder = config.folder.replace(/\/+$/, "");
-        this.prompt = config.prompt || defaultPrompt(this.folder, site);
+        this.prompt = config.prompt || null;
         this.homeCard = config.homeCard === true;
         this.schedule = config.schedule || DEFAULT_SCHEDULE;
-        this.about = config.about ? config.about.replace(/\/+$/, "") : null;
+        this.about = config.about || null;
         const keys = config.keys || {};
         this.providers = (config.providers || Object.keys(PROVIDERS)).map(p => {
             const own = typeof p === "string" ? { name: p } : p;
@@ -126,15 +131,16 @@ export class AiReviews {
             }
             return provider;
         });
+        this._scopes = null;
     }
 
-    sectionDir () {
+    /** Where the shared model choice and the reviews job's state live: the root's reviews folder. */
+    jobDir () {
         return join(this.siteRoot, this.folder);
     }
 
-    /** The prompt as sent and shown: the site's, then the answer format. */
-    fullPrompt () {
-        return `${this.prompt}\n\n${ANSWER_FORMAT}`;
+    modelsPath () {
+        return join(this.jobDir(), MODELS_FOLDER, "models.json");
     }
 
     /** The providers colvmn can produce reviews for (an API adapter and a key name). */
@@ -142,14 +148,101 @@ export class AiReviews {
         return this.providers.filter(p => p.key);
     }
 
-    modelsPath () {
-        return join(this.sectionDir(), MODELS_FOLDER, "models.json");
+    /** The opted-in pages, root first, as ReviewScopes. */
+    scopes () {
+        if (!this._scopes) {
+            this._scopes = optedInPages(this.siteRoot, this.folder).map(({ dir, meta }) => new ReviewScope(this, dir, meta));
+        }
+        return this._scopes;
     }
 
-    /** A home-page card for the section, added to the root page's last card grid (mutates json). */
+    /** The scope whose page is this folder, or null. */
+    scopeAt (pageDir) {
+        return this.scopes().find(s => s.dir === pageDir) || null;
+    }
+
+    /** The scope whose reviews folder holds this page folder, or null. */
+    scopeContaining (pageDir) {
+        return this.scopes().find(s => s.contains(pageDir)) || null;
+    }
+
+    /** What a site's settings get wrong, as messages. */
+    warnings () {
+        const out = [];
+        if (this.scopes().length === 0) {
+            out.push("aiReviews: no page opts in, so nothing is reviewed. Add \"aiReviews\": true to the root page, or to any page whose folder should be reviewed.");
+        }
+        if (this.about) {
+            out.push(`aiReviews: "about" is no longer used; each review's Details show its prompt. Remove it, and its page (${this.folder}/${this.about}).`);
+        }
+        return out;
+    }
+
+    /** With homeCard, a card for the root's reviews on the root page (mutates json). */
+    decorateHome (json) {
+        const root = this.scopeAt(this.siteRoot);
+        if (this.homeCard && root) {
+            root.decorateHome(json);
+        }
+    }
+}
+
+/** One opted-in page: its folder and everything below it, reviewed. */
+export class ReviewScope {
+
+    constructor (reviews, dir, meta) {
+        this.reviews = reviews;
+        this.dir = dir;
+        this.meta = meta;
+        this.isRoot = dir === reviews.siteRoot;
+        /** The page's path from the site root, "/"-separated; "" for the root. */
+        this.rel = relative(reviews.siteRoot, dir).split(sep).filter(Boolean).join("/");
+        this.folder = reviews.folder;
+        this.providers = reviews.providers;
+        this.prompt = (typeof meta.prompt === "string" && meta.prompt.trim()) || reviews.prompt
+            || (this.isRoot ? defaultPrompt(this.folder, reviews.site) : defaultScopePrompt(this, reviews.site));
+    }
+
+    /** The page's title, for prompts and messages. */
+    title () {
+        return this.meta.title || this.meta.topTitle || this.rel.split("/").pop() || this.reviews.site.title || "";
+    }
+
+    sectionDir () {
+        return join(this.dir, this.folder);
+    }
+
+    /** What the reviews are made from: the site's llms-full.txt for the root, the scope's own otherwise. */
+    llmsFullPath () {
+        return join(this.dir, "llms-full.txt");
+    }
+
+    /** The prompt as sent and shown: the scope's, then the answer format. */
+    fullPrompt () {
+        return `${this.prompt}\n\n${ANSWER_FORMAT}`;
+    }
+
+    /** Whether a page folder is in this scope's reviews folder. */
+    contains (pageDir) {
+        const dir = this.sectionDir();
+        return pageDir === dir || pageDir.startsWith(dir + sep);
+    }
+
+    /** The footer link from the page to its reviews, once its reviews page exists; else null. */
+    footerLink () {
+        if (!this.pageMeta(this.sectionDir())) {
+            return null;
+        }
+        return {
+            href: `${this.folder.split("/").map(encodeURIComponent).join("/")}/index.html`,
+            label: this.isRoot ? "AI reviews of this site" : "AI reviews of this section"
+        };
+    }
+
+    /** A home-page card for the root's reviews, added to the root page's last card grid (mutates json). */
     decorateHome (json) {
         const meta = this.pageMeta(this.sectionDir());
-        if (!this.homeCard || !meta) {
+        if (!meta) {
             return;
         }
         const content = json.content || (json.content = []);
@@ -179,20 +272,11 @@ export class AiReviews {
         return parseMarkdown(readFileSync(path, "utf-8"));
     }
 
-    /** Whether a page folder is in the section (so out of the llms files). */
-    contains (pageDir) {
-        const dir = this.sectionDir();
-        return pageDir === dir || pageDir.startsWith(dir + sep);
-    }
-
-    /** What a page folder is within the section: { kind, provider, archived }. */
+    /** What a page folder is within the reviews folder: { kind, provider, archived }. */
     roleOf (pageDir) {
         const parts = relative(this.sectionDir(), pageDir).split(sep).filter(Boolean);
         if (parts.length === 0) {
             return { kind: "section" };
-        }
-        if (parts.length === 1 && parts[0] === this.about) {
-            return { kind: "about" };
         }
         const provider = this.providers.find(p => p.name === parts[0]);
         if (!provider) {
@@ -207,7 +291,7 @@ export class AiReviews {
         return { kind: "other" };
     }
 
-    /** The content entries to add to a section page's json (mutates json.content). */
+    /** The content entries to add to a reviews page's json (mutates json.content). */
     decorate (pageDir, json) {
         const role = this.roleOf(pageDir);
         if (role.kind === "review" || role.kind === "archived") {
@@ -216,9 +300,7 @@ export class AiReviews {
         const content = json.content || [];
         if (role.kind === "section") {
             json.subtitle = this.fillDate(json.subtitle);
-            json.content = this.about ? [this.providerCards(), ...content] : [this.providerCards(), ...content, this.promptEntry()];
-        } else if (role.kind === "about") {
-            json.content = [...content, this.promptEntry()];
+            json.content = [this.providerCards(), ...content, this.promptEntry()];
         } else if (role.kind === "review") {
             const earlier = this.archiveEntry(role.provider);
             const details = this.detailsEntry(role.provider, json);
@@ -241,7 +323,7 @@ export class AiReviews {
         }
     }
 
-    // --- section page ---
+    // --- reviews page ---
 
     providerCards () {
         const items = this.providers.map(p => {
@@ -256,10 +338,6 @@ export class AiReviews {
                 arrow: "Read"
             };
         });
-        const about = this.aboutCard();
-        if (about) {
-            items.push(about);
-        }
         return { type: "ContentCards", items, columns: this.providers.length % 2 === 0 ? 2 : undefined };
     }
 
@@ -275,16 +353,6 @@ export class AiReviews {
             .sort();
         const latest = dates[dates.length - 1];
         return latest ? text.replaceAll("{date}", escapeHtml(latest)) : text.replace(/\s*\bon \{date\}|\{date\}/g, "");
-    }
-
-    /** The card for the "how these are made" page, last in the grid; null without one. */
-    aboutCard () {
-        const dir = join(this.sectionDir(), this.about || "");
-        if (!this.about || !existsSync(join(dir, "_index.md")) || !existsSync(join(dir, "index.html"))) {
-            return null;
-        }
-        const meta = parseMarkdown(readFileSync(join(dir, "_index.md"), "utf-8"));
-        return { title: meta.title || this.about, folder: this.about, subtitle: ContentCards.cardSubtitle(meta), arrow: "Read" };
     }
 
     promptEntry () {
@@ -400,6 +468,60 @@ function defaultPrompt (folder, site) {
     const name = site.title || "this site's subject";
     const read = url ? `Read ${url}llms.txt and the pages it links.` : "Read this site's llms.txt and the pages it links.";
     return `${read} Ignore the "${folder}" section. Evaluate ${name}: what it is, its strengths, its weaknesses and risks, who should and shouldn't use it, and how it compares to alternatives.`;
+}
+
+/** The default prompt for a page other than the root: its own llms-full.txt, and the page as the subject. */
+function defaultScopePrompt (scope, site) {
+    const url = site.siteUrl && site.siteUrl !== "/" ? site.siteUrl.replace(/\/?$/, "/") : null;
+    const path = scope.rel.split("/").map(encodeURIComponent).join("/") + "/";
+    const read = url ? `Read ${url}${path}llms-full.txt.` : "Read this section's llms-full.txt.";
+    const of = site.title ? ` of ${site.title}` : "";
+    return `${read} Evaluate the "${scope.title()}" section${of}: what it is, its strengths, its weaknesses and risks, who should and shouldn't use it, and how it compares to alternatives.`;
+}
+
+/** Folders never searched for pages (as in static-gen.js), and nested sites, which have their own colvmn.json. */
+const SKIP_DIRS = new Set(["node_modules", "external-libs", "source", "build", "dist", "vendor", "npm-pkg", "webserver", "resources", "colvmn"]);
+
+/** The pages that opt in ("aiReviews": true), root first, then by path; reviews folders aren't searched. */
+function optedInPages (siteRoot, folder) {
+    const found = [];
+    const reviewsName = folder.split("/")[0];
+    const walk = dir => {
+        const meta = readPageSource(dir);
+        if (meta && meta.aiReviews === true) {
+            found.push({ dir, meta });
+        }
+        let entries;
+        try {
+            entries = readdirSync(dir, { withFileTypes: true });
+        } catch {
+            return;
+        }
+        for (const e of entries.filter(e => e.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
+            const sub = join(dir, e.name);
+            if (e.name.startsWith(".") || SKIP_DIRS.has(e.name) || e.name === reviewsName || existsSync(join(sub, "colvmn.json"))) {
+                continue;
+            }
+            walk(sub);
+        }
+    };
+    walk(siteRoot);
+    return found;
+}
+
+/** A folder's page source (_index.json or _index.md), parsed, or null. */
+function readPageSource (dir) {
+    try {
+        if (existsSync(join(dir, "_index.json"))) {
+            return JSON.parse(readFileSync(join(dir, "_index.json"), "utf-8"));
+        }
+        if (existsSync(join(dir, "_index.md"))) {
+            return parseMarkdown(readFileSync(join(dir, "_index.md"), "utf-8"));
+        }
+    } catch {
+        return null;
+    }
+    return null;
 }
 
 /** The site's name: its root page's topTitle or title. */

@@ -1,6 +1,6 @@
 /**
- * Reading a model's answer and writing it as a review page, plus the
- * section's default pages. Used by reviews.js; see layout/AiReviews.js for
+ * Reading a model's answer and writing it as a review page, plus a scope's
+ * default reviews page. Used by reviews.js; see layout/AiReviews.js for
  * the frontmatter the pages carry and how they're shown.
  */
 
@@ -25,9 +25,10 @@ export function inputHash (llmsFull, modelId, prompt) {
     return createHash("sha256").update(llmsFull.replace(STAMP_LINE, "")).update("\0" + modelId + "\0" + prompt).digest("hex").slice(0, 16);
 }
 
-/** The message sent to a model: the prompt, and the docs in place of the link. */
-export function reviewMessage (fullPrompt, llmsFull) {
-    return `${fullPrompt}\n\nYou can't browse here, so the site's llms-full.txt (llms.txt with the pages it links) is below instead.\n\n<llms-full.txt>\n${llmsFull}\n</llms-full.txt>`;
+/** The message sent to a model: the prompt, and the docs in place of the link (the site's, or one section's). */
+export function reviewMessage (fullPrompt, llmsFull, isRoot = true) {
+    const what = isRoot ? "the site's llms-full.txt (llms.txt with the pages it links)" : "this section's llms-full.txt (its pages)";
+    return `${fullPrompt}\n\nYou can't browse here, so ${what} is below instead.\n\n<llms-full.txt>\n${llmsFull}\n</llms-full.txt>`;
 }
 
 /**
@@ -164,25 +165,7 @@ export function archiveReview (providerDir) {
     return name;
 }
 
-/** The section page, when the site hasn't written one. */
-export function defaultSectionMarkdown (title) {
-    return `# ${title}\n\nAI reviews of this site's content on {date}\n`;
-}
-
-/** The review process page, when the site hasn't written one. */
-export function defaultAboutMarkdown (title, when) {
-    return `---
-cardSubtitle: The prompt, the rules, and how to check a review yourself.
----
-# ${title}
-
-## Overview
-
-A scheduled job sends each model the same prompt, with this site's documentation attached (its llms-full.txt).
-
-- **No editing, no rerolling.** Each review is the model's first complete answer, published as written, criticism included. A run that fails is retried; a finished answer is never replaced by a second try.
-- **Corrections beside the review.** Where a review gets a fact wrong, an Author's note may follow it. The review itself is never edited.
-- **Dated, with history kept.** ${when[0].toUpperCase() + when.slice(1)}, each provider's top model is checked; a review is redone when the documentation or that model has changed. The replaced review moves to that model's earlier reviews.
-- **Check it yourself.** Each review page links to the same prompt in that model's own app.
-`;
+/** A scope's reviews page, when the site hasn't written one. */
+export function defaultSectionMarkdown (title, isRoot = true) {
+    return `# ${title}\n\nAI reviews of this ${isRoot ? "site" : "section"}'s content on {date}\n`;
 }

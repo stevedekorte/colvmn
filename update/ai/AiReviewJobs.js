@@ -1,11 +1,13 @@
 /**
  * The job colvmn adds when a site's colvmn.json has "aiReviews", with no
- * update file: <section>, running reviews.js on the aiReviews "schedule"
- * (monthly by default). Each run first chooses each provider's latest top
- * model, then reviews only the providers whose docs or model changed; it
- * publishes directly.
+ * update file: <folder> at the site root, running reviews.js on the aiReviews
+ * "schedule" (monthly by default). Each run first chooses each provider's
+ * latest top model, then, for every opted-in page, reviews only the
+ * providers whose content or model changed; it publishes directly.
  * It is given the providers' keys that have a value: the standard names, or
- * those aiReviews' "keys" gives. Its state file sits in the section folder.
+ * those aiReviews' "keys" gives. It may write each opted-in page's reviews
+ * folder and the shared model choice; its state file sits in the root's
+ * reviews folder.
  */
 
 import { dirname, join } from "node:path";
@@ -24,16 +26,20 @@ export function aiReviewUpdateFiles (siteRoot, env = process.env) {
     }
     const credentials = new Credentials(siteRoot, env);
     const names = reviews.producible().map(p => p.key);
-    const keys = names.filter(k => !credentials.resolve(k, reviews.sectionDir()).problem);
+    const keys = names.filter(k => !credentials.resolve(k, reviews.jobDir()).problem);
     const problems = keys.length ? [] : [`no AI provider key has a value: set one of ${names.join(", ")}`];
-    const section = reviews.folder;
-    const writes = [`${section}/*`, `${section}/${MODELS_FOLDER}/**`, ...reviews.providers.map(p => `${section}/${p.name}/**`)];
-    if (reviews.about) {
-        writes.push(`${section}/${reviews.about}/**`);
+    const scopes = reviews.scopes();
+    if (scopes.length === 0) {
+        problems.push("no page opts in: add \"aiReviews\": true to the root page, or to any page whose folder should be reviewed");
+    }
+    const writes = [`${reviews.folder}/${MODELS_FOLDER}/**`];
+    for (const scope of scopes) {
+        const section = scope.rel ? `${scope.rel}/${reviews.folder}` : reviews.folder;
+        writes.push(`${section}/*`, ...reviews.providers.map(p => `${section}/${p.name}/**`));
     }
     const reviewsJob = UpdateFile.builtIn({
         siteRoot,
-        folder: reviews.sectionDir(),
+        folder: reviews.jobDir(),
         script: join(HERE, "reviews.js"),
         problems,
         fields: {

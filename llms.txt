@@ -4,7 +4,7 @@
 
 ## AI Reviews
 
-- [AI Reviews](/ai-reviews/): Claude, ChatGPT, Gemini and Grok review your site from its own docs. One setting and an API key; colvmn does the rest.
+- [AI Reviews](/ai-reviews/): Claude, ChatGPT, Gemini and Grok review your site, or any section of it, from its own docs. One setting per page and an API key; colvmn does the rest.
 
 ## Authoring
 
