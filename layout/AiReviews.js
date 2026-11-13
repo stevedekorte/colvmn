@@ -288,7 +288,7 @@ export class AiReviews {
         const body = "<p>Every model is given the same prompt. You can ask it yourself:</p>"
             + promptHtml(this.fullPrompt())
             + "<p>Answers vary with the account, plan and settings they're asked from.</p>";
-        return { type: "ContentText", title: "The prompt", body };
+        return { type: "ContentText", title: "The Prompt", body };
     }
 
     // --- review pages ---
