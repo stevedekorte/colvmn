@@ -1106,11 +1106,7 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
   justify-content: flex-end;
 }
 
-/* When the footer follows a card grid, neither draws a rule between them. */
-.card-grid:has(+ .page-footer) {
-  border-bottom: none;
-}
-
+/* A card grid already ends with a rule; the footer doesn't add a second one. */
 .card-grid + .page-footer {
   margin-top: 0;
   border-top: none;
