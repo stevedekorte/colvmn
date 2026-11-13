@@ -35,7 +35,7 @@
  *
  * What the generator adds:
  *   section page   {date} in its subtitle becomes the latest review's date;
- *                  one card per provider (model name, date, its summary) and the about
+ *                  one card per provider (model name and its summary) and the about
  *                  card, then the page's own text (and the prompt, when
  *                  there's no about page)
  *   about page     its own text, then the prompt
@@ -160,7 +160,6 @@ export class AiReviews {
             }
             return {
                 title: escapeHtml(meta.modelName || meta.model || p.name),
-                date: escapeHtml(meta.reviewed),
                 subtitle: escapeHtml(cardSummary(meta.summary || "")),
                 folder: p.name,
                 arrow: "Read"

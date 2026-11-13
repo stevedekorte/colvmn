@@ -118,7 +118,7 @@ test("aiReviews: provider cards, review headers with prefilled links, the archiv
         const read = folder => readFileSync(join(site, folder, "index.html"), "utf-8");
 
         const section = read("AI Reviews");
-        assert.match(section, /<h3>Claude Opus 5\.5<\/h3><div class="card-date">2026-11-20<\/div><p>A coherent naked-objects framework with a small community\.<\/p>/);
+        assert.match(section, /<h3>Claude Opus 5\.5<\/h3><p>A coherent naked-objects framework with a small community\.<\/p>/);
         assert.match(section, /AI reviews of this site(&#39;|')s content on 2026-11-20/);
         assert.match(section, /Not reviewed yet\./);                 // Gemini has no review
         assert.match(section, /How they(&#39;|')re made/);
