@@ -2,6 +2,7 @@
   "title": "",
   "topTitle": "colvmn",
   "subtitle": "A minimal static-site layout engine.",
+  "aiReviews": true,
   "content": [
     {
       "type": "ContentText",

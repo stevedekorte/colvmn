@@ -316,3 +316,22 @@ test("reviews.js: a section is reviewed from its own llms-full.txt with its own 
         rmSync(site, { recursive: true, force: true });
     }
 });
+
+test("defaultSiteRoot: the folder above the engine, or the engine itself when it hosts its own site", async () => {
+    const { defaultSiteRoot } = await import("../update/SiteRoot.js");
+    const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const { tmpdir } = await import("node:os");
+    const top = mkdtempSync(join(tmpdir(), "colvmn-root-"));
+    try {
+        const engine = join(top, "colvmn");
+        mkdirSync(engine);
+        writeFileSync(join(top, "_index.md"), "# Site\n");
+        assert.equal(defaultSiteRoot(engine), top);          // a site's colvmn/ folder
+        rmSync(join(top, "_index.md"));
+        writeFileSync(join(engine, "_index.json"), "{}");
+        assert.equal(defaultSiteRoot(engine), engine);       // colvmn.dev: the engine is the site
+    } finally {
+        rmSync(top, { recursive: true, force: true });
+    }
+});

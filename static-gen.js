@@ -24,6 +24,7 @@
  * nested site built on its own produces the same output.
  */
 
+import { defaultSiteRoot } from "./update/SiteRoot.js";
 import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -71,7 +72,7 @@ ContentBase.typeMap = {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Default: colvmn lives at <siteRoot>/colvmn/ as a submodule.
 // Override with argv[2] (e.g. "." to self-host colvmn's own pages).
-const siteRoot = resolve(process.argv[2] || join(__dirname, ".."));
+const siteRoot = resolve(process.argv[2] || defaultSiteRoot(__dirname));
 
 const skipDirs = new Set([
     "node_modules", "external-libs", "source", "build", "dist", "vendor",

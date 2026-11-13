@@ -1,3 +1,7 @@
 {
-  "siteUrl": "https://colvmn.dev/"
+    "siteUrl": "https://colvmn.dev/",
+    "buildStamp": true,
+    "aiReviews": {
+        "folder": "AI Reviews"
+    }
 }

@@ -1,5 +1,7 @@
 # colvmn — Full Documentation
 
+Site build: colvmn · 2026-11-13 · e76ba7f
+
 colvmn (pronounced column) is a tiny layout engine for static sites. Pages are described by an _index.md with YAML frontmatter, or an _index.json. The engine renders each page to static HTML at build time and to live DOM in the browser, so content is visible to JavaScript-free crawlers and to readers with JavaScript enabled.
 
 See also: /llms.txt (curated index) and /sitemap.xml.
@@ -106,8 +108,8 @@ The first time, each reviews page is written with default text. Edit it as you l
 ## The pages
 
 - **The page itself.** A footer link to its reviews: **AI reviews →**.
-- **The reviews page** (`<page>/AI Reviews/`). "AI reviews of this section's content on {date}", where `{date}` becomes the latest review's date. Then one card per model: its full name and its one-sentence verdict. Then the prompt.
-- **A review page.** The model, date and verdict, the review, then **Details**: the model ID, the build stamp the model quoted, the exact prompt with a link that opens it in that model's own app, and a line saying it isn't an endorsement by the provider. Then earlier reviews.
+- **The reviews page** (`<page>/AI Reviews/`). "AI reviews of this section's content on {date}", where `{date}` becomes the latest review's date. Then one card per model: its full name and its one-sentence verdict.
+- **A review page.** The model, date and verdict, the review, then **Details**, closed until clicked: the model ID, the build stamp the model quoted, the exact prompt with a link that opens it in that model's own app, and a line saying it isn't an endorsement by the provider. Then earlier reviews.
 - **The home page,** with `homeCard` and an opted-in root. A card for the root's reviews, added to the root page's last card grid.
 
 Every reviews folder is left out of `llms.txt` and every `llms-full.txt`, so a model reviewing the site never reads earlier reviews.

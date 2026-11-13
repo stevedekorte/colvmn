@@ -26,6 +26,7 @@
  * update/workflow-template.yml (GitHub Actions).
  */
 
+import { defaultSiteRoot } from "./update/SiteRoot.js";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { UpdateJobs } from "./update/UpdateJobs.js";
@@ -42,7 +43,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
  * @returns {{ siteRoot: string, dryRun: boolean, folder: string|null, now: Date, json: boolean, trigger: string, push: boolean }}
  */
 export function parseArgs (argv) {
-    const options = { siteRoot: resolve(HERE, ".."), dryRun: false, folder: null, now: new Date(), json: false, trigger: "schedule", push: false };
+    const options = { siteRoot: defaultSiteRoot(HERE), dryRun: false, folder: null, now: new Date(), json: false, trigger: "schedule", push: false };
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i];
         if (a === "--dry-run") {

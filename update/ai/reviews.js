@@ -37,6 +37,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { AiReviews } from "../../layout/AiReviews.js";
 import { Credentials } from "../Credentials.js";
+import { defaultSiteRoot } from "../SiteRoot.js";
 import { providerFor } from "./Providers.js";
 import { askClaude, chooserPrompt, validChoices } from "./ModelChooser.js";
 import { archiveReview, defaultSectionMarkdown, frontmatterValue, inputHash, parseAnswer, reviewMarkdown, reviewMessage, writePage } from "./ReviewPages.js";
@@ -68,7 +69,7 @@ export function localDate (date = new Date()) {
 
 export async function main (argv = [], env = process.env, today = localDate()) {
     const options = parseArgs(argv);
-    const siteRoot = env.COLVMN_SITE_ROOT || resolve(HERE, "..", "..", "..");
+    const siteRoot = env.COLVMN_SITE_ROOT || defaultSiteRoot(resolve(HERE, "..", ".."));
     const reviews = AiReviews.forSiteRoot(siteRoot);
     if (!reviews) {
         console.log(`no aiReviews in ${siteRoot}/colvmn.json`);
