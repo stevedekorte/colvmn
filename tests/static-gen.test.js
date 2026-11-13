@@ -105,3 +105,39 @@ test("the build stamp names the last commit that changed included pages", () => 
         rmSync(site, { recursive: true, force: true });
     }
 });
+
+test("aiReviews: provider cards, review headers with prefilled links, the archive, and no llms", () => {
+    const prompt = "Read https://example.com/llms.txt & evaluate it.";
+    const site = makeSite({ buildStamp: true, aiReviews: { folder: "AI Reviews", prompt, providers: ["Claude", "Gemini"] } });
+    try {
+        writePage(site, "AI Reviews", "# AI Reviews\n\nUnedited reviews of this site.\n\n## How they're made\n\nThe first answer is published.\n");
+        writePage(site, "AI Reviews/Claude", "---\nmodelName: Claude Opus 5.5\nreviewed: 2026-11-20\nstamp: Site build: Example · 2026-11-19 · abc1234\nshare: https://claude.ai/share/xyz\n---\n# Claude\n\nIt is a framework.\n");
+        writePage(site, "AI Reviews/Claude/archive/2026-10-01", "---\nmodelName: Claude Opus 5\nreviewed: 2026-10-01\n---\n# Claude\n\nAn older review.\n");
+        const before = commitAll(site, "pages");
+        build(site);
+        const read = folder => readFileSync(join(site, folder, "index.html"), "utf-8");
+
+        const section = read("AI Reviews");
+        assert.match(section, /Claude Opus 5\.5 · 2026-11-20/);
+        assert.match(section, /Not reviewed yet\./);                 // Gemini has no review
+        assert.match(section, /How they(&#39;|')re made/);
+        assert.match(section, /class="review-prompt">Read https:\/\/example\.com\/llms\.txt &amp; evaluate it\./);
+
+        const claude = read("AI Reviews/Claude");
+        assert.match(claude, new RegExp(`href="https://claude\\.ai/new\\?q=${encodeURIComponent(prompt).replace(/[.?*()]/g, "\\$&")}"`));
+        assert.match(claude, /Quoted build stamp: Site build: Example · 2026-11-19 · abc1234/);
+        assert.match(claude, /View the original conversation/);
+        assert.match(claude, /not an endorsement by Anthropic/);
+        assert.match(claude, /Earlier reviews[\s\S]*archive\/2026-10-01\/index\.html/);
+
+        const archived = read("AI Reviews/Claude/archive/2026-10-01");
+        assert.match(archived, /The current review/);
+        assert.match(archived, /didn(&#39;|')t quote the site(&#39;|')s build stamp|didn't quote/);
+
+        const { llms, llmsFull } = build(site);
+        assert.doesNotMatch(llms + llmsFull, /AI Reviews|It is a framework/);
+        assert.match(llmsFull, new RegExp(`· ${before}`));
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});

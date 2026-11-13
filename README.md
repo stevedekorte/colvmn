@@ -127,7 +127,23 @@ A site without its own `colvmn.json` uses the nearest one in a folder above it, 
 
 `"buildStamp": true` adds a line like `Site build: My Site · 2026-11-12 · 3c23b7b` to the top of `llms.txt` and `llms-full.txt` and to the bottom of the root page. It names the last commit that changed a page the llms files include, so rebuilding without such a change, or committing only generated output or excluded pages, leaves it as it was. Uncommitted edits don't count until they're committed. Nothing is written outside a git repo.
 
-`buildStamp` and `llmsExclude` belong to a site's own `colvmn.json`; a nested site doesn't inherit them.
+`buildStamp`, `llmsExclude` and `aiReviews` belong to a site's own `colvmn.json`; a nested site doesn't inherit them.
+
+#### AI reviews — `aiReviews`
+
+A section of pages in which AI models review the site. colvmn renders the section; producing the reviews is the site's own job (typically a scheduled script that calls each provider's API).
+
+```json
+"aiReviews": {
+  "folder": "AI Reviews",
+  "prompt": "Read https://example.com/llms.txt and the pages it links. Evaluate ...",
+  "providers": ["Claude", "ChatGPT", "Gemini", "Grok"]
+}
+```
+
+Each provider is a subfolder of the section. The four above have their company, app and prefilled-prompt link built in; another is given as `{ "name", "company", "app", "ask" }`, where `ask` is a URL with `{prompt}` in it. A review is the provider folder's `_index.md`: frontmatter `modelName`, `model`, `reviewed` (the date), `stamp` (the build stamp the model quoted) and `share` (a link to the original conversation, optional), and the review as its body. Replaced reviews go in `<provider>/archive/<date>/`.
+
+The generator adds one card per provider to the section page, with the prompt after the page's own text; a header to each review (model, date, quoted stamp, "Ask … yourself", the original conversation, and a not-an-endorsement line); and the list of earlier reviews. The whole section is left out of the llms files and the build stamp, so later reviews never read earlier ones.
 
 ### Scheduled updates
 

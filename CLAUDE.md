@@ -48,6 +48,7 @@ How it works:
 - `layout/ContentBase.js` — base class for content blocks (`computeHtml` = build markup; `postRender` = runtime behavior hook)
 - `layout/Content*.js` — content block renderers (Text, Cards, Table, Image, Timeline, Toc, KeyValue, UnorderedList, OrderedList)
 - `layout/MarkdownParser.js` — frontmatter + markdown to page JSON
+- `layout/AiReviews.js` — the AI Reviews section set up by `colvmn.json`'s `aiReviews` (provider cards, review headers, archive lists; out of the llms files). Build-time only, not bundled
 - `update.js` — the scheduled-updates runner: finds `_update.md` jobs, decides which are due (schedule or `on: push`, `watch`, `minInterval`), runs them, publishes (`direct` or `pr`), and emails a summary if `colvmn.json` asks
 - `update/` — its parts: `UpdateFile` (update-file parsing), `Schedule` (named and cron schedules), `UpdateJobs` (jobs, state, due checks), `JobRunner` (running script and prompt jobs, the `writes` and leak checks, publishing), `Credentials` (`_credentials/` lookup and values), `Notifier` (email via Resend), `Git`, `Glob`, `workflow-template.yml`
 - `tests/` — `npm test` (node:test); the runner tests build temp git repos

@@ -45,6 +45,7 @@ import { ContentFAQ } from "./layout/ContentFAQ.js";
 import { ContentClassDoc } from "./layout/ContentClassDoc.js";
 import { ContentComparisonTable } from "./layout/ContentComparisonTable.js";
 import { PageIndex } from "./layout/PageIndex.js";
+import { AiReviews } from "./layout/AiReviews.js";
 import { parseMarkdown } from "./layout/MarkdownParser.js";
 import { buildAnalyticsHtml, applyAnalytics } from "./analytics.js";
 
@@ -301,7 +302,7 @@ async function generatePage (pageDir) {
     // Pages render relative to their own site root, so a nested site's pages
     // match what its own build produces.
     const localRoot = localRootFor(pageDir);
-    const { siteUrl, analyticsHtml } = siteConfigFor(localRoot);
+    const { siteUrl, analyticsHtml, aiReviews } = siteConfigFor(localRoot);
     const relPath = relative(localRoot, pageDir) || ".";
     const pathSegments = relPath === "."
         ? []
@@ -322,6 +323,14 @@ async function generatePage (pageDir) {
     if (!page.json) {
         console.log(`  skipped (no content): ${relPath}`);
         return;
+    }
+
+    // An AI Reviews page gets its generated parts (cards, review header,
+    // archive list), resolved like the page's own content.
+    if (aiReviews && aiReviews.contains(pageDir)) {
+        aiReviews.decorate(pageDir, page.json);
+        page.children = page.json.content.map(c => ContentBase.fromJson(c, 0));
+        await Promise.all(page.children.map(c => c.resolve()));
     }
 
     let pageHtml = page.computePageHtml();
@@ -523,6 +532,8 @@ function matchesLlmsExclude (relPath, patterns) {
 // A page is left out when its path matches the site's "llmsExclude", or when
 // it or any page folder above it says "llms": false.
 function isExcludedFromLlms (pageDir, patterns) {
+    const { aiReviews } = siteConfigFor(localRootFor(pageDir));
+    if (aiReviews && aiReviews.contains(pageDir)) return true;
     const relPath = relative(siteRoot, pageDir);
     if (relPath && matchesLlmsExclude(relPath, patterns)) return true;
     let dir = pageDir;
@@ -923,6 +934,7 @@ function siteConfigFor (localRoot) {
         analyticsHtml,
         buildStamp: own.buildStamp === true,
         llmsExclude: Array.isArray(own.llmsExclude) ? own.llmsExclude : [],
+        aiReviews: AiReviews.forConfig(localRoot, own.aiReviews),
     };
     siteConfigCache.set(localRoot, config);
     return config;
