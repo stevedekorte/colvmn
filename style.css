@@ -1054,15 +1054,6 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
   font-size: 12px;
 }
 
-/* Build stamp: the root page only, opt-in via colvmn.json "buildStamp" */
-.build-stamp {
-  margin-top: 60px;
-  font-size: 12px;
-  color: #888;
-  text-align: center;
-  letter-spacing: 0.3px;
-}
-
 /* AI Reviews (colvmn.json "aiReviews"): the header above a review, the prompt */
 .review-header {
   font-size: 14px;
@@ -1115,35 +1106,30 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
   justify-content: flex-end;
 }
 
-.next-link {
+/* A card grid already ends with a rule; the footer doesn't add a second one. */
+.card-grid + .page-footer {
+  border-top: none;
+  padding-top: 0;
+}
+
+/* Footer links darken on hover like the other site links, without an underline. */
+.next-link,
+.reviews-link {
   color: #555;
   text-decoration: none;
   font-size: 14px;
   letter-spacing: 0.3px;
-  border-bottom: 1px solid transparent;
-  padding-bottom: 1px;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s;
 }
 
-.next-link:hover {
+.next-link:hover,
+.reviews-link:hover {
   color: #2a2a2a;
-  border-bottom-color: #2a2a2a;
 }
 
 /* The AI reviews link sits at the footer's left, the next-section link at its right. */
 .reviews-link {
   margin-right: auto;
-  color: #555;
-  text-decoration: none;
-  font-size: 14px;
-  letter-spacing: 0.3px;
-  border-bottom: 1px solid transparent;
-  padding-bottom: 1px;
-}
-
-.reviews-link:hover {
-  color: #2a2a2a;
-  border-bottom-color: #2a2a2a;
 }
 
 /* ContentCompetitorTable */

@@ -125,7 +125,7 @@ A site without its own `colvmn.json` uses the nearest one in a folder above it, 
 
 #### Build stamp — `buildStamp`
 
-`"buildStamp": true` adds a line like `Site build: My Site · 2026-11-12 · 3c23b7b` to the top of `llms.txt` and `llms-full.txt` and to the bottom of the root page. It names the last commit that changed a page the llms files include, so rebuilding without such a change, or committing only generated output or excluded pages, leaves it as it was. Uncommitted edits don't count until they're committed. Nothing is written outside a git repo.
+`"buildStamp": true` adds a line like `Site build: My Site · 2026-11-12 · 3c23b7b` to the top of `llms.txt` and `llms-full.txt`, and as an HTML comment at the bottom of the root page (in its source, not shown on the page). It names the last commit that changed a page the llms files include, so rebuilding without such a change, or committing only generated output or excluded pages, leaves it as it was. Uncommitted edits don't count until they're committed. Nothing is written outside a git repo.
 
 `buildStamp`, `llmsExclude` and `aiReviews` belong to a site's own `colvmn.json`; a nested site doesn't inherit them.
 

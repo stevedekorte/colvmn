@@ -82,7 +82,7 @@ test("no build stamp unless colvmn.json asks for one", () => {
         commitAll(site, "pages");
         const { llms, llmsFull, rootHtml } = build(site);
         assert.doesNotMatch(llms + llmsFull, /Site build:/);
-        assert.doesNotMatch(rootHtml, /build-stamp/);
+        assert.doesNotMatch(rootHtml, /Site build:/);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }
@@ -96,7 +96,8 @@ test("the build stamp names the last commit that changed included pages", () => 
         const stamp = new RegExp(`Site build: Example · \\d{4}-\\d{2}-\\d{2} · ${first}`);
         assert.match(out.llms, stamp);
         assert.match(out.llmsFull, stamp);
-        assert.match(out.rootHtml, /<div class="build-stamp">Site build: Example/);
+        assert.match(out.rootHtml, /<!-- Site build: Example/);
+        assert.doesNotMatch(out.rootHtml, /class="build-stamp"/, "the stamp is not shown on the page");
 
         // Generated output and excluded pages don't move it.
         commitAll(site, "generated output");

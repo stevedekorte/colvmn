@@ -350,9 +350,10 @@ async function generatePage (pageDir) {
     const docTitle = page.computeDocumentTitle();
 
     // The build stamp goes on the site's root page only, so a new stamp
-    // rewrites one page, not all of them.
+    // rewrites one page, not all of them. It is an HTML comment: readable in
+    // the page source, invisible on the page.
     if (pageDir === siteRoot && siteBuildStamp) {
-        pageHtml += `<div class="build-stamp">${escapeHtml(siteBuildStamp)}</div>`;
+        pageHtml += `<!-- ${escapeHtml(siteBuildStamp).replace(/--/g, "- -")} -->`;
     }
 
     // The "loaded" class is the contract with the browser runtime: PageIndex.render
