@@ -171,9 +171,10 @@ test("aiReviews: provider cards, review headers with prefilled links, the archiv
         assert.match(section, /AI reviews of this site(&#39;|')s content on 2026-11-20/);
         assert.match(section, /Not reviewed yet\./);                 // Gemini has no review
         assert.match(section, /How they(&#39;|')re made/);
-        assert.match(section, /class="review-prompt">Read https:\/\/example\.com\/llms\.txt &amp; evaluate it\./);
+        assert.doesNotMatch(section, /The Prompt|class="review-prompt"/);   // the prompt is in each review's Details
 
         const claude = read("AI Reviews/Claude");
+        assert.match(claude, /class="review-prompt">Read https:\/\/example\.com\/llms\.txt &amp; evaluate it\./);
         const askUrl = "https://claude.ai/new?q=" + encodeURIComponent(`${prompt}\n\n${ANSWER_FORMAT}`);
         assert.ok(claude.includes(`href="${askUrl.replace(/&/g, "&amp;")}"`), "the prefilled link carries the prompt and the answer format");
         // Model, date and links on top; the technical details after the review.
@@ -245,7 +246,8 @@ test("aiReviews: a section that opts in gets its own reviews, footer link, and l
         const section = readFileSync(join(site, "guide", "AI Reviews", "index.html"), "utf-8");
         assert.match(section, /<h3>Claude Fable 5\.2<\/h3><p>Just the guide\.<\/p>/);
         assert.match(section, /AI reviews of this section(&#39;|')s content on 2026-11-11/);
-        assert.match(section, /class="review-prompt">Is this guide clear\?/);
+        assert.doesNotMatch(section, /class="review-prompt"/);
+        assert.match(readFileSync(join(site, "guide", "AI Reviews", "Claude", "index.html"), "utf-8"), /class="review-prompt">Is this guide clear\?/);
         assert.match(readFileSync(join(site, "AI Reviews", "index.html"), "utf-8"), /<p>The whole site\.<\/p>/);
     } finally {
         rmSync(site, { recursive: true, force: true });

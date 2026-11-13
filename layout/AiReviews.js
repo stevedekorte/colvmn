@@ -55,7 +55,7 @@
  * What the generator adds:
  *   reviews page   {date} in its subtitle becomes the latest review's date;
  *                  one card per provider (model name and its verdict), then
- *                  the page's own text and the prompt
+ *                  the page's own text
  *   review pages   a header: model, date and verdict; after the review,
  *                  "Details" (model ID, quoted stamp, the prompt, "Ask
  *                  <provider> yourself" and the original conversation, the
@@ -300,7 +300,7 @@ export class ReviewScope {
         const content = json.content || [];
         if (role.kind === "section") {
             json.subtitle = this.fillDate(json.subtitle);
-            json.content = [this.providerCards(), ...content, this.promptEntry()];
+            json.content = [this.providerCards(), ...content];
         } else if (role.kind === "review") {
             const earlier = this.archiveEntry(role.provider);
             const details = this.detailsEntry(role.provider, json);
@@ -355,12 +355,6 @@ export class ReviewScope {
         return latest ? text.replaceAll("{date}", escapeHtml(latest)) : text.replace(/\s*\bon \{date\}|\{date\}/g, "");
     }
 
-    promptEntry () {
-        const body = "<p>Every model is given the same prompt. You can ask it yourself:</p>"
-            + promptHtml(this.fullPrompt())
-            + "<p>Answers vary with the account, plan and settings they're asked from.</p>";
-        return { type: "ContentText", title: "The Prompt", body };
-    }
 
     // --- review pages ---
 
