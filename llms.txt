@@ -2,7 +2,7 @@
 
 > A minimal static-site layout engine.
 
-Site build: colvmn · 2026-11-13 · e76ba7f
+Site build: colvmn · 2026-11-13 · 7ff7970
 
 ## AI Reviews
 
