@@ -957,6 +957,7 @@ function siteConfigFor (localRoot) {
         analyticsHtml,
         buildStamp: own.buildStamp === true,
         llmsExclude: Array.isArray(own.llmsExclude) ? own.llmsExclude : [],
+        unlisted: Array.isArray(own.unlisted) ? own.unlisted : [],
         aiReviews: own.aiReviews ? AiReviews.forSiteRoot(localRoot) : null,
     };
     siteConfigCache.set(localRoot, config);
@@ -968,7 +969,7 @@ function siteConfigFor (localRoot) {
 // ---------------------------------------------------------------------------
 
 async function main () {
-    const { siteUrl, buildStamp, llmsExclude, aiReviews } = siteConfigFor(siteRoot);
+    const { siteUrl, buildStamp, llmsExclude, unlisted, aiReviews } = siteConfigFor(siteRoot);
 
     // The site root must itself be a page. A siteRoot resolved one level too
     // high still finds every page below it, but none of them is ever isRoot,
@@ -1018,7 +1019,9 @@ async function main () {
     }
     console.log(`Static gen: found ${pages.length} layout pages under ${siteRoot} (root: "${rootLabel}")`);
 
-    const llmsPages = pages.filter(p => !isExcludedFromLlms(p, llmsExclude));
+    // "unlisted" folders are still generated but left out of the sitemap and llms files.
+    const isUnlisted = p => { const rel = relative(siteRoot, p); return !!rel && matchesLlmsExclude(rel, unlisted); };
+    const llmsPages = pages.filter(p => !isUnlisted(p) && !isExcludedFromLlms(p, llmsExclude));
     const excludedPages = pages.filter(p => !llmsPages.includes(p));
     if (excludedPages.length) {
         console.log(`  left out of llms.txt / llms-full.txt: ${excludedPages.length} pages`);
@@ -1033,7 +1036,7 @@ async function main () {
     }
 
     // Write sitemap.xml at site root
-    const sitemap = generateSitemap(pages, siteUrl);
+    const sitemap = generateSitemap(pages.filter(p => !isUnlisted(p)), siteUrl);
     writeFileSync(join(siteRoot, "sitemap.xml"), sitemap);
     console.log(`  generated: sitemap.xml (${pages.length} URLs)`);
 

@@ -61,6 +61,24 @@ function makeSite (config) {
     return site;
 }
 
+test("unlisted folders stay generated but leave the sitemap and llms files", () => {
+    const site = makeSite({ siteUrl: "https://example.com/", unlisted: ["guide"] });
+    try {
+        commitAll(site, "pages");
+        const { llms, llmsFull } = build(site);
+        const sitemap = readFileSync(join(site, "sitemap.xml"), "utf-8");
+        assert.match(sitemap, /example\.com\/kept\//);
+        assert.doesNotMatch(sitemap, /\/guide\//, "the folder and everything under it");
+        for (const text of [llms, llmsFull]) {
+            assert.match(text, /Kept Page/);
+            assert.doesNotMatch(text, /Guide|Unused Draft/);
+        }
+        assert.match(readFileSync(join(site, "guide", "index.html"), "utf-8"), /Guide text/, "still generated");
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
 test("llms: false leaves a page and its subtree out; llmsExclude matches a folder name at any depth", () => {
     const site = makeSite({ llmsExclude: ["_unused"] });
     try {

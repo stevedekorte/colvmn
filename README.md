@@ -123,6 +123,10 @@ A site without its own `colvmn.json` uses the nearest one in a folder above it, 
 - A page sets `llms: false` in its frontmatter (or `"llms": false` in `_index.json`) to leave out itself and everything under it.
 - A site lists folders in `colvmn.json`: `"llmsExclude": ["_unused", "drafts/old"]`. A name without `/` matches a folder of that name at any depth; one with `/` matches that path from the site root, and everything under it.
 
+#### Hidden pages — `unlisted`
+
+`"unlisted": ["projects/old-draft"]` in `colvmn.json` keeps those folders' pages out of `sitemap.xml`, `llms.txt` and `llms-full.txt`. Patterns match as in `llmsExclude`. The pages are still generated; remove a page's card from its parent's `_index.json` to drop it from navigation, and leave the folder out of the deploy if it should not be served at all.
+
 #### Build stamp — `buildStamp`
 
 `"buildStamp": true` adds a line like `Site build: My Site · 2026-11-12 · 3c23b7b` to the top of `llms.txt` and `llms-full.txt`, and as an HTML comment at the bottom of the root page (in its source, not shown on the page). It names the last commit that changed a page the llms files include, so rebuilding without such a change, or committing only generated output or excluded pages, leaves it as it was. Uncommitted edits don't count until they're committed. Nothing is written outside a git repo.
