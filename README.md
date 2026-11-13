@@ -84,6 +84,16 @@ The footer renders a link to the next sibling page, taken from the next entry af
 
 The flag is opt-in per page — pages without it render no footer.
 
+### Collapsed sections — `{.collapsed}`
+
+Mark a section's heading to have it start closed; clicking the heading opens it, and its plus mark turns to a minus:
+
+```markdown
+## Details {.collapsed}
+```
+
+In `_index.json`, set `"collapsed": true` on a top-level `ContentText` entry. A link to the section opens it. Without JavaScript, and in print, it shows open. AI review pages use it for their Details.
+
 ### Zoomable images — `colvmn-zoomable-image`
 
 Give any image the class `colvmn-zoomable-image` to make it click-to-enlarge. Clicking the image (or focusing it and pressing Enter) opens a full-viewport overlay; clicking the overlay or pressing Escape closes it.

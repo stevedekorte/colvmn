@@ -182,6 +182,7 @@ test("aiReviews: provider cards, review headers with prefilled links, the archiv
         assert.doesNotMatch(claude.split("It is a framework.")[0], /Build stamp it quoted|not an endorsement/);
         assert.match(claude, /View the original conversation/);
         assert.match(claude, /not an endorsement by Anthropic/);
+        assert.match(claude, /<h2 id="details" class="collapsible-head"><button type="button" class="collapsible-toggle" aria-expanded="false" aria-controls="details-panel">/);   // Details starts closed
         assert.match(claude, /class="review-header">[\s\S]*<nav class="toc"><ul><li><a href="#details">Details<\/a><\/li><li><a href="#earlier-reviews">Earlier reviews<\/a><\/li><\/ul><\/nav>/);   // a contents list under the header
         assert.match(claude, /class="review-verdict">A coherent naked-objects framework with a small community\.<\/p>/);   // the full verdict, at the top
         assert.match(claude, /Earlier reviews[\s\S]*archive\/2026-10-01\/index\.html/);
@@ -275,6 +276,22 @@ test("aiReviews homeCard: a card for the section joins the root page's last card
         const { rootHtml, llmsFull } = build(site);
         assert.match(rootHtml, /<h3>Kept<\/h3>[\s\S]*<a class="card[^"]*" href="AI%20Reviews\/index\.html"><h3>AI Reviews<\/h3><p>What four models make of it\.<\/p>/);
         assert.doesNotMatch(llmsFull, /What four models/);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
+test("a heading marked {.collapsed} builds a closed section that its heading opens; the marker stays out of the llms files", () => {
+    const site = makeSite({});
+    try {
+        writePage(site, "kept", "# Kept Page\n\nKept text.\n\n## Notes {.collapsed}\n\nHidden text.\n\n## Open\n\nShown text.\n");
+        const { llmsFull } = build(site);
+        const html = readFileSync(join(site, "kept", "index.html"), "utf-8");
+        assert.match(html, /<h2 id="notes" class="collapsible-head"><button type="button" class="collapsible-toggle" aria-expanded="false" aria-controls="notes-panel"><span class="collapsible-title">Notes<\/span>/);
+        assert.match(html, /<noscript><style>#notes-panel\{[^<]*<\/style><\/noscript><div id="notes-panel" class="collapsible-panel"><div class="collapsible-inner"><div class="section"><div class="section-body"><p>Hidden text\.<\/p>/);
+        assert.match(html, /<h2 id="open">Open<\/h2>/);
+        assert.match(llmsFull, /^## Notes$/m);
+        assert.doesNotMatch(llmsFull, /\{\.collapsed\}/);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }

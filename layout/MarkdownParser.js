@@ -338,7 +338,10 @@ export function parseMarkdown (text) {
 
         if (block.type === "heading" && block.level === 2) {
             if (currentSection) sections.push(currentSection);
-            currentSection = { title: block.text, blocks: [] };
+            // "## Details {.collapsed}": a section shown closed, opened by its heading.
+            const collapsed = /\s*\{\.collapsed\}\s*$/.test(block.text);
+            currentSection = { title: block.text.replace(/\s*\{\.collapsed\}\s*$/, ""), blocks: [] };
+            if (collapsed) currentSection.collapsed = true;
         } else if (block.type === "heading" && block.level >= 3 && currentSection) {
             currentSection.blocks.push({ type: "heading", level: block.level, text: block.text });
         } else if (currentSection) {
@@ -356,6 +359,7 @@ export function parseMarkdown (text) {
     const content = sections.map(section => {
         const entry = { type: "ContentText" };
         if (section.title) entry.title = section.title;
+        if (section.collapsed) entry.collapsed = true;
         const body = blocksToHtml(section.blocks);
         if (body) entry.body = body;
         return entry;

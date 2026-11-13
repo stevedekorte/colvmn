@@ -143,6 +143,7 @@ const BUNDLE_FILES = [
     "ContentComparisonTable.js",
     "PageIndex.js",
     "Lightbox.js",
+    "Collapsible.js",
     "layout.js",
 ];
 
@@ -899,7 +900,7 @@ function generateLlmsFull (pages, scope = null) {
         out += `Source: ${url}\n\n`;
 
         if (meta.rawMarkdown) {
-            out += meta.rawMarkdown.trim() + "\n";
+            out += meta.rawMarkdown.trim().replace(/^(#{2,6} .*?)\s*\{\.collapsed\}[ \t]*$/gm, "$1") + "\n";
         } else {
             out += jsonPageToMarkdown(meta.json);
         }

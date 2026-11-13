@@ -344,7 +344,10 @@ function parseMarkdown (text) {
 
         if (block.type === "heading" && block.level === 2) {
             if (currentSection) sections.push(currentSection);
-            currentSection = { title: block.text, blocks: [] };
+            // "## Details {.collapsed}": a section shown closed, opened by its heading.
+            const collapsed = /\s*\{\.collapsed\}\s*$/.test(block.text);
+            currentSection = { title: block.text.replace(/\s*\{\.collapsed\}\s*$/, ""), blocks: [] };
+            if (collapsed) currentSection.collapsed = true;
         } else if (block.type === "heading" && block.level >= 3 && currentSection) {
             currentSection.blocks.push({ type: "heading", level: block.level, text: block.text });
         } else if (currentSection) {
@@ -362,6 +365,7 @@ function parseMarkdown (text) {
     const content = sections.map(section => {
         const entry = { type: "ContentText" };
         if (section.title) entry.title = section.title;
+        if (section.collapsed) entry.collapsed = true;
         const body = blocksToHtml(section.blocks);
         if (body) entry.body = body;
         return entry;
@@ -588,6 +592,10 @@ class ContentText extends ContentBase {
             return html;
         }
 
+        if (this.depth === 0 && title && this.json.collapsed) {
+            return this.collapsedHtml(title, body, childHtml);
+        }
+
         if (this.depth === 0) {
             let html = "";
             if (title) html += `<h2 id="${slugify(title)}">${title}</h2>`;
@@ -606,6 +614,26 @@ class ContentText extends ContentBase {
         if (body) html += body;
         html += "</div></div>";
         if (childHtml) html += childHtml;
+        return html;
+    }
+
+    /**
+     * A top-level section ("collapsed": true, or "## Title {.collapsed}"),
+     * shown closed: its heading is a button that opens it (layout/Collapsible.js).
+     * Without JavaScript the noscript style shows it open.
+     */
+    collapsedHtml (title, body, childHtml) {
+        const slug = slugify(title);
+        const panel = `${slug}-panel`;
+        let html = `<h2 id="${slug}" class="collapsible-head">`;
+        html += `<button type="button" class="collapsible-toggle" aria-expanded="false" aria-controls="${panel}">`;
+        html += `<span class="collapsible-title">${title}</span><span class="collapsible-mark" aria-hidden="true"></span>`;
+        html += "</button></h2>";
+        html += `<noscript><style>#${panel}{grid-template-rows:1fr;visibility:visible;opacity:1}#${slug} .collapsible-mark{display:none}</style></noscript>`;
+        html += `<div id="${panel}" class="collapsible-panel"><div class="collapsible-inner">`;
+        if (body) html += `<div class="section"><div class="section-body">${body}</div></div>`;
+        if (childHtml) html += childHtml;
+        html += "</div></div>";
         return html;
     }
 }
@@ -2200,7 +2228,66 @@ function initLightbox (doc = document) {
 }
 
 
+// ===== Collapsible.js =====
+// Page-global open/close behavior for collapsed sections.
+//
+// A section marked "collapsed" ("## Details {.collapsed}" in markdown,
+// "collapsed": true in JSON) is built by ContentText as an <h2
+// class="collapsible-head"> holding a toggle button, followed by its
+// .collapsible-panel; style.css shows the panel closed until the heading has
+// the class "open". This attaches the behavior (see colvmn/CLAUDE.md,
+// "Rendering model"): clicking the heading opens or closes it, and following
+// a link to the section, or to anything inside it, opens it first.
+//
+// It is registered from layout.js and uses event delegation, like Lightbox.js.
+
+const setOpen = (head, open) => {
+    head.classList.toggle("open", open);
+    const button = head.querySelector(".collapsible-toggle");
+    if (button) button.setAttribute("aria-expanded", open ? "true" : "false");
+};
+
+// The collapsible heading that holds or owns an element, or null.
+const headFor = (el) => {
+    if (!el) return null;
+    if (el.classList && el.classList.contains("collapsible-head")) return el;
+    const panel = el.closest && el.closest(".collapsible-panel");
+    const head = panel && panel.previousElementSibling;
+    return head && head.classList.contains("collapsible-head") ? head : null;
+};
+
+function initCollapsibles (doc = document) {
+    if (typeof doc === "undefined" || !doc.body) return;
+
+    doc.addEventListener("click", (e) => {
+        const button = e.target.closest && e.target.closest(".collapsible-toggle");
+        if (!button) return;
+        const head = button.closest(".collapsible-head");
+        if (head) setOpen(head, !head.classList.contains("open"));
+    });
+
+    // A link to a closed section (a contents entry, say) opens it.
+    const openForHash = () => {
+        let id;
+        try {
+            id = decodeURIComponent(doc.location.hash.slice(1));
+        } catch (err) {
+            return;
+        }
+        const head = id && headFor(doc.getElementById(id));
+        if (head && !head.classList.contains("open")) {
+            setOpen(head, true);
+            const target = doc.getElementById(id);
+            if (target) target.scrollIntoView();
+        }
+    };
+    doc.defaultView.addEventListener("hashchange", openForHash);
+    openForHash();
+}
+
+
 // ===== layout.js =====
+
 
 
 
@@ -2239,6 +2326,7 @@ ContentBase.typeMap = {
 document.addEventListener("DOMContentLoaded", () => {
     new PageIndex().init();
     initLightbox();
+    initCollapsibles();
 });
 
 })();

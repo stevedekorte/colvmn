@@ -13,6 +13,7 @@ import { ContentClassDoc } from "./ContentClassDoc.js";
 import { ContentComparisonTable } from "./ContentComparisonTable.js";
 import { PageIndex } from "./PageIndex.js";
 import { initLightbox } from "./Lightbox.js";
+import { initCollapsibles } from "./Collapsible.js";
 
 ContentBase.typeMap = {
     ContentText,
@@ -37,4 +38,5 @@ ContentBase.typeMap = {
 document.addEventListener("DOMContentLoaded", () => {
     new PageIndex().init();
     initLightbox();
+    initCollapsibles();
 });

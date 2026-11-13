@@ -889,6 +889,105 @@ p code, li code, p tt, li tt {
   }
 }
 
+/* Collapsed sections ("## Details {.collapsed}", or "collapsed": true): the
+   heading is a button with a plus that turns to a minus; the panel slides open.
+   layout/Collapsible.js adds "open" to the heading. */
+.collapsible-head {
+  margin-bottom: 0;
+  border-bottom: 1px solid #ddd;
+}
+.collapsible-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  border: 0;
+  margin: 0;
+  padding: 0 0 10px;
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  color: #999;
+  cursor: pointer;
+  transition: color 240ms ease;
+}
+.collapsible-head.open .collapsible-toggle,
+.collapsible-toggle:hover {
+  color: #2a2a2a;
+}
+.collapsible-toggle:focus-visible {
+  outline: 2px solid #2a2a2a;
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+.collapsible-title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.collapsible-mark {
+  flex: 0 0 auto;
+  position: relative;
+  width: 11px;
+  height: 11px;
+  color: #999;
+  transition: color 160ms ease;
+}
+.collapsible-toggle:hover .collapsible-mark {
+  color: #2a2a2a;
+}
+.collapsible-mark::before,
+.collapsible-mark::after {
+  content: "";
+  position: absolute;
+  background: currentColor;
+}
+.collapsible-mark::before {
+  left: 0;
+  top: 5px;
+  width: 11px;
+  height: 1px;
+}
+.collapsible-mark::after {
+  left: 5px;
+  top: 0;
+  width: 1px;
+  height: 11px;
+  transition: transform 280ms cubic-bezier(0.3, 0, 0.2, 1);
+}
+.collapsible-head.open .collapsible-mark::after {
+  transform: rotate(90deg);
+}
+.collapsible-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  opacity: 0;
+  transition: grid-template-rows 320ms cubic-bezier(0.3, 0, 0.2, 1), opacity 240ms ease, visibility 0s linear 320ms;
+}
+.collapsible-head.open + noscript + .collapsible-panel,
+.collapsible-head.open + .collapsible-panel {
+  grid-template-rows: 1fr;
+  visibility: visible;
+  opacity: 1;
+  transition: grid-template-rows 320ms cubic-bezier(0.3, 0, 0.2, 1), opacity 240ms ease, visibility 0s;
+}
+.collapsible-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+/* The heading's own rule replaces the section's */
+.collapsible-inner > .section:first-child {
+  border-top: none;
+  padding-top: 20px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .collapsible-toggle, .collapsible-mark, .collapsible-mark::after, .collapsible-panel { transition: none; }
+}
+
 /* Print */
 @media print {
   body { background: none; }
@@ -905,6 +1004,8 @@ p code, li code, p tt, li tt {
   .card-grid { break-inside: avoid; }
   .back-link { display: none; }
   .page-footer { display: none; }
+  .collapsible-panel { grid-template-rows: 1fr; visibility: visible; opacity: 1; }
+  .collapsible-mark { display: none; }
 }
 
 /* ClassDoc — language-agnostic class/proto/struct documentation */

@@ -48,6 +48,7 @@ How it works:
 - `layout/ContentBase.js` — base class for content blocks (`computeHtml` = build markup; `postRender` = runtime behavior hook)
 - `layout/Content*.js` — content block renderers (Text, Cards, Table, Image, Timeline, Toc, KeyValue, UnorderedList, OrderedList)
 - `layout/MarkdownParser.js` — frontmatter + markdown to page JSON
+- `layout/Collapsible.js` — open/close behavior for collapsed sections (page-global, event delegation; see "Collapsed sections")
 - `layout/AiReviews.js` — AI reviews: `AiReviews` (the site's `colvmn.json` `aiReviews` settings and providers, and the pages that opt in with `aiReviews: true`) and `ReviewScope` (one opted-in page's folder: its prompt, its reviews folder, and what the generator adds: provider cards, review headers and details, archive lists, the footer link, the home card; reviews folders are out of every llms file). Build-time only, not bundled
 - `update.js` — the scheduled-updates runner: finds `_update.md` jobs, decides which are due (schedule or `on: push`, `watch`, `minInterval`), runs them, publishes (`direct` or `pr`), and emails a summary if `colvmn.json` asks
 - `update/` — its parts: `UpdateFile` (update-file parsing), `Schedule` (named and cron schedules), `UpdateJobs` (jobs, state, due checks), `JobRunner` (running script and prompt jobs, the `writes` and leak checks, publishing), `Credentials` (`_credentials/` lookup and values), `SecretFiles` (keeping `*.secret.txt` value files out of git: not read, build fails, never staged), `Notifier` (email via Resend), `Git`, `Glob`, `workflow-template.yml`
@@ -59,6 +60,7 @@ How it works:
 
 The markdown parser supports:
 - Standard markdown (headings, bold, italic, links, images, code blocks, lists)
+- Collapsed sections — `## Details {.collapsed}` (or `"collapsed": true` on a top-level `ContentText` in JSON) builds a section shown closed, whose heading opens it (see "Collapsed sections")
 - Image attribute lists — a Pandoc-style `{…}` suffix on an image: `![alt](src){.class #id key=value}` (see "Zoomable images")
 - Tables (standard `| col | col |` pipe syntax)
 - Raw HTML blocks (passed through as-is)
@@ -72,6 +74,10 @@ Any image can be made click-to-enlarge by giving it the class `colvmn-zoomable-i
 - **Raw HTML / `ContentText` body:** add the class directly — `<img class="colvmn-zoomable-image" src="screen.png" alt="…">`.
 
 It is progressive enhancement: the markup ships from the build, and the interactivity is attached at runtime by `layout/Lightbox.js` (`initLightbox`, wired in from `layout.js`). Because it is page-global behavior — not tied to any content block — it lives in `layout.js` rather than a `Content*` block, and uses event delegation so it works for images from any source (markdown, raw HTML, etc.). With no JS the image still renders normally. See "Rendering model" for why page-global behavior belongs in `layout.js`.
+
+## Collapsed sections
+
+A top-level section can start closed: mark its heading `## Details {.collapsed}` in markdown, or set `"collapsed": true` on its `ContentText` entry in `_index.json`. The heading becomes a button with a plus mark; clicking it slides the section open and the plus turns to a minus. A link to the section (a contents entry, say) or to anything inside it opens it. The markup ships from the build (`ContentText.collapsedHtml`); `layout/Collapsible.js` (`initCollapsibles`, wired in from `layout.js`) attaches the behavior. With no JS, a `<noscript>` style shows it open, and print shows it open. The marker is left out of `llms-full.txt`. AI review pages use it for their Details.
 
 ## Page Metadata
 
