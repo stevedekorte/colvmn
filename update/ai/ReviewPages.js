@@ -27,8 +27,8 @@ export function inputHash (llmsFull, modelId, prompt) {
 
 /** The message sent to a model: the prompt, and the docs in place of the link (the site's, or one section's). */
 export function reviewMessage (fullPrompt, llmsFull, isRoot = true) {
-    const what = isRoot ? "the site's llms-full.txt (llms.txt with the pages it links)" : "this section's llms-full.txt (its pages)";
-    return `${fullPrompt}\n\nYou can't browse here, so ${what} is below instead.\n\n<llms-full.txt>\n${llmsFull}\n</llms-full.txt>`;
+    const what = isRoot ? "the site's llms-full.txt (all its pages)" : "this section's llms-full.txt (its pages)";
+    return `${fullPrompt}\n\nYou can't browse here, so ${what} is below. Base your review only on it.\n\n<llms-full.txt>\n${llmsFull}\n</llms-full.txt>`;
 }
 
 /**

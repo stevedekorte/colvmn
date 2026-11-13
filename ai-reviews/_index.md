@@ -80,10 +80,12 @@ Every reviews folder is left out of `llms.txt` and every `llms-full.txt`, so a m
 
 A page's own `prompt` (in its frontmatter) comes first, then the site's `prompt` in `colvmn.json`, then a default:
 
-- **The root** asks the model to read the site's `llms.txt` and the pages it links, ignore the AI Reviews, and evaluate the site's subject: what it is, its strengths, weaknesses and risks, who should and shouldn't use it, and how it compares to alternatives.
+- **The root** asks the model to read the site's `llms-full.txt` and evaluate the site's subject: what it is, its strengths, weaknesses and risks, who should and shouldn't use it, and how it compares to alternatives.
 - **Any other page** asks it to read that page's `llms-full.txt` and evaluate that section the same way.
 
 A section often deserves its own question: `prompt: Evaluate this guide: is it accurate, clear and complete, and who is it for?`
+
+The model is sent that `llms-full.txt` with the prompt and told to base its review only on it. Reviews folders are never in it, so no review reads another.
 
 colvmn adds two lines asking the answer to begin with the build stamp the model saw and a verdict of at most 20 words. It reads both from the answer: the stamp shows which version of the docs was reviewed (and whether the model read them at all), and the verdict is the model's card text.
 

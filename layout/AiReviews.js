@@ -200,7 +200,7 @@ export class ReviewScope {
         this.folder = reviews.folder;
         this.providers = reviews.providers;
         this.prompt = (typeof meta.prompt === "string" && meta.prompt.trim()) || reviews.prompt
-            || (this.isRoot ? defaultPrompt(this.folder, reviews.site) : defaultScopePrompt(this, reviews.site));
+            || (this.isRoot ? defaultPrompt(reviews.site) : defaultScopePrompt(this, reviews.site));
     }
 
     /** The page's title, for prompts and messages. */
@@ -457,11 +457,11 @@ function promptHtml (prompt) {
     return `<blockquote class="review-prompt">${escapeHtml(prompt).split("\n").join("<br>")}</blockquote>`;
 }
 
-function defaultPrompt (folder, site) {
+function defaultPrompt (site) {
     const url = site.siteUrl && site.siteUrl !== "/" ? site.siteUrl.replace(/\/?$/, "/") : null;
     const name = site.title || "this site's subject";
-    const read = url ? `Read ${url}llms.txt and the pages it links.` : "Read this site's llms.txt and the pages it links.";
-    return `${read} Ignore the "${folder}" section. Evaluate ${name}: what it is, its strengths, its weaknesses and risks, who should and shouldn't use it, and how it compares to alternatives.`;
+    const read = url ? `Read ${url}llms-full.txt.` : "Read this site's llms-full.txt.";
+    return `${read} Evaluate ${name}: what it is, its strengths, its weaknesses and risks, who should and shouldn't use it, and how it compares to alternatives.`;
 }
 
 /** The default prompt for a page other than the root: its own llms-full.txt, and the page as the subject. */
