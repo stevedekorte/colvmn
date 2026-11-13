@@ -10,36 +10,11 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { providerFor, compareVersions } from "../update/ai/Providers.js";
 import { parseAnswer, safeMarkdown, inputHash } from "../update/ai/ReviewPages.js";
+import { parseChoice, validChoices } from "../update/ai/ModelChooser.js";
 import { UpdateJobs } from "../update/UpdateJobs.js";
 
 const AI = join(dirname(fileURLToPath(import.meta.url)), "..", "update", "ai");
-
-test("the top model: Fable over Opus for Claude, the plain highest version elsewhere", () => {
-    const claude = providerFor("Claude", {});
-    assert.deepEqual(claude.pickTop([
-        { id: "claude-opus-5-5", display_name: "Claude Opus 5.5", created_at: "2026-10-01" },
-        { id: "claude-fable-5-1", display_name: "Claude Fable 5.1", created_at: "2026-08-01" },
-        { id: "claude-fable-5-2", display_name: "Claude Fable 5.2", created_at: "2026-10-20" },
-        { id: "claude-sonnet-5-5", display_name: "Claude Sonnet 5.5", created_at: "2026-11-01" }
-    ]), { id: "claude-fable-5-2", name: "Claude Fable 5.2" });
-    assert.deepEqual(claude.pickTop([{ id: "claude-opus-5", created_at: "1" }, { id: "claude-opus-5-5", display_name: "Claude Opus 5.5", created_at: "2" }]), { id: "claude-opus-5-5", name: "Claude Opus 5.5" });
-
-    const openai = providerFor("ChatGPT", {});
-    assert.deepEqual(openai.pickTop(["gpt-5", "gpt-5.1", "gpt-5.1-mini", "gpt-5.10-2026-01-01", "gpt-4.1", "o3"].map(id => ({ id }))), { id: "gpt-5.1", name: "GPT-5.1" });
-
-    const grok = providerFor("Grok", {});
-    assert.deepEqual(grok.pickTop(["grok-3", "grok-4", "grok-4-fast", "grok-code-1"].map(id => ({ id }))), { id: "grok-4", name: "Grok 4" });
-
-    const gemini = providerFor("Gemini", {});
-    const g = (id, displayName) => ({ name: `models/${id}`, displayName, supportedGenerationMethods: ["generateContent"] });
-    assert.deepEqual(gemini.pickTop([g("gemini-2.5-pro", "Gemini 2.5 Pro"), g("gemini-3-pro-preview", "Gemini 3 Pro Preview"), g("gemini-3-flash", "x")]), { id: "gemini-3-pro-preview", name: "Gemini 3 Pro Preview" });
-    assert.deepEqual(gemini.pickTop([g("gemini-3-pro-preview", "P"), g("gemini-3-pro", "Gemini 3 Pro")]), { id: "gemini-3-pro", name: "Gemini 3 Pro" });
-
-    assert.ok(compareVersions("5.10", "5.9") > 0);
-    assert.equal(providerFor("Mistral"), null);
-});
 
 test("an answer gives its quoted stamp, verdict and review; HTML is escaped outside code", () => {
     const a = parseAnswer("**Build stamp:** `Site build: X · 2026-11-12 · abc`\nVerdict: \"Solid, small community.\"\n\n# Review\n\nIt's fine <script>alert(1)</script> and `a<b`.\n");
@@ -62,32 +37,38 @@ function makeSite (aiReviews) {
     return site;
 }
 
-test("aiReviews adds a models job (pr) and a reviews job (direct, watching the docs and models.json), with the keys that have values", () => {
+test("Claude's model choice: the JSON at the end of its answer, and only IDs from the provider's own list", () => {
+    const choice = parseChoice('Searched.\n```json\n{"Gemini": {"id": "gemini-4-carbon", "name": "Gemini 4 Carbon", "source": "https://blog.google/x", "why": "Newest frontier."}, "Grok": {"id": "grok-9"}}\n```');
+    const lists = { Gemini: { ids: ["gemini-4-argon", "gemini-4-carbon"] }, Grok: { ids: ["grok-4.7"] } };
+    const { chosen, rejected } = validChoices(choice, lists);
+    assert.deepEqual(chosen, { Gemini: { id: "gemini-4-carbon", name: "Gemini 4 Carbon", source: "https://blog.google/x", why: "Newest frontier." } });
+    assert.deepEqual(rejected, ["Grok: grok-9 isn't in its model list"]);
+});
+
+test("aiReviews adds one reviews job (direct, watching the docs), with the keys that have values", () => {
     const site = makeSite({ folder: "AI Reviews", about: "Review Process" });
     try {
         let jobs = UpdateJobs.inSite(site, {});
-        assert.deepEqual(jobs.all().map(j => j.folderName()), ["AI Reviews/_models", "AI Reviews"]);
+        assert.deepEqual(jobs.all().map(j => j.folderName()), ["AI Reviews"]);
         assert.match(jobs.all()[0].problems().join(), /no AI provider key has a value/);
 
-        jobs = UpdateJobs.inSite(site, { ANTHROPIC_API_KEY: "sk-test-123456" });
-        const [models, reviews] = jobs.all();
-        assert.deepEqual(models.problems(), []);
-        assert.equal(models.updateFile.publish(), "pr");
-        assert.deepEqual(models.updateFile.secrets(), ["ANTHROPIC_API_KEY"]);
+        const [reviews] = UpdateJobs.inSite(site, { ANTHROPIC_API_KEY: "sk-test-123456" }).all();
+        assert.deepEqual(reviews.problems(), []);
+        assert.deepEqual(reviews.updateFile.secrets(), ["ANTHROPIC_API_KEY"]);
         assert.equal(reviews.updateFile.publish(), "direct");
-        assert.deepEqual(reviews.updateFile.watch(), ["llms-full.txt", "AI Reviews/_models/models.json"]);
+        assert.deepEqual(reviews.updateFile.watch(), ["llms-full.txt"]);
         assert.equal(reviews.updateFile.minIntervalMs(), 30 * 86400e3);
         assert.ok(reviews.updateFile.writes().includes("AI Reviews/Claude/**"));
-        assert.ok(!reviews.updateFile.writes().some(w => w.includes("_models")), "models.json isn't the reviews job's own output, so changing it makes the job due");
+        assert.ok(reviews.updateFile.writes().includes("AI Reviews/_models/**"));
         assert.ok(existsSync(reviews.updateFile.scriptPath()));
     } finally {
         rmSync(site, { recursive: true, force: true });
     }
 });
 
-/** A stand-in for the Claude API; counts the reviews asked for. */
-async function fakeClaude (answer) {
-    const calls = { reviews: 0, lastBody: null };
+/** A stand-in for the Claude API: model lists, the model choice (a request with tools, paused once), and reviews. */
+async function fakeClaude (answer, chosenId = "claude-fable-5-2") {
+    const calls = { reviews: 0, choices: 0, lastBody: null };
     const server = createServer((req, res) => {
         let body = "";
         req.on("data", c => { body += c; });
@@ -100,8 +81,17 @@ async function fakeClaude (answer) {
             if (req.method === "GET" && req.url.startsWith("/v1/models")) {
                 return res.end(JSON.stringify({ data: [{ id: "claude-fable-5-2", display_name: "Claude Fable 5.2", created_at: "2026-10-20" }, { id: "claude-opus-5-5", display_name: "Claude Opus 5.5", created_at: "2026-10-01" }], has_more: false }));
             }
+            const request = JSON.parse(body);
+            if (request.tools) {
+                calls.choices++;
+                if (request.messages.length === 1) {
+                    return res.end(JSON.stringify({ stop_reason: "pause_turn", content: [{ type: "text", text: "Searching." }] }));
+                }
+                const json = JSON.stringify({ Claude: { id: chosenId, name: "Claude Fable 5.2", source: "https://www.anthropic.com/news/x", why: "Newest frontier." } });
+                return res.end(JSON.stringify({ stop_reason: "end_turn", content: [{ type: "text", text: "```json\n" + json + "\n```" }] }));
+            }
             calls.reviews++;
-            calls.lastBody = JSON.parse(body);
+            calls.lastBody = request;
             res.end(JSON.stringify({ stop_reason: "end_turn", content: [{ type: "text", text: answer }], usage: { input_tokens: 100, output_tokens: 50 } }));
         });
     });
@@ -109,10 +99,10 @@ async function fakeClaude (answer) {
     return { calls, url: `http://127.0.0.1:${server.address().port}`, close: () => server.close() };
 }
 
-function runScript (name, site, base) {
+function runReviews (site, base, args = [], key = "sk-test-123456") {
     return new Promise(resolve => {
-        const child = spawn(process.execPath, [join(AI, name)], {
-            env: { PATH: process.env.PATH, COLVMN_SITE_ROOT: site, ANTHROPIC_API_KEY: "sk-test-123456", COLVMN_AI_BASE_CLAUDE: base },
+        const child = spawn(process.execPath, [join(AI, "reviews.js"), ...args], {
+            env: { PATH: process.env.PATH, COLVMN_SITE_ROOT: site, ANTHROPIC_API_KEY: key, COLVMN_AI_BASE_CLAUDE: base },
             stdio: ["ignore", "pipe", "pipe"]
         });
         let out = "";
@@ -122,17 +112,19 @@ function runScript (name, site, base) {
     });
 }
 
-test("models.js writes the top model; reviews.js writes the review, skips it when nothing changed, and archives it when the docs change", async () => {
+test("reviews.js: Claude chooses the model, --models stops there; then the review is written, skipped when nothing changed, archived when the docs change", async () => {
     const site = makeSite({ folder: "AI Reviews", about: "Review Process", providers: ["Claude", "Gemini"] });
     const api = await fakeClaude("Build stamp: Site build: Example · 2026-11-12 · abc1234\nVerdict: Clear docs, small ecosystem.\n\n## Strengths\n\nGood.\n");
     try {
-        let r = await runScript("models.js", site, api.url);
+        let r = await runReviews(site, api.url, ["--models"]);
         assert.equal(r.status, 0, r.out);
+        assert.equal(api.calls.choices, 2, "one pause, then the answer");
+        assert.equal(api.calls.reviews, 0, "--models pays for no review");
         const models = JSON.parse(readFileSync(join(site, "AI Reviews", "_models", "models.json"), "utf8"));
-        assert.deepEqual(models, { Claude: { id: "claude-fable-5-2", name: "Claude Fable 5.2" } });
-        assert.equal((await runScript("models.js", site, api.url)).status, 3, "no change the second time");
+        assert.equal(models.Claude.id, "claude-fable-5-2");
+        assert.equal(models.Claude.source, "https://www.anthropic.com/news/x");
 
-        r = await runScript("reviews.js", site, api.url);
+        r = await runReviews(site, api.url);
         assert.equal(r.status, 0, r.out);
         assert.equal(api.calls.reviews, 1);
         assert.equal(api.calls.lastBody.model, "claude-fable-5-2");
@@ -140,41 +132,47 @@ test("models.js writes the top model; reviews.js writes the review, skips it whe
         const review = readFileSync(join(site, "AI Reviews", "Claude", "_index.md"), "utf8");
         assert.match(review, /^---\nmodelName: Claude Fable 5\.2\nmodel: claude-fable-5-2\nreviewed: \d{4}-\d{2}-\d{2}\nsummary: Clear docs, small ecosystem\.\nstamp: Site build: Example · 2026-11-12 · abc1234\ninputHash: [0-9a-f]{16}\n---\n# Claude\n\n## Strengths\n\nGood\.\n$/);
         assert.ok(existsSync(join(site, "AI Reviews", "Claude", "index.html")));
-        assert.match(readFileSync(join(site, "AI Reviews", "_index.md"), "utf8"), /on \{date\}/);              // default section page
+        assert.match(readFileSync(join(site, "AI Reviews", "_index.md"), "utf8"), /on \{date\}/);
         assert.match(readFileSync(join(site, "AI Reviews", "Review Process", "_index.md"), "utf8"), /at most every 30 days/);
 
-        r = await runScript("reviews.js", site, api.url);
+        r = await runReviews(site, api.url);
         assert.equal(r.status, 3, r.out);
-        assert.equal(api.calls.reviews, 1, "unchanged docs and model: no new review");
+        assert.equal(api.calls.reviews, 1, "same docs and model: no new review");
 
         writeFileSync(join(site, "llms-full.txt"), "# Example\n\nSite build: Example · 2026-11-13 · def5678\n\nThe docs, revised.\n");
-        r = await runScript("reviews.js", site, api.url);
+        r = await runReviews(site, api.url, ["--only", "Claude"]);
         assert.equal(r.status, 0, r.out);
         assert.equal(api.calls.reviews, 2);
-        const archive = join(site, "AI Reviews", "Claude", "archive");
-        const [dated] = readdirSync(archive);
+        const [dated] = readdirSync(join(site, "AI Reviews", "Claude", "archive"));
         assert.match(dated, /^\d{4}-\d{2}-\d{2}$/);
-        assert.ok(existsSync(join(archive, dated, "_index.md")) && existsSync(join(archive, dated, "index.html")));
     } finally {
         api.close();
         rmSync(site, { recursive: true, force: true });
     }
 });
 
-test("reviews.js with a key the provider rejects: nothing is written, and it fails", async () => {
+test("an ID Claude names that isn't in the provider's list is refused, and that provider is skipped, not guessed", async () => {
+    const site = makeSite({ folder: "AI Reviews", providers: ["Claude"] });
+    const api = await fakeClaude("unused", "claude-made-up-9");
+    try {
+        const r = await runReviews(site, api.url);
+        assert.equal(r.status, 3, r.out);
+        assert.match(r.out, /skipped, no model chosen: Claude: claude-made-up-9 isn't in its model list/);
+        assert.equal(api.calls.reviews, 0);
+        assert.ok(!existsSync(join(site, "AI Reviews", "Claude")));
+    } finally {
+        api.close();
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
+test("reviews.js with a key the provider rejects: nothing is written, and it fails without showing the key", async () => {
     const site = makeSite({ folder: "AI Reviews", providers: ["Claude"] });
     const api = await fakeClaude("unused");
     try {
-        mkdirSync(join(site, "AI Reviews", "_models"), { recursive: true });
-        writeFileSync(join(site, "AI Reviews", "_models", "models.json"), JSON.stringify({ Claude: { id: "claude-fable-5-2", name: "Claude Fable 5.2" } }));
-        const r = await new Promise(resolve => {
-            const child = spawn(process.execPath, [join(AI, "reviews.js")], { env: { PATH: process.env.PATH, COLVMN_SITE_ROOT: site, ANTHROPIC_API_KEY: "sk-wrong-key-000", COLVMN_AI_BASE_CLAUDE: api.url } });
-            let out = "";
-            child.stdout.on("data", c => { out += c; });
-            child.on("close", status => resolve({ status, out }));
-        });
-        assert.equal(r.status, 1);
-        assert.match(r.out, /Claude: failed: 127\.0\.0\.1:\d+ answered 401: bad key/);
+        const r = await runReviews(site, api.url, [], "sk-wrong-key-000");
+        assert.equal(r.status, 3, r.out);
+        assert.match(r.out, /Claude: couldn't list models: 127\.0\.0\.1:\d+ answered 401: bad key/);
         assert.doesNotMatch(r.out, /sk-wrong-key/);
         assert.ok(!existsSync(join(site, "AI Reviews", "Claude")));
     } finally {
@@ -204,24 +202,19 @@ function runUpdate (site, args, base) {
     });
 }
 
-test("through the runner: the models job opens a PR branch; merged, the reviews job commits a review", async () => {
+test("through the runner: the reviews job chooses the model, reviews, and commits both", async () => {
     const site = makeSite({ folder: "AI Reviews", providers: ["Claude"] });
     const api = await fakeClaude("Build stamp: none\nVerdict: Fine.\n\nA review.\n");
     try {
         await git(site, "init", "-q", "-b", "main");
         await git(site, "add", "-A");
         await git(site, "-c", "user.name=T", "-c", "user.email=t@example.com", "commit", "-q", "-m", "site");
-
-        let r = await runUpdate(site, ["--folder", "AI Reviews/_models"], api.url);
-        assert.equal(r.status, 0, r.out);
-        assert.match(r.out, /committed on colvmn-update\/AI-Reviews\/_models/);
-        assert.equal(await git(site, "status", "--porcelain"), "");
-        await git(site, "-c", "user.name=T", "-c", "user.email=t@example.com", "merge", "-q", "colvmn-update/AI-Reviews/_models");   // a person confirms the model
-
-        r = await runUpdate(site, ["--folder", "AI Reviews"], api.url);
+        const r = await runUpdate(site, ["--folder", "AI Reviews"], api.url);
         assert.equal(r.status, 0, r.out);
         assert.match(r.out, /AI Reviews: changed — committed/);
-        assert.match(await git(site, "show", "--stat", "--format=%s", "HEAD"), /AI Reviews\/Claude\/_index\.md[\s\S]*AI Reviews\/_update\.state\.json/);
+        const stat = await git(site, "show", "--stat", "--format=%s", "HEAD");
+        assert.match(stat, /AI Reviews\/Claude\/_index\.md/);
+        assert.match(stat, /AI Reviews\/_models\/models\.json/);
         assert.equal(api.calls.reviews, 1);
     } finally {
         api.close();
@@ -234,9 +227,9 @@ test("keys: the standard names by default, a site's own names with aiReviews key
     try {
         mkdirSync(join(site, "_credentials"));
         writeFileSync(join(site, "_credentials", "CLAUDE_REVIEW_KEY.secret.txt"), "sk-review-123456\n");
-        const [models] = UpdateJobs.inSite(site, { OPENAI_API_KEY: "sk-openai-123456", ANTHROPIC_API_KEY: "sk-runner-123456" }).all();
-        assert.deepEqual(models.updateFile.secrets(), ["CLAUDE_REVIEW_KEY", "OPENAI_API_KEY"], "Claude uses its own key, not the runner's");
-        assert.deepEqual(models.problems(), []);
+        const [reviews] = UpdateJobs.inSite(site, { OPENAI_API_KEY: "sk-openai-123456", ANTHROPIC_API_KEY: "sk-runner-123456" }).all();
+        assert.deepEqual(reviews.updateFile.secrets(), ["CLAUDE_REVIEW_KEY", "OPENAI_API_KEY"], "Claude uses its own key, not the runner's");
+        assert.deepEqual(reviews.problems(), []);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }

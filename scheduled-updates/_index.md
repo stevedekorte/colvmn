@@ -106,7 +106,7 @@ To run on GitHub Actions instead, copy `colvmn/update/workflow-template.yml` to 
 
 ## Built-in jobs
 
-A site whose `colvmn.json` has `aiReviews` gets two jobs without writing any update file: one keeps track of each AI provider's top model, the other has those models review the site. See [AI Reviews](../ai-reviews/index.html).
+A site whose `colvmn.json` has `aiReviews` gets a job without writing any update file: it has Claude choose each AI provider's latest top model, then has those models review the site. See [AI Reviews](../ai-reviews/index.html).
 
 ## Notifications
 

@@ -26,14 +26,16 @@ Then give the runner at least one key, as an environment variable or in `_creden
 | `GEMINI_API_KEY` | Google |
 | `XAI_API_KEY` | xAI |
 
-To keep the reviews' spending apart, give them keys of their own with `keys`: `"keys": { "Claude": "CLAUDE_REVIEW_KEY" }`. A review costs well under a dollar. A provider without a key is skipped, and its card says it hasn't been reviewed yet.
+To keep the reviews' spending apart, give them keys of their own with `keys`: `"keys": { "Claude": "CLAUDE_REVIEW_KEY" }`. A provider without a key is skipped, and its card says it hasn't been reviewed yet.
 
 ## What happens
 
-The runner adds two jobs of its own:
+The runner adds a job of its own. It runs when `llms-full.txt` has changed, at most once every 30 days, and each run has two steps:
 
-1. **Models**, daily. For each provider with a key, it reads the model list and picks the latest top model: the newest of its flagship family, leaving out smaller, faster and dated variants. When a pick changes, it opens a pull request updating `AI Reviews/_models/models.json`. A model list says what exists, not what is best, so a person confirms the pick by merging.
-2. **Reviews**, when `llms-full.txt` or `models.json` has changed, at most once every 30 days. Each confirmed model is sent the prompt with `llms-full.txt` attached. If neither the docs, the model nor the prompt changed since its current review, it is skipped. Otherwise its answer is published as written: the previous review moves to the archive and the new one is committed.
+1. **Choose the models.** For each provider with a key, colvmn reads the provider's model list from its API. Claude, with web search, then reads the providers' own announcements and chooses each one's newest, most capable model from that list. Names alone can't tell: they change shape between generations (Gemini 4 is "Argon", "Carbon" and "Hydrogen"). Only an ID from the provider's own list is accepted, and a provider Claude can't choose for is skipped, never guessed. The choices, with the page each is based on, are recorded in `AI Reviews/_models/models.json`. This needs the Claude key, and costs a few cents.
+2. **Review.** A provider whose current review was made from the same docs, model and prompt is skipped. Otherwise its model is sent the prompt with `llms-full.txt` attached, and its answer is published as written: the previous review moves to the archive and the new one is committed.
+
+To check before paying for reviews, run the first step alone, or one provider: `node colvmn/update/ai/reviews.js --models`, or `--only Gemini`. Each review sends the whole of `llms-full.txt`, so its cost grows with your docs: for a site of about 200,000 tokens, roughly one to three dollars per model.
 
 The first time, the section page and the about page are written with default text. Edit them as you like.
 
@@ -58,7 +60,7 @@ colvmn adds two lines asking the answer to begin with the build stamp the model 
 | --- | --- |
 | `folder` | The section's folder. The only one required. |
 | `prompt` | The review prompt, before the two lines colvmn adds. |
-| `providers` | Default `["Claude", "ChatGPT", "Gemini", "Grok"]`. `{ "name": "Claude", "model": "<id>" }` pins a model. Another provider is `{ "name", "company", "app", "ask" }` (`ask` is a URL with `{prompt}`); it can be shown, not produced. |
+| `providers` | Default `["Claude", "ChatGPT", "Gemini", "Grok"]`. `{ "name": "Claude", "model": "<id>" }` pins a model instead of having it chosen. Another provider is `{ "name", "company", "app", "ask" }` (`ask` is a URL with `{prompt}`); it can be shown, not produced. |
 | `about` | A subfolder explaining how the reviews are made. It gets the prompt and a card at the end of the grid. |
 | `homeCard` | `true` adds a card for the section to the root page. |
 | `every` | The least time between reviews: `30d` by default. |

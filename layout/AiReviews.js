@@ -1,7 +1,7 @@
 /**
  * AI Reviews: a section of pages in which AI models review the site, set up
- * by colvmn.json's "aiReviews". colvmn both produces the reviews (two built-in
- * update jobs, see update/ai/) and renders them (here, from static-gen.js;
+ * by colvmn.json's "aiReviews". colvmn both produces the reviews (a built-in
+ * update job, see update/ai/reviews.js) and renders them (here, from static-gen.js;
  * not bundled for the browser, which doesn't re-render built pages).
  *
  *   "aiReviews": {

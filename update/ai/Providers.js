@@ -1,14 +1,11 @@
 /**
  * The AI providers colvmn can get reviews from: for each, how to list its
- * models, which one is its latest top model, and how to ask it for a review.
+ * models and how to ask it for a review.
  * Plain HTTPS, no SDKs (colvmn has no dependencies), with a long timeout
  * since a review of a whole site's docs can take minutes.
  *
- * Picking the "latest top model" is a guess, because a model list says what
- * exists, not what is top: the newest model of the provider's flagship
- * family, leaving out smaller, faster and dated variants. The models job
- * publishes its guess as a pull request, so a person confirms it before any
- * review uses it.
+ * Which listed model is the provider's top one is chosen by Claude with web
+ * search (ModelChooser.js), not by its name.
  *
  * COLVMN_AI_BASE_<NAME> (e.g. COLVMN_AI_BASE_CLAUDE) replaces a provider's
  * API address; the tests use it to talk to a local stand-in.
@@ -63,23 +60,6 @@ export function requestJson (method, url, headers, body = null, timeoutMs = LIST
     });
 }
 
-/** Compares "5.1" and "5" as version numbers. */
-export function compareVersions (a, b) {
-    const pa = a.split(".").map(Number), pb = b.split(".").map(Number);
-    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-        const d = (pa[i] || 0) - (pb[i] || 0);
-        if (d !== 0) {
-            return d;
-        }
-    }
-    return 0;
-}
-
-/** The entry with the highest version, from entries with a `version`. */
-function highestVersion (entries) {
-    return entries.reduce((best, e) => (!best || compareVersions(e.version, best.version) > 0 ? e : best), null);
-}
-
 class Provider {
 
     constructor (name, defaultBase, env = process.env) {
@@ -87,13 +67,17 @@ class Provider {
         this.base = (env[`COLVMN_AI_BASE_${name.toUpperCase()}`] || defaultBase).replace(/\/+$/, "");
     }
 
-    /** The latest top model: { id, name }, or null when none is found. */
-    async latestTopModel (key) {
-        return this.pickTop(await this.listModels(key));
+    /** The model IDs this provider's API lists for a key. */
+    async modelIds (key) {
+        return (await this.listModels(key)).map(m => this.idOf(m));
+    }
+
+    idOf (m) {
+        return m.id;
     }
 }
 
-/** Anthropic's Claude: the newest Fable model, else the newest Opus. */
+/** Anthropic's Claude. */
 class ClaudeProvider extends Provider {
 
     constructor (env) {
@@ -115,18 +99,6 @@ class ClaudeProvider extends Provider {
         return models;
     }
 
-    pickTop (models) {
-        for (const family of ["fable", "opus"]) {
-            const found = models
-                .filter(m => new RegExp(`^claude-${family}-`).test(m.id))
-                .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
-            if (found.length) {
-                return { id: found[0].id, name: found[0].display_name || found[0].id };
-            }
-        }
-        return null;
-    }
-
     async review (key, model, text) {
         const r = await requestJson("POST", `${this.base}/v1/messages`, this.headers(key), {
             model,
@@ -145,13 +117,11 @@ class ClaudeProvider extends Provider {
     }
 }
 
-/** An OpenAI-style API (OpenAI, xAI): models named "<prefix>-<version>", the highest version without a suffix. */
+/** An OpenAI-style API (OpenAI, xAI). */
 class ChatCompletionsProvider extends Provider {
 
-    constructor (name, defaultBase, idPattern, displayName, env) {
+    constructor (name, defaultBase, env) {
         super(name, defaultBase, env);
-        this.idPattern = idPattern;
-        this.displayName = displayName;
     }
 
     headers (key) {
@@ -160,14 +130,6 @@ class ChatCompletionsProvider extends Provider {
 
     async listModels (key) {
         return (await requestJson("GET", `${this.base}/v1/models`, this.headers(key))).data || [];
-    }
-
-    pickTop (models) {
-        const best = highestVersion(models
-            .map(m => ({ id: m.id, match: m.id.match(this.idPattern) }))
-            .filter(m => m.match)
-            .map(m => ({ id: m.id, version: m.match[1] })));
-        return best ? { id: best.id, name: this.displayName(best.version) } : null;
     }
 
     async review (key, model, text) {
@@ -190,7 +152,7 @@ class ChatCompletionsProvider extends Provider {
     }
 }
 
-/** Google's Gemini: the highest-numbered Pro model, a stable one over a preview of the same version. */
+/** Google's Gemini. */
 class GeminiProvider extends Provider {
 
     constructor (env) {
@@ -199,6 +161,10 @@ class GeminiProvider extends Provider {
 
     headers (key) {
         return { "x-goog-api-key": key };
+    }
+
+    idOf (m) {
+        return String(m.name).replace(/^models\//, "");
     }
 
     async listModels (key) {
@@ -210,21 +176,6 @@ class GeminiProvider extends Provider {
             token = page.nextPageToken || null;
         } while (token);
         return models;
-    }
-
-    pickTop (models) {
-        const candidates = models
-            .filter(m => (m.supportedGenerationMethods || ["generateContent"]).includes("generateContent"))
-            .map(m => ({ m, id: String(m.name).replace(/^models\//, "") }))
-            .map(c => ({ ...c, match: c.id.match(/^gemini-(\d+(?:\.\d+)?)-pro(-preview)?$/) }))
-            .filter(c => c.match)
-            .map(c => ({ ...c, version: c.match[1], preview: Boolean(c.match[2]) }));
-        const top = highestVersion(candidates);
-        if (!top) {
-            return null;
-        }
-        const best = candidates.find(c => c.version === top.version && !c.preview) || top;
-        return { id: best.id, name: best.m.displayName || best.id };
     }
 
     async review (key, model, text) {
@@ -248,9 +199,9 @@ class GeminiProvider extends Provider {
 export function providerFor (name, env = process.env) {
     switch (name) {
         case "Claude": return new ClaudeProvider(env);
-        case "ChatGPT": return new ChatCompletionsProvider("ChatGPT", "https://api.openai.com", /^gpt-(\d+(?:\.\d+)?)$/, v => `GPT-${v}`, env);
+        case "ChatGPT": return new ChatCompletionsProvider("ChatGPT", "https://api.openai.com", env);
         case "Gemini": return new GeminiProvider(env);
-        case "Grok": return new ChatCompletionsProvider("Grok", "https://api.x.ai", /^grok-(\d+(?:\.\d+)?)$/, v => `Grok ${v}`, env);
+        case "Grok": return new ChatCompletionsProvider("Grok", "https://api.x.ai", env);
         default: return null;
     }
 }

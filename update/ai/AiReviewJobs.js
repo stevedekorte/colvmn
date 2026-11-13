@@ -1,16 +1,10 @@
 /**
- * The two jobs colvmn adds when a site's colvmn.json has "aiReviews", with
- * no update files:
- *
- *   <section>/_models   models.js, daily: the providers' latest top models,
- *                       into _models/models.json, published as a pull request
- *   <section>           reviews.js, daily, when llms-full.txt or models.json
- *                       changed, at most once per "every": the reviews,
- *                       published directly
- *
- * Each is given the providers' keys that have a value: the standard names,
- * or those aiReviews' "keys" gives. Their state files sit in
- * those folders like any job's.
+ * The job colvmn adds when a site's colvmn.json has "aiReviews", with no
+ * update file: <section>, running reviews.js daily when llms-full.txt has
+ * changed, at most once per "every". Each run first chooses each provider's
+ * latest top model, then reviews what is out of date; it publishes directly.
+ * It is given the providers' keys that have a value: the standard names, or
+ * those aiReviews' "keys" gives. Its state file sits in the section folder.
  */
 
 import { dirname, join } from "node:path";
@@ -21,7 +15,7 @@ import { Credentials } from "../Credentials.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-/** The site's built-in AI Reviews update files, or [] without "aiReviews". */
+/** The site's built-in AI Reviews update file, or [] without "aiReviews". */
 export function aiReviewUpdateFiles (siteRoot, env = process.env) {
     const reviews = AiReviews.forSiteRoot(siteRoot);
     if (!reviews) {
@@ -32,14 +26,7 @@ export function aiReviewUpdateFiles (siteRoot, env = process.env) {
     const keys = names.filter(k => !credentials.resolve(k, reviews.sectionDir()).problem);
     const problems = keys.length ? [] : [`no AI provider key has a value: set one of ${names.join(", ")}`];
     const section = reviews.folder;
-    const models = UpdateFile.builtIn({
-        siteRoot,
-        folder: join(reviews.sectionDir(), MODELS_FOLDER),
-        script: join(HERE, "models.js"),
-        problems,
-        fields: { schedule: "daily", run: "colvmn/update/ai/models.js", writes: [`${section}/${MODELS_FOLDER}/**`], publish: "pr", secrets: keys }
-    });
-    const writes = [`${section}/*`, ...reviews.providers.map(p => `${section}/${p.name}/**`)];
+    const writes = [`${section}/*`, `${section}/${MODELS_FOLDER}/**`, ...reviews.providers.map(p => `${section}/${p.name}/**`)];
     if (reviews.about) {
         writes.push(`${section}/${reviews.about}/**`);
     }
@@ -50,7 +37,7 @@ export function aiReviewUpdateFiles (siteRoot, env = process.env) {
         problems,
         fields: {
             schedule: "daily",
-            watch: ["llms-full.txt", `${section}/${MODELS_FOLDER}/models.json`],
+            watch: ["llms-full.txt"],
             minInterval: reviews.every,
             run: "colvmn/update/ai/reviews.js",
             writes,
@@ -58,5 +45,5 @@ export function aiReviewUpdateFiles (siteRoot, env = process.env) {
             secrets: keys
         }
     });
-    return [models, reviewsJob];
+    return [reviewsJob];
 }

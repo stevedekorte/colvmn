@@ -19,7 +19,7 @@
  *
  * Jobs run and publish (publish: direct commits here; publish: pr commits
  * on a branch, and --push pushes it and opens the PR). A site whose
- * colvmn.json has "aiReviews" also gets two built-in jobs (update/ai/). The
+ * colvmn.json has "aiReviews" also gets a built-in job (update/ai/). The
  * runner refuses to start on a working tree with uncommitted changes. See
  * update/JobRunner.js for what a job gets and how its exit status is read.
  * To run on a schedule: update/launchd-template.plist (your own Mac) or
