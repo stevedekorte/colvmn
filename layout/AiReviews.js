@@ -25,6 +25,8 @@
  *
  *   modelName   "Claude Opus 5.5"      model       "claude-opus-5-5"
  *   reviewed    "2026-11-20"           stamp       the build stamp the model quoted
+ *   summary     the model's own one-line summary of its review (the prompt
+ *               asks for one), shown on its card under the full model name
  *   share       a link to the original conversation, when there is one
  *
  * and the body is the review, published as written. A hand-written
@@ -32,7 +34,7 @@
  * Replaced reviews live in <provider>/archive/<date>/, newest first.
  *
  * What the generator adds:
- *   section page   one card per provider (model and date) and the about
+ *   section page   one card per provider (model name, date, its summary) and the about
  *                  card, then the page's own text (and the prompt, when
  *                  there's no about page)
  *   about page     its own text, then the prompt
@@ -136,7 +138,13 @@ export class AiReviews {
             if (!meta) {
                 return { title: p.name, subtitle: "Not reviewed yet.", link: false };
             }
-            return { title: p.name, folder: p.name, subtitle: escapeHtml(describeModelAndDate(meta)), arrow: "Read" };
+            return {
+                title: escapeHtml(meta.modelName || meta.model || p.name),
+                date: escapeHtml(meta.reviewed),
+                subtitle: escapeHtml(cardSummary(meta.summary || "")),
+                folder: p.name,
+                arrow: "Read"
+            };
         });
         const about = this.aboutCard();
         if (about) {
@@ -231,6 +239,16 @@ export class AiReviews {
         const json = parseMarkdown(readFileSync(path, "utf-8"));
         return json.reviewed ? json : null;
     }
+}
+
+/** The model's own one-line summary, clipped at a word if it runs long for a card. */
+function cardSummary (text) {
+    const max = 140;
+    if (text.length <= max) {
+        return text;
+    }
+    const cut = text.slice(0, max);
+    return cut.slice(0, cut.lastIndexOf(" ")).replace(/[,;:.]$/, "") + "…";
 }
 
 function describeModelAndDate (meta) {

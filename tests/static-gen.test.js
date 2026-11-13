@@ -111,14 +111,14 @@ test("aiReviews: provider cards, review headers with prefilled links, the archiv
     const site = makeSite({ buildStamp: true, aiReviews: { folder: "AI Reviews", prompt, providers: ["Claude", "Gemini"] } });
     try {
         writePage(site, "AI Reviews", "# AI Reviews\n\nUnedited reviews of this site.\n\n## How they're made\n\nThe first answer is published.\n");
-        writePage(site, "AI Reviews/Claude", "---\nmodelName: Claude Opus 5.5\nreviewed: 2026-11-20\nstamp: Site build: Example · 2026-11-19 · abc1234\nshare: https://claude.ai/share/xyz\n---\n# Claude\n\nIt is a framework.\n");
+        writePage(site, "AI Reviews/Claude", "---\nmodelName: Claude Opus 5.5\nreviewed: 2026-11-20\nsummary: A coherent naked-objects framework with a small community.\nstamp: Site build: Example · 2026-11-19 · abc1234\nshare: https://claude.ai/share/xyz\n---\n# Claude\n\nIt is a framework.\n");
         writePage(site, "AI Reviews/Claude/archive/2026-10-01", "---\nmodelName: Claude Opus 5\nreviewed: 2026-10-01\n---\n# Claude\n\nAn older review.\n");
         const before = commitAll(site, "pages");
         build(site);
         const read = folder => readFileSync(join(site, folder, "index.html"), "utf-8");
 
         const section = read("AI Reviews");
-        assert.match(section, /Claude Opus 5\.5 · 2026-11-20/);
+        assert.match(section, /<h3>Claude Opus 5\.5<\/h3><div class="card-date">2026-11-20<\/div><p>A coherent naked-objects framework with a small community\.<\/p>/);
         assert.match(section, /Not reviewed yet\./);                 // Gemini has no review
         assert.match(section, /How they(&#39;|')re made/);
         assert.match(section, /class="review-prompt">Read https:\/\/example\.com\/llms\.txt &amp; evaluate it\./);
