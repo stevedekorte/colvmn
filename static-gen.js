@@ -543,10 +543,13 @@ function matchesLlmsExclude (relPath, patterns) {
     });
 }
 
-// A page is left out when its path matches the site's "llmsExclude", or when
-// it or any page folder above it says "llms": false.
+// A page is left out when it belongs to a nested site (which has its own llms
+// files), when its path matches the site's "llmsExclude", when it is in an
+// AI reviews folder, or when it or any page folder above it says "llms": false.
 function isExcludedFromLlms (pageDir, patterns) {
-    const { aiReviews } = siteConfigFor(localRootFor(pageDir));
+    const localRoot = localRootFor(pageDir);
+    if (localRoot !== siteRoot) return true;
+    const { aiReviews } = siteConfigFor(localRoot);
     if (aiReviews && aiReviews.scopeContaining(pageDir)) return true;
     const relPath = relative(siteRoot, pageDir);
     if (relPath && matchesLlmsExclude(relPath, patterns)) return true;

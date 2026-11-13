@@ -279,13 +279,20 @@ export class PageIndex {
         // Content
         const contentHtml = this.children.map(c => c.computeHtml()).join("");
 
-        // Footer links: the page's AI reviews (set by static-gen for a page
-        // that opts in to them), and the optional next-section link (opt-in
-        // via "nextSectionLink": true).
-        const footerLinks = [];
+        // The footer, one line: the page's own "footerLinks" ([{ title, href }])
+        // and its AI reviews link (set by static-gen for a page that opts in),
+        // separated by middle dots; then, at the right, the optional
+        // next-section link (opt-in via "nextSectionLink": true).
+        const links = (Array.isArray(this.json.footerLinks) ? this.json.footerLinks : [])
+            .filter(l => l && l.href && l.title)
+            .map(l => ({ href: String(l.href).replace(/"/g, "&quot;"), label: l.title }));
         if (this.reviewsLink) {
-            const { href, label } = this.reviewsLink;
-            footerLinks.push(`<a class="reviews-link" href="${href}">${label}</a>`);
+            links.push(this.reviewsLink);
+        }
+        const footerLinks = [];
+        if (links.length) {
+            const items = links.map(l => `<a href="${l.href}">${l.label}</a>`);
+            footerLinks.push(`<span class="footer-links">${items.join('<span class="footer-sep"> &middot; </span>')}</span>`);
         }
         if (this.nextLink) {
             const { kind, title, href } = this.nextLink;

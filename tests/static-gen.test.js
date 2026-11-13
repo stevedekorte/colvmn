@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
@@ -89,6 +89,25 @@ test("llms: false leaves a page and its subtree out; llmsExclude matches a folde
             assert.match(text, /Guide/);
             assert.doesNotMatch(text, /Private Page|Private Child|Unused Draft/);
         }
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
+test("a nested site's pages stay out of the enclosing site's llms files and build stamp, but are generated and in the sitemap", () => {
+    const site = makeSite({ buildStamp: true });
+    try {
+        writePage(site, "fun/game/docs", "# Game Docs\n\nNested site text.\n");
+        writePage(site, "fun/game/docs/rules", "# Rules\n\nNested rules text.\n");
+        symlinkSync(join(dirname(staticGen)), join(site, "fun", "game", "docs", "colvmn"));
+        const first = commitAll(site, "pages");
+        writeFileSync(join(site, "fun", "game", "docs", "rules", "_index.md"), "# Rules\n\nEdited.\n");
+        commitAll(site, "nested edit");
+        const { llms, llmsFull } = build(site);
+        assert.doesNotMatch(llms + llmsFull, /Game Docs|Nested|Rules|fun\/game/);
+        assert.match(llmsFull, new RegExp(`· ${first}`), "a nested edit doesn't move the stamp");
+        assert.match(readFileSync(join(site, "fun", "game", "docs", "rules", "index.html"), "utf-8"), /Edited\./);
+        assert.match(readFileSync(join(site, "sitemap.xml"), "utf-8"), /fun\/game\/docs\/rules\//);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }
@@ -184,10 +203,10 @@ test("aiReviews: a page that opts in gets a footer link once its reviews page ex
     try {
         optIn(site, ".");
         commitAll(site, "pages");
-        assert.doesNotMatch(build(site).rootHtml, /reviews-link/, "no reviews page yet");
+        assert.doesNotMatch(build(site).rootHtml, /AI reviews of this site/, "no reviews page yet");
         writePage(site, "AI Reviews", "# AI Reviews\n\nAI reviews of this site's content on {date}\n");
-        assert.match(build(site).rootHtml, /<div class="page-footer"><a class="reviews-link" href="AI%20Reviews\/index\.html">AI reviews of this site<\/a><\/div>/);
-        assert.doesNotMatch(readFileSync(join(site, "kept", "index.html"), "utf-8"), /reviews-link/);
+        assert.match(build(site).rootHtml, /<div class="page-footer"><span class="footer-links"><a href="AI%20Reviews\/index\.html">AI reviews of this site<\/a><\/span><\/div>/);
+        assert.doesNotMatch(readFileSync(join(site, "kept", "index.html"), "utf-8"), /AI reviews of this/);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }
@@ -219,14 +238,27 @@ test("aiReviews: a section that opts in gets its own reviews, footer link, and l
         }
 
         const guide = readFileSync(join(site, "guide", "index.html"), "utf-8");
-        assert.match(guide, /<a class="reviews-link" href="AI%20Reviews\/index\.html">AI reviews of this section<\/a>/);
-        assert.doesNotMatch(readFileSync(join(site, "guide", "lesson", "index.html"), "utf-8"), /reviews-link/, "not inherited");
+        assert.match(guide, /<a href="AI%20Reviews\/index\.html">AI reviews of this section<\/a>/);
+        assert.doesNotMatch(readFileSync(join(site, "guide", "lesson", "index.html"), "utf-8"), /AI reviews of this/, "not inherited");
 
         const section = readFileSync(join(site, "guide", "AI Reviews", "index.html"), "utf-8");
         assert.match(section, /<h3>Claude Fable 5\.2<\/h3><p>Just the guide\.<\/p>/);
         assert.match(section, /AI reviews of this section(&#39;|')s content on 2026-11-11/);
         assert.match(section, /class="review-prompt">Is this guide clear\?/);
         assert.match(readFileSync(join(site, "AI Reviews", "index.html"), "utf-8"), /<p>The whole site\.<\/p>/);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
+test("footerLinks and the AI reviews link share one footer line, separated by middle dots", () => {
+    const site = makeSite({ aiReviews: { folder: "AI Reviews", providers: ["Claude"] } });
+    try {
+        rmSync(join(site, "_index.md"));
+        writeFileSync(join(site, "_index.json"), JSON.stringify({ topTitle: "Example", title: "Example", aiReviews: true, footerLinks: [{ title: "llms.txt", href: "llms.txt" }, { title: "llms-full.txt", href: "llms-full.txt" }], content: [] }));
+        writePage(site, "AI Reviews", "# AI Reviews\n\nAI reviews of this site's content on {date}\n");
+        commitAll(site, "pages");
+        assert.match(build(site).rootHtml, /<div class="page-footer"><span class="footer-links"><a href="llms\.txt">llms\.txt<\/a><span class="footer-sep"> &middot; <\/span><a href="llms-full\.txt">llms-full\.txt<\/a><span class="footer-sep"> &middot; <\/span><a href="AI%20Reviews\/index\.html">AI reviews of this site<\/a><\/span><\/div>/);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }

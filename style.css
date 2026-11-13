@@ -1097,7 +1097,7 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
   user-select: all;
 }
 
-/* Page footer — opt-in next/up link via "nextSectionLink": true */
+/* Page footer — footerLinks and the AI reviews link at the left, the next/up link ("nextSectionLink": true) at the right */
 .page-footer {
   margin-top: 60px;
   padding-top: 24px;
@@ -1106,15 +1106,18 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
   justify-content: flex-end;
 }
 
-/* A card grid already ends with a rule; the footer doesn't add a second one. */
+/* When the footer follows a card grid, neither draws a rule between them. */
+.card-grid:has(+ .page-footer) {
+  border-bottom: none;
+}
+
 .card-grid + .page-footer {
+  margin-top: 0;
   border-top: none;
-  padding-top: 0;
 }
 
 /* Footer links darken on hover like the other site links, without an underline. */
-.next-link,
-.reviews-link {
+.next-link {
   color: #555;
   text-decoration: none;
   font-size: 14px;
@@ -1122,14 +1125,26 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
   transition: color 0.15s;
 }
 
-.next-link:hover,
-.reviews-link:hover {
+.next-link:hover {
   color: #2a2a2a;
 }
 
-/* The AI reviews link sits at the footer's left, the next-section link at its right. */
-.reviews-link {
+/* The footer's own links (footerLinks, the AI reviews link) sit on one line at its left, separated by middle dots; the next-section link at its right. */
+.footer-links {
   margin-right: auto;
+  color: #999;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+}
+
+.footer-links a {
+  color: #555;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.footer-links a:hover {
+  color: #2a2a2a;
 }
 
 /* ContentCompetitorTable */

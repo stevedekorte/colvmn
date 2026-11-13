@@ -83,4 +83,5 @@ Top-level keys in `_index.json` (or `_index.md` frontmatter) recognised by the e
 - `analytics: false` — omit the site's analytics snippets (from `colvmn.json`) on this page.
 - `llms: false` — leave this page and everything under it out of `llms.txt` / `llms-full.txt` (it is still generated and in the sitemap). Site-wide folder patterns go in `colvmn.json` as `llmsExclude`.
 - `aiReviews: true` — AI models review this page's folder and everything below it (the site's settings are `colvmn.json`'s `aiReviews`); its reviews live in that setting's `folder` inside this page's folder, and the page gets a footer link to them. `prompt` sets this page's review prompt. Not inherited.
+- `footerLinks` — `[{ "title": "llms.txt", "href": "llms.txt" }, …]`: links on one line at the left of the page footer, separated by middle dots; the AI reviews link (`aiReviews: true`) joins them.
 - `nextSectionLink: true` — render a footer link at the bottom of the page pointing to the next sibling (taken from the parent's `ContentCards` items list). Falls back to an up-link to the parent if this page is the last sibling. Opt-in per page; absent flag = no footer.

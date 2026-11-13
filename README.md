@@ -165,7 +165,7 @@ Credentials are described in `_credentials/` folders and given only to the scrip
 
 ### Nested sites
 
-A folder below the site root with its own `colvmn/` engine (typically a submodule's docs) is a nested site. The root build regenerates its pages too, rendering them as their own site (own root page, header and brand), so the output matches what the nested site's own build produces. Because those pages load their own engine's CSS and JS, the root build fails if a nested site's colvmn version differs from the root's — update the nested copy, then rerun.
+A folder below the site root with its own `colvmn/` engine (typically a submodule's docs) is a nested site. The root build regenerates its pages too, rendering them as their own site (own root page, header and brand), so the output matches what the nested site's own build produces. Because those pages load their own engine's CSS and JS, the root build fails if a nested site's colvmn version differs from the root's — update the nested copy, then rerun. A nested site's pages are in the sitemap but not in the enclosing site's `llms.txt`, `llms-full.txt` or build stamp: the nested site has llms files of its own.
 
 #### Analytics
 
