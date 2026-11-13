@@ -5,6 +5,7 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { SECRET_FILES_EXCLUDE } from "./SecretFiles.js";
 
 export class Git {
 
@@ -61,11 +62,11 @@ export class Git {
     /** Throws away every change in the site's working tree. */
     discardChanges () {
         this.run(["checkout", "-q", "--", "."]);
-        this.run(["clean", "-fdq", "--", "."]);
+        this.run(["clean", "-fdq", "--", ".", SECRET_FILES_EXCLUDE]);   // credential value files are never cleaned away
     }
 
     commitAll (message) {
-        this.run(["add", "-A", "--", "."]);
+        this.run(["add", "-A", "--", ".", SECRET_FILES_EXCLUDE]);   // ...nor committed, ignored or not
         this.run(["commit", "-q", "-m", message]);
         return this.head();
     }

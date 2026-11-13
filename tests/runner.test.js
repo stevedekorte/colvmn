@@ -5,15 +5,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { main } from "../update.js";
 import { UpdateJobs } from "../update/UpdateJobs.js";
 import { JobRunner } from "../update/JobRunner.js";
 import { Git } from "../update/Git.js";
 import { Credentials } from "../update/Credentials.js";
 import { Notifier } from "../update/Notifier.js";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 function git (root, ...args) {
     return execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
@@ -216,6 +219,8 @@ test("credentials: values from .secret.txt files, unless locked by git-crypt; fo
         "_credentials/SERVICE.secret.txt": "not json",
         "_credentials/LOCKED.json": "{}",
         "_credentials/LOCKED.secret.txt": "\u0000GITCRYPT\u0000ciphertext",
+        ".gitignore": "_credentials/STRIPE_KEY.secret.txt\n_credentials/SERVICE.secret.txt\n",
+        ".gitattributes": "_credentials/LOCKED.secret.txt filter=git-crypt diff=git-crypt\n",
         "Job/_update.md": JOB
     }, (root) => {
         const creds = new Credentials(root, {});
@@ -360,4 +365,33 @@ test("notifications: off by default; on failure and changes, or what a job asks 
     } finally {
         rmSync(root, { recursive: true, force: true });
     }
+});
+
+test("credential value files git could commit: not read, never staged, never cleaned, and the build fails", () => {
+    withRepo({
+        "_credentials/API_KEY.json": "{}",
+        "Job/_update.md": KEY_JOB, "Job/job.js": APPEND
+    }, (root) => {
+        writeFileSync(join(root, "_credentials", "API_KEY.secret.txt"), "exposed-key-value\n");   // after the first commit, not ignored
+        const problem = new Credentials(root, {}).resolve("API_KEY", join(root, "Job")).problem;
+        assert.match(problem, /API_KEY\.secret\.txt isn't ignored by git/);
+        assert.doesNotMatch(problem, /exposed-key-value/);
+        assert.equal(new Credentials(root, { API_KEY: "from-env-123" }).resolve("API_KEY", root).value, "from-env-123", "the environment needs no file");
+
+        const g = new Git(root);
+        writeFileSync(join(root, "Job", "page.md"), "changed");
+        g.commitAll("a change");
+        assert.equal(git(root, "ls-files", "_credentials"), "_credentials/API_KEY.json", "the value file isn't committed");
+        g.discardChanges();
+        assert.ok(existsSync(join(root, "_credentials", "API_KEY.secret.txt")), "nor cleaned away");
+
+        writeFileSync(join(root, "_index.md"), "# Root\n");
+        writeFileSync(join(root, "index.html"), "");
+        const build = spawnSync(process.execPath, [join(HERE, "..", "static-gen.js"), root], { encoding: "utf8" });
+        assert.equal(build.status, 1);
+        assert.match(build.stderr, /git could commit: _credentials\/API_KEY\.secret\.txt/);
+
+        writeFileSync(join(root, ".gitignore"), "_credentials/*.secret.txt\n");
+        assert.equal(new Credentials(root, {}).resolve("API_KEY", root).value, "exposed-key-value");
+    });
 });

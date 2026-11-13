@@ -46,6 +46,7 @@ import { ContentClassDoc } from "./layout/ContentClassDoc.js";
 import { ContentComparisonTable } from "./layout/ContentComparisonTable.js";
 import { PageIndex } from "./layout/PageIndex.js";
 import { AiReviews } from "./layout/AiReviews.js";
+import { exposedSecretFiles, exposedMessage } from "./update/SecretFiles.js";
 import { parseMarkdown } from "./layout/MarkdownParser.js";
 import { buildAnalyticsHtml, applyAnalytics } from "./analytics.js";
 
@@ -967,6 +968,13 @@ async function main () {
         process.exit(1);
     }
     const rootLabel = rootMeta.json.topTitle || rootMeta.json.title || "(untitled)";
+
+    // Credential values must never reach git; stop the build while any could.
+    const exposed = exposedSecretFiles(siteRoot);
+    if (exposed.length) {
+        console.error(`Static gen: ${exposedMessage(exposed)}`);
+        process.exit(1);
+    }
 
     const pages = findLayoutPages(siteRoot);
     if (!pages.includes(siteRoot)) {

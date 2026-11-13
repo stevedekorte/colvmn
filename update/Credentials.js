@@ -9,8 +9,8 @@
  *
  * The value comes from the environment variable of the same name when it is
  * set (e.g. GitHub Actions secrets), else from `_credentials/<NAME>.secret.txt`
- * beside the description (kept out of git, or encrypted with git-crypt; a file
- * still locked counts as missing). A description may check the value's format:
+ * beside the description, which must be ignored by git or encrypted with
+ * git-crypt (see SecretFiles.js; a file still locked counts as missing). A description may check the value's format:
  *
  *   { "about": "Stripe restricted key, read-only", "pattern": "^rk_" }
  *   { "about": "GCP service account", "format": "json" }
@@ -26,9 +26,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import { AiReviews, PROVIDERS } from "../layout/AiReviews.js";
 
-const FOLDER = "_credentials";
-
-const SECRET_SUFFIX = ".secret.txt";
+import { CREDENTIALS_FOLDER as FOLDER, SECRET_SUFFIX, isProtected } from "./SecretFiles.js";
 
 /** The standard API key names colvmn describes itself, for any job that lists them. */
 const STANDARD_KEYS = Object.fromEntries(Object.values(PROVIDERS).map(p => [p.key, { about: `${p.company} API key` }]));
@@ -69,6 +67,10 @@ export class Credentials {
         if (found.description.blocked === true) {
             return { problem: `credential ${name} is blocked for this folder (${found.path})` };
         }
+        const exposed = this.exposedValueFile(name, found.dir);
+        if (exposed) {
+            return { problem: `credential ${name}: ${exposed} isn't ignored by git, so it could be committed; add "${FOLDER}/*${SECRET_SUFFIX}" to .gitignore` };
+        }
         const value = this.valueFor(name, found.dir);
         if (value === null) {
             return { problem: `credential ${name} has no value: set the ${name} environment variable or add ${FOLDER}/${name}${SECRET_SUFFIX} (unlocked)` };
@@ -92,6 +94,15 @@ export class Credentials {
             }
         }
         return this.builtIn[name] ? { dir: this.siteRoot, path: "(built in)", description: this.builtIn[name] } : null;
+    }
+
+    /** The value file's path when it exists and git could commit it, else null. */
+    exposedValueFile (name, dir) {
+        if (this.env[name]) {
+            return null;
+        }
+        const path = join(dir, FOLDER, `${name}${SECRET_SUFFIX}`);
+        return existsSync(path) && !isProtected(path) ? join(FOLDER, `${name}${SECRET_SUFFIX}`) : null;
     }
 
     valueFor (name, dir) {
