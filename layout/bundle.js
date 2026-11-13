@@ -1887,11 +1887,15 @@ class PageIndex {
                     while (depth <= maxDepth) {
                         const prefix = "../".repeat(depth);
                         try {
+                            let json = null;
                             const resp = await ContentBase.asyncFetch(`${prefix}_index.json`);
                             if (resp.ok) {
-                                const json = await resp.json();
-                                if (json.topTitle) { this.topTitle = json.topTitle; break; }
+                                json = await resp.json();
+                            } else {
+                                const mdResp = await ContentBase.asyncFetch(`${prefix}_index.md`);
+                                if (mdResp.ok) json = parseMarkdown(await mdResp.text());
                             }
+                            if (json && json.topTitle) { this.topTitle = json.topTitle; break; }
                         } catch (e) { /* continue */ }
                         depth++;
                     }

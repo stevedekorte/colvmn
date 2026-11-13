@@ -98,6 +98,12 @@ h2:first-of-type {
   margin-top: 0;
 }
 
+/* ...unless something came before it: an untitled card grid or section */
+.card-grid ~ h2:first-of-type,
+.section ~ h2:first-of-type {
+  margin-top: 60px;
+}
+
 h3 {
   font-size: 17px;
   font-weight: 300;
@@ -1059,10 +1065,6 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
 
 /* AI Reviews (colvmn.json "aiReviews"): the header above a review, the prompt */
 .review-header {
-  border-top: 1px solid #ddd;
-  border-bottom: 1px solid #ddd;
-  padding: 14px 0;
-  margin-bottom: 32px;
   font-size: 14px;
 }
 .review-header p {
