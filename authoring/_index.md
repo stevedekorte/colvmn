@@ -23,7 +23,7 @@ The same top-level keys work in markdown frontmatter and at the top of `_index.j
 | `llms` | `false` leaves the page and everything under it out of `llms.txt` and `llms-full.txt`. It is still generated and in the sitemap. |
 | `aiReviews` | `true` has AI models review this page's folder (see [AI Reviews](../ai-reviews/index.html)). `prompt` sets its review prompt. Not inherited. |
 | `footerLinks` | `[{ "title": "…", "href": "…" }]`: links on one line at the left of the page footer, separated by middle dots. The AI reviews link joins them. |
-| `pageLayout` | `"wide"` sets the page's titled sections in columns on wide screens: two from 1200px, three from 1860px and four from 2500px, given that many sections. Each section stays whole in one column, with everything else spanning both. Narrower screens and print show the usual single column. |
+| `maxColumns` | On wide screens a page's titled sections are set in columns (two from 1200px, three from 1860px, four from 2500px, given enough sections and subsections to fill them). A heading always starts a column with its first subsection; a long section may continue in the next column between subsections. Everything else spans the columns. `maxColumns` (1 to 4) caps that for this page; set it in `colvmn.json` for the whole site. `1` keeps one column. |
 | `nextSectionLink` | `true` adds a footer link to the next sibling in the parent's cards, or up to the parent after the last one. |
 
 ## Content blocks

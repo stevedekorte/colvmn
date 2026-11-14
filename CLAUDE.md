@@ -49,6 +49,7 @@ How it works:
 - `layout/Content*.js` — content block renderers (Text, Cards, Table, Image, Timeline, Toc, KeyValue, UnorderedList, OrderedList)
 - `layout/MarkdownParser.js` — frontmatter + markdown to page JSON
 - `layout/ContentSlideshow.js` — the slideshow block for `_index.json` pages
+- `layout/Columns.js` — builds a page's columns on wide viewports (see `maxColumns` under Page Metadata)
 - `layout/Slideshow.js` — slideshow behavior (see "Slideshows")
 - `layout/Collapsible.js` — open/close behavior for collapsed sections (page-global, event delegation; see "Collapsed sections")
 - `layout/AiReviews.js` — AI reviews: `AiReviews` (the site's `colvmn.json` `aiReviews` settings and providers, and the pages that opt in with `aiReviews: true`) and `ReviewScope` (one opted-in page's folder: its prompt, its reviews folder, and what the generator adds: provider cards, review headers and details, archive lists, the footer link, the home card; reviews folders are out of every llms file). Build-time only, not bundled
@@ -91,7 +92,8 @@ Consecutive images marked `{.slideshow}` (`![Alt](a.jpg){.slideshow}`, in one pa
 Top-level keys in `_index.json` (or `_index.md` frontmatter) recognised by the engine:
 
 - `title`, `subtitle`, `topTitle`, `cardSubtitle` — header / intro / parent-card text
-- `pageLayout` — adds a `page-{value}` class to the `.page` div for layout variants. `"wide"` flows the page's titled sections into two columns on viewports 1200px and wider (three from 1860px and four from 2500px, given that many sections): `PageIndex` wraps each titled top-level `ContentText` or list (its `<h2>` and everything under it) in a `.col-group`, and style.css sets the page in two columns, each group whole in one, with everything else (intro, contents, cards, tables, untitled text, footer) spanning both and up to four cards in one row. Needs at least two titled sections; narrower viewports and print are unchanged.
+- `pageLayout` — adds a `page-{value}` class to the `.page` div for layout variants.
+- `maxColumns` — 1 to 4 (default 4, or `colvmn.json`'s `maxColumns`): the most columns the page's titled sections are set in on wide viewports (two from 1200px, three from 1860px, four from 2500px, given enough sections and subsections to fill them). `PageIndex` wraps each titled top-level `ContentText`, list or `ContentKeyValue` in a `.col-group`, its heading and first subsection in a `.col-keep`, and marks the page `.has-cols`/`.has-cols-3`/`.has-cols-4` and `.max-cols-2`/`.max-cols-3`. `layout/Columns.js` builds the columns (`.col-set`): it splits the sections' units (each `.col-keep`, and each later subsection) in order into the columns, never splitting a unit, preferring to start sections at a column top unless continuing one saves over 15% height, and gives a subsection continuing at a column top a heading's worth of space (`.col-continued`). Without JS, style.css's fallback uses the browser's own columns. Everything else (intro, contents, cards, tables, untitled text, footer) spans the page, with up to four cards in one row. Narrower viewports and print are one column.
 - `heroImage`, `heroLayout`, `heroAspect` — hero block configuration
 - `analytics: false` — omit the site's analytics snippets (from `colvmn.json`) on this page.
 - `llms: false` — leave this page and everything under it out of `llms.txt` / `llms-full.txt` (it is still generated and in the sitemap). Site-wide folder patterns go in `colvmn.json` as `llmsExclude`.

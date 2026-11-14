@@ -345,16 +345,54 @@ test("ContentSlideshow builds the same slideshow in a JSON page, with its option
     }
 });
 
-test("pageLayout wide: each titled top-level section is wrapped in a .col-group; untitled text and cards are not", () => {
+test("columns by default: each titled top-level section (text, list, key/value) is a .col-group; maxColumns caps them, 1 turns them off", () => {
+    const site = makeSite({ maxColumns: 3 });
+    try {
+        writePage(site, "kept", "# Kept Page\n\nAn intro line.\n\n## One\n\nFirst.\n\n## Two\n\nSecond.\n");
+        writePage(site, "guide", "---\nmaxColumns: 1\n---\n# Guide\n\nGuide text.\n\n## One\n\nFirst.\n\n## Two\n\nSecond.\n");
+        writeFileSync(join(site, "private", "_index.json"), JSON.stringify({ title: "Private Page", llms: false, maxColumns: 2, content: [{ type: "ContentKeyValue", title: "Facts", items: { A: "1" } }, { type: "ContentText", title: "Notes", body: "<p>x</p>" }] }));
+        rmSync(join(site, "private", "_index.md"));
+        build(site);
+        const kept = readFileSync(join(site, "kept", "index.html"), "utf-8");
+        assert.match(kept, /<div class="col-group"><div class="col-keep"><h2 id="one">One<\/h2><div class="section"><div class="section-body"><p>First\.<\/p><\/div><\/div><\/div><\/div><div class="col-group"><div class="col-keep"><h2 id="two">Two<\/h2>/);   // a heading is kept with its first subsection
+        assert.match(kept, /<div class="page loaded has-cols max-cols-3">/);          // two sections, and the site's cap
+        const guide = readFileSync(join(site, "guide", "index.html"), "utf-8");
+        assert.doesNotMatch(guide, /col-group|max-cols/);                           // maxColumns: 1
+        const priv = readFileSync(join(site, "private", "index.html"), "utf-8");
+        assert.match(priv, /<div class="page loaded has-cols max-cols-2">/);          // the page's own cap wins
+        assert.match(priv, /<div class="col-group"><div class="col-keep"><h2>Facts<\/h2><div class="section">/);                // key/value blocks are sections too
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
+test("planColumns splits units, in order, into non-empty columns with the tallest as short as it can be", async () => {
+    const { planColumns } = await import("../layout/Columns.js");
+    const u = (height, keep = false, last = false) => ({ height, keep, last });
+    // Three sections, the last long with three subsections: one column each, the long one continuing in a third.
+    const units = [u(400, true, true), u(300, true, true), u(250, true), u(500), u(400, false, true)];
+    assert.deepEqual(planColumns(units, 3, 60), [2, 4]);
+    // Two columns: starting the long section fresh in the second column (1150 tall) is within 15% of
+    // continuing it (1120), so the section isn't split.
+    const two = [u(500, true, true), u(250, true, true), u(250, true), u(500), u(400, false, true)];
+    assert.deepEqual(planColumns(two, 2, 60), [2]);
+    // Starting it fresh (1660) is far taller than continuing its last subsection (1260): continue it.
+    const tall = [u(200, true, true), u(200, true), u(800), u(800, false, true)];
+    assert.deepEqual(planColumns(tall, 2, 60), [3]);
+    assert.deepEqual(planColumns([u(100, true, true), u(100, true, true)], 4), [1]);   // never more columns than units
+    assert.deepEqual(planColumns([u(100, true, true), u(100, true, true)], 1), []);
+});
+
+test("columns count a section's parts: one section with three subsections can fill three columns", () => {
     const site = makeSite({});
     try {
-        writePage(site, "kept", "---\npageLayout: wide\n---\n# Kept Page\n\nAn intro line.\n\n## One\n\nFirst.\n\n## Two\n\nSecond.\n");
-        writePage(site, "guide", "# Guide\n\nGuide text.\n\n## One\n\nFirst.\n");
+        writeFileSync(join(site, "kept", "_index.json"), JSON.stringify({ title: "Kept Page", content: [{ type: "ContentText", title: "Product", body: "<p>Intro.</p>", content: [
+            { type: "ContentText", title: "Features", body: "<p>a</p>" }, { type: "ContentText", title: "Stack", body: "<p>b</p>" }] }] }));
+        rmSync(join(site, "kept", "_index.md"));
         build(site);
         const html = readFileSync(join(site, "kept", "index.html"), "utf-8");
-        assert.match(html, /class="page loaded page-wide"|class="page page-wide loaded"|page-wide/);
-        assert.match(html, /<div class="col-group"><h2 id="one">One<\/h2><div class="section"><div class="section-body"><p>First\.<\/p><\/div><\/div><\/div><div class="col-group"><h2 id="two">Two<\/h2>/);
-        assert.doesNotMatch(readFileSync(join(site, "guide", "index.html"), "utf-8"), /col-group/, "only wide pages");
+        assert.match(html, /<div class="page loaded has-cols has-cols-3">/);
+        assert.match(html, /<div class="col-group"><div class="col-keep"><h2 id="product">Product<\/h2><div class="section"><div class="section-body"><p>Intro\.<\/p><\/div><\/div><\/div><div class="section"><div class="section-head">Features/);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }

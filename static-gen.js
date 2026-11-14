@@ -149,6 +149,7 @@ const BUNDLE_FILES = [
     "Lightbox.js",
     "Collapsible.js",
     "Slideshow.js",
+    "Columns.js",
     "layout.js",
 ];
 
@@ -351,6 +352,7 @@ async function generatePage (pageDir) {
     }
     const ownScope = aiReviews && aiReviews.scopeAt(pageDir);
     page.reviewsLink = ownScope ? ownScope.footerLink() : null;
+    page.siteMaxColumns = siteConfigFor(localRoot).maxColumns;
 
     let pageHtml = page.computePageHtml();
     const docTitle = page.computeDocumentTitle();
@@ -370,6 +372,8 @@ async function generatePage (pageDir) {
     if (page.json.pageLayout) {
         pageClasses.push(`page-${page.json.pageLayout}`);
     }
+    // How many column sections the page has, and its cap (style.css and layout/Columns.js read them).
+    pageClasses.push(...page.columnClasses());
 
     // Read existing HTML template
     const htmlPath = join(pageDir, "index.html");
@@ -980,6 +984,7 @@ function siteConfigFor (localRoot) {
         llmsExclude: Array.isArray(own.llmsExclude) ? own.llmsExclude : [],
         unlisted: Array.isArray(own.unlisted) ? own.unlisted : [],
         aiReviews: own.aiReviews ? AiReviews.forSiteRoot(localRoot) : null,
+        maxColumns: own.maxColumns ?? null,
     };
     siteConfigCache.set(localRoot, config);
     return config;

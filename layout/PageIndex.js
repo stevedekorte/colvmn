@@ -29,6 +29,7 @@ export class PageIndex {
         this.parentTitle = null;
         this.children = [];
         this.reviewsLink = null;
+        this.siteMaxColumns = null;
     }
 
     // Browser entry point. Always runs loadPage() + render() on DOMContentLoaded.
@@ -236,9 +237,93 @@ export class PageIndex {
         };
     }
 
-    /** A block that flows into a column on a wide page: a titled text section or list. */
+    /** A block that flows into a column on a wide viewport: a titled text section, list or key/value block. */
     static isColumnGroup (json) {
-        return Boolean(json && json.title) && ["ContentText", "ContentUnorderedList", "ContentOrderedList"].includes(json.type);
+        return Boolean(json && json.title) && ["ContentText", "ContentUnorderedList", "ContentOrderedList", "ContentKeyValue"].includes(json.type);
+    }
+
+    /**
+     * A section's HTML with its leading <h2> and the first block after it
+     * (any <noscript> between them included) wrapped in a .col-keep, which
+     * style.css never splits: a heading always starts a column together with
+     * its first subsection, in every browser (Safari ignores break-after:
+     * avoid in columns). Later subsections may still move to the next column.
+     */
+    static keepHeadingWithFirst (html) {
+        const head = html.match(/^<h2\b[\s\S]*?<\/h2>/);
+        if (!head) return html;
+        let i = head[0].length;
+        const noscript = html.slice(i).match(/^(?:<noscript>[\s\S]*?<\/noscript>)*/);
+        i += noscript[0].length;
+        const open = html.slice(i).match(/^<([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/);
+        if (!open) return html;
+        // The end of that element: count its own tag's opens and closes.
+        const tag = open[1].toLowerCase();
+        const re = new RegExp(`<(/?)${tag}\\b[^>]*>`, "gi");
+        re.lastIndex = i;
+        let depth = 0, end = -1, m;
+        while ((m = re.exec(html))) {
+            depth += m[1] ? -1 : 1;
+            if (depth === 0) {
+                end = re.lastIndex;
+                break;
+            }
+        }
+        if (end < 0) return html;
+        return `<div class="col-keep">${html.slice(0, end)}</div>${html.slice(end)}`;
+    }
+
+    /**
+     * How many top-level elements an HTML string has, <noscript> aside: in a
+     * column section, the parts that can go in separate columns (its
+     * .col-keep and each later subsection).
+     */
+    static topLevelElementCount (html) {
+        const VOID = /^(area|base|br|col|embed|hr|img|input|link|meta|source|track|wbr)$/i;
+        const re = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)\b[^>]*?(\/?)>/g;
+        let depth = 0, count = 0, m;
+        while ((m = re.exec(html))) {
+            const [, close, tag, selfClose] = m;
+            if (VOID.test(tag) || selfClose) {
+                if (depth === 0) count++;
+                continue;
+            }
+            if (close) {
+                depth--;
+            } else {
+                if (depth === 0 && tag.toLowerCase() !== "noscript") count++;
+                depth++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * The page's classes for columns: how many parts its column sections
+     * have, that can go in separate columns (has-cols for two or more,
+     * has-cols-3, has-cols-4), and its cap below four (max-cols-2,
+     * max-cols-3). style.css and layout/Columns.js read them. Call after
+     * computePageHtml().
+     */
+    columnClasses () {
+        const out = [];
+        const n = this.columnUnitCount || 0;
+        if (n >= 2) out.push("has-cols");
+        if (n >= 3) out.push("has-cols-3");
+        if (n >= 4) out.push("has-cols-4");
+        const max = this.maxColumns();
+        if (n >= 2 && (max === 2 || max === 3)) out.push(`max-cols-${max}`);
+        return out;
+    }
+
+    /**
+     * The most columns this page's sections may flow into on wide viewports,
+     * 1 to 4: the page's "maxColumns", else the site's (static-gen sets
+     * siteMaxColumns from colvmn.json), else 4.
+     */
+    maxColumns () {
+        const n = Number(this.json.maxColumns ?? this.siteMaxColumns ?? 4);
+        return Number.isFinite(n) ? Math.max(1, Math.min(4, Math.round(n))) : 4;
     }
 
     computePageHtml () {
@@ -281,14 +366,20 @@ export class PageIndex {
             introHtml = `<div class="intro"><p>${this.json.subtitle}</p></div>`;
         }
 
-        // Content. With "pageLayout": "wide", each titled top-level section
-        // (its <h2> and everything under it) is wrapped in a .col-group; on
-        // wide viewports style.css flows those groups into two columns and
-        // lets everything else (cards, tables, untitled text) span both.
-        const wide = this.json.pageLayout === "wide";
+        // Content. Each titled top-level section (its <h2> and everything
+        // under it) is wrapped in a .col-group; on wide viewports style.css
+        // flows those groups into columns and lets everything else (cards,
+        // tables, untitled text) span them. "maxColumns": 1 turns it off.
+        const columns = this.maxColumns();
+        this.columnUnitCount = 0;
         const contentHtml = this.children.map(c => {
             const html = c.computeHtml();
-            return wide && PageIndex.isColumnGroup(c.json) && html ? `<div class="col-group">${html}</div>` : html;
+            if (columns > 1 && PageIndex.isColumnGroup(c.json) && html) {
+                const grouped = PageIndex.keepHeadingWithFirst(html);
+                this.columnUnitCount += PageIndex.topLevelElementCount(grouped);
+                return `<div class="col-group">${grouped}</div>`;
+            }
+            return html;
         }).join("");
 
         // The footer, one line: the page's own "footerLinks" ([{ title, href }])
@@ -338,6 +429,7 @@ export class PageIndex {
         // below (postRender) is the only runtime work that matters for such pages.
         if (!page.classList.contains("loaded")) {
             page.innerHTML = this.computePageHtml();
+            page.classList.add(...this.columnClasses());
         }
 
         if (this.json.pageLayout) {

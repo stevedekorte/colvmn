@@ -1128,13 +1128,19 @@ p code, li code, p tt, li tt {
   .slideshow-frame .slide { transition: none; }
 }
 
-/* Wide pages ("pageLayout": "wide"): on wide viewports, the titled
-   sections flow into two columns (three from 1860px, four from 2500px). PageIndex wraps each titled top-level
-   section (an <h2> and everything under it) in a .col-group; each group stays
-   whole in one column, leaving space below it rather than splitting.
-   Everything else (header, intro, contents, cards, tables, untitled text, the
-   footer) spans both columns. Below 1200px, and in print, the page is as
-   usual. */
+/* Columns: on wide viewports a page's titled sections are set side by side,
+   two columns from 1200px, three from 1860px and four from 2500px, given
+   enough sections and subsections to fill them, up to the page's or site's
+   "maxColumns". PageIndex wraps each titled top-level section (an
+   <h2> and everything under it) in a .col-group, keeps its heading and first
+   subsection together in a .col-keep, and marks the page: .has-cols (two or
+   more parts that can go in separate columns: each section's .col-keep and
+   later subsections), .has-cols-3, .has-cols-4, and a cap of .max-cols-2 or
+   .max-cols-3. layout/Columns.js then splits the sections, in order, into
+   .col-set columns, moving whole subsections only; without JavaScript the
+   browser's own columns do it (.has-cols without .js-columns). Everything
+   else (header, intro, contents, cards, tables, untitled text, the footer)
+   spans the page. Below 1200px, and in print, the page is one column. */
 
 /* Wrapping changes which <h2> is the first of its type, so every heading but
    the page's first keeps its top margin. */
@@ -1142,77 +1148,128 @@ p code, li code, p tt, li tt {
 .page > .section ~ .col-group > h2,
 .page > .card-grid ~ .col-group > h2,
 .page > .col-group ~ .col-group > h2,
+.page > h2 ~ .col-group > .col-keep > h2,
+.page > .section ~ .col-group > .col-keep > h2,
+.page > .card-grid ~ .col-group > .col-keep > h2,
+.page > .col-group ~ .col-group > .col-keep > h2,
 .page > .col-group ~ h2 {
   margin-top: 60px;
 }
 
 @media screen and (min-width: 1200px) {
-  /* At least two groups: one can't fill two columns. */
-  .page:has(> .col-group ~ .col-group) {
+  .page.has-cols {
+    --cols: 2;
     max-width: 1320px;
     width: calc(100% - 80px);
-    column-count: 2;
-    column-gap: 64px;
-    column-rule: 1px solid #ddd;
   }
-  .page:has(> .col-group ~ .col-group) > :not(.col-group) {
-    column-span: all;
-  }
-  /* A group never splits; if it doesn't fit in what's left of the first
-     column, it moves to the second. */
-  .page:has(> .col-group ~ .col-group) > .col-group {
-    break-inside: avoid;
-    padding-bottom: 60px;
-  }
-  /* The groups' bottom padding spaces them, so headings sit flush at the top
-     of both columns. */
-  .page:has(> .col-group ~ .col-group) > .col-group > h2,
-  .page:has(> .col-group ~ .col-group) > .col-group + h2 {
+
+  /* Inside a column: headings flush at the top, a label beside its body
+     stacked, and a subsection that continues a section at the top of a
+     column given the space a heading takes, its divider line moving down
+     with its text (padding, since a margin is dropped at a column top). */
+  .page.has-cols .col-group > h2,
+  .page.has-cols .col-group > .col-keep > h2 {
     margin-top: 0;
   }
-  /* A label beside its body is too tight in a column: stack them. */
-  .page:has(> .col-group ~ .col-group) > .col-group .section-two-col {
+  .page.has-cols .col-group .section-two-col {
     grid-template-columns: 1fr;
     gap: 12px 0;
   }
+  .page.has-cols .col-group > .col-continued {
+    padding-top: var(--col-heading-space, 0px);
+  }
+  .page.has-cols .col-group > .section.col-continued {
+    position: relative;
+    border-top-color: transparent;
+    padding-top: calc(var(--col-heading-space, 0px) + 30px);
+  }
+  .page.has-cols .col-group > .section.col-continued::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(var(--col-heading-space, 0px) - 1px);
+    border-top: 1px solid #ddd;
+  }
+
+  /* Columns built by layout/Columns.js: side by side, each column's
+     sections spaced by a bottom margin, the set spaced from what follows. */
+  .col-set {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 64px;
+    margin-bottom: 60px;
+  }
+  .col-set > .col {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .col-set .col-group {
+    margin-bottom: 60px;
+  }
+  .col-set > .col > :last-child {
+    margin-bottom: 0;
+  }
+
+  /* Without JavaScript: the browser's own columns, each subsection whole and
+     each heading kept with its first subsection. */
+  .page.has-cols:not(.js-columns) {
+    column-count: var(--cols);
+    column-gap: 64px;
+  }
+  .page.has-cols:not(.js-columns) > :not(.col-group) {
+    column-span: all;
+  }
+  .page.has-cols:not(.js-columns) > .col-group {
+    margin-bottom: 60px;
+  }
+  .page.has-cols:not(.js-columns) > .col-group + :not(.col-group) {
+    margin-top: 60px;
+  }
+  .page.has-cols:not(.js-columns) .col-group .col-keep,
+  .page.has-cols:not(.js-columns) .col-group .section,
+  .page.has-cols:not(.js-columns) .col-group li,
+  .page.has-cols:not(.js-columns) .col-group table,
+  .page.has-cols:not(.js-columns) .col-group pre {
+    break-inside: avoid;
+  }
+
   /* Up to four cards sit in one row under the columns; larger sets keep
      their own grid. */
-  .page:has(> .col-group ~ .col-group) > .card-grid:not(:has(> .card:nth-child(5))) {
+  .page.has-cols > .card-grid:not(:has(> .card:nth-child(5))) {
     grid-template-columns: none;
     grid-auto-flow: column;
     grid-auto-columns: 1fr;
   }
-  .page:has(> .col-group ~ .col-group) > .card-grid:not(:has(> .card:nth-child(5))) > .card {
+  .page.has-cols > .card-grid:not(:has(> .card:nth-child(5))) > .card {
     grid-column: auto;
     border-top: none;
     border-right: 1px solid #ddd;
     padding-left: 30px;
     padding-right: 30px;
   }
-  .page:has(> .col-group ~ .col-group) > .card-grid:not(:has(> .card:nth-child(5))) > .card:first-child {
+  .page.has-cols > .card-grid:not(:has(> .card:nth-child(5))) > .card:first-child {
     padding-left: 0;
   }
-  .page:has(> .col-group ~ .col-group) > .card-grid:not(:has(> .card:nth-child(5))) > .card:last-child {
+  .page.has-cols > .card-grid:not(:has(> .card:nth-child(5))) > .card:last-child {
     border-right: none;
     padding-right: 0;
   }
 }
 
 /* Wider still, three columns, then four, for pages with enough sections to
-   fill them; each column stays about as wide as in two, and the gaps alone
-   separate them. */
+   fill them; each column stays about as wide as in two. */
 @media screen and (min-width: 1860px) {
-  .page:has(> .col-group ~ .col-group ~ .col-group) {
+  .page.has-cols-3:not(.max-cols-2) {
+    --cols: 3;
     max-width: 1960px;
-    column-count: 3;
-    column-rule: none;
   }
 }
 @media screen and (min-width: 2500px) {
-  .page:has(> .col-group ~ .col-group ~ .col-group ~ .col-group) {
+  .page.has-cols-4:not(.max-cols-2):not(.max-cols-3) {
+    --cols: 4;
     max-width: 2600px;
-    column-count: 4;
-    column-rule: none;
   }
 }
 
@@ -1237,6 +1294,7 @@ p code, li code, p tt, li tt {
   .slideshow-frame { display: block; }
   .slideshow-frame .slide { opacity: 1; margin-bottom: 12px; break-inside: avoid; }
   .slideshow-controls, .slideshow-edge { display: none; }
+  .col-set { display: block; }
 }
 
 /* ClassDoc — language-agnostic class/proto/struct documentation */

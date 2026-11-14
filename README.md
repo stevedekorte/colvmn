@@ -84,17 +84,11 @@ The footer renders a link to the next sibling page, taken from the next entry af
 
 The flag is opt-in per page — pages without it render no footer.
 
-### Wide pages — `pageLayout: wide`
+### Columns on wide screens — `maxColumns`
 
-A long page of many sections can use the width of a big screen:
+On a wide screen, a page's titled sections are set in columns: two from 1200px, three from 1860px and four from 2500px, given enough sections and subsections to fill them. A section's heading always starts a column with its first subsection; a long section may continue in the next column between its subsections, which then line up with the text beside them. Everything else (the intro, contents, cards, tables, untitled text, the footer) spans them, and up to four cards sit in one row underneath. Narrower screens and print show the usual single column.
 
-```markdown
----
-pageLayout: wide
----
-```
-
-On viewports 1200px and wider, its titled sections flow into two columns, each section kept whole in one column; from 1860px into three, and from 2500px into four, when the page has that many sections. Everything else (the intro, contents, cards, tables, untitled text, the footer) spans both, and up to four cards sit in one row under the columns. Narrower screens and print show the usual single column.
+It's on for every page. To cap it, set `maxColumns` (1 to 4) on a page, or in `colvmn.json` for the whole site; a page's own setting wins. `maxColumns: 1` keeps a page in one column.
 
 ### Collapsed sections — `{.collapsed}`
 

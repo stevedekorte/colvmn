@@ -16,6 +16,7 @@ import { PageIndex } from "./PageIndex.js";
 import { initLightbox } from "./Lightbox.js";
 import { initCollapsibles } from "./Collapsible.js";
 import { initSlideshows } from "./Slideshow.js";
+import { initColumns } from "./Columns.js";
 
 ContentBase.typeMap = {
     ContentText,
@@ -42,5 +43,6 @@ document.addEventListener("DOMContentLoaded", () => {
     new PageIndex().init();
     initLightbox();
     initCollapsibles();
+    initColumns();
     initSlideshows();   // after initLightbox: it leaves only the shown slide focusable
 });
