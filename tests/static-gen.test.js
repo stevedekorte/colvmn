@@ -331,6 +331,20 @@ test("slideshow options: .autoplay and .no-controls on any image go on the slide
     }
 });
 
+test("a markdown page's frontmatter stays out of llms-full.txt, but its title and subtitle are kept", () => {
+    const site = makeSite({});
+    try {
+        writePage(site, "headed", "---\nmaxColumns: 1\n---\n# Headed Page\n\nHeaded text.\n");
+        writePage(site, "titled", "---\ntitle: Titled Page\nsubtitle: A short summary.\n---\n\n## Part\n\nTitled text.\n");
+        const { llmsFull } = build(site);
+        assert.doesNotMatch(llmsFull, /maxColumns|^title:|^subtitle:/m);
+        assert.match(llmsFull, /Source: \/headed\/\n\n# Headed Page\n\nHeaded text\./);
+        assert.match(llmsFull, /Source: \/titled\/\n\n# Titled Page\n\nA short summary\.\n\n## Part\n\nTitled text\./);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
 test("ContentSlideshow builds the same slideshow in a JSON page, with its options, and lists its images in llms-full.txt", () => {
     const site = makeSite({});
     try {

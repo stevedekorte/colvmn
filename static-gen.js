@@ -49,7 +49,7 @@ import { ContentSlideshow } from "./layout/ContentSlideshow.js";
 import { PageIndex } from "./layout/PageIndex.js";
 import { AiReviews } from "./layout/AiReviews.js";
 import { exposedSecretFiles, exposedMessage } from "./update/SecretFiles.js";
-import { parseMarkdown } from "./layout/MarkdownParser.js";
+import { parseMarkdown, splitFrontmatter } from "./layout/MarkdownParser.js";
 import { buildAnalyticsHtml, applyAnalytics } from "./analytics.js";
 
 // Register content types (mirrors layout.js)
@@ -713,6 +713,19 @@ function withoutCollapsedMarkers (markdown) {
     }).join("\n");
 }
 
+// A markdown page's text for llms-full.txt: its frontmatter settings are left
+// out, but a title or subtitle set there is kept, as the page shows it.
+function llmsMarkdown (raw) {
+    const { meta, body } = splitFrontmatter(raw);
+    const subtitle = meta.subtitle ? htmlToPlain(String(meta.subtitle)) + "\n\n" : "";
+    const h1 = body.match(/^# .*\n?/m);
+    if (h1) {
+        const at = h1.index + h1[0].length;
+        return (body.slice(0, at) + (subtitle ? "\n" + subtitle : "") + body.slice(at).replace(/^\n+/, subtitle ? "" : "\n")).trim();
+    }
+    return ((meta.title ? `# ${meta.title}\n\n` : "") + subtitle + body.trim()).trim();
+}
+
 function pageDisplayTitle (pageDir, meta) {
     if (meta && meta.json && meta.json.title) return meta.json.title;
     const relPath = relative(siteRoot, pageDir);
@@ -921,7 +934,7 @@ function generateLlmsFull (pages, scope = null) {
         out += `Source: ${url}\n\n`;
 
         if (meta.rawMarkdown) {
-            out += withoutCollapsedMarkers(meta.rawMarkdown.trim()) + "\n";
+            out += withoutCollapsedMarkers(llmsMarkdown(meta.rawMarkdown).trim()) + "\n";
         } else {
             out += jsonPageToMarkdown(meta.json);
         }

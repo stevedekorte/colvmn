@@ -371,6 +371,12 @@ function parseFrontmatter (lines) {
     return { meta, rest: lines.slice(i + 1) };
 }
 
+/** A markdown page's frontmatter settings and the text after them. */
+export function splitFrontmatter (text) {
+    const { meta, rest } = parseFrontmatter(text.split("\n"));
+    return { meta, body: rest.join("\n") };
+}
+
 export function parseMarkdown (text) {
     const rawLines = text.split("\n");
     const { meta, rest: lines } = parseFrontmatter(rawLines);
