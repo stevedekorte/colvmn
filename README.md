@@ -84,6 +84,18 @@ The footer renders a link to the next sibling page, taken from the next entry af
 
 The flag is opt-in per page — pages without it render no footer.
 
+### Wide pages — `pageLayout: wide`
+
+A long page of many sections can use the width of a big screen:
+
+```markdown
+---
+pageLayout: wide
+---
+```
+
+On viewports 1200px and wider, its titled sections flow into two columns, each section kept whole in one column; from 1860px into three, and from 2500px into four, when the page has that many sections. Everything else (the intro, contents, cards, tables, untitled text, the footer) spans both, and up to four cards sit in one row under the columns. Narrower screens and print show the usual single column.
+
 ### Collapsed sections — `{.collapsed}`
 
 Mark a section's heading to have it start closed; clicking the heading opens it, and its plus mark turns to a minus:

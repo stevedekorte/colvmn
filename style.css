@@ -1128,6 +1128,94 @@ p code, li code, p tt, li tt {
   .slideshow-frame .slide { transition: none; }
 }
 
+/* Wide pages ("pageLayout": "wide"): on wide viewports, the titled
+   sections flow into two columns (three from 1860px, four from 2500px). PageIndex wraps each titled top-level
+   section (an <h2> and everything under it) in a .col-group; each group stays
+   whole in one column, leaving space below it rather than splitting.
+   Everything else (header, intro, contents, cards, tables, untitled text, the
+   footer) spans both columns. Below 1200px, and in print, the page is as
+   usual. */
+
+/* Wrapping changes which <h2> is the first of its type, so every heading but
+   the page's first keeps its top margin. */
+.page > h2 ~ .col-group > h2,
+.page > .section ~ .col-group > h2,
+.page > .card-grid ~ .col-group > h2,
+.page > .col-group ~ .col-group > h2,
+.page > .col-group ~ h2 {
+  margin-top: 60px;
+}
+
+@media screen and (min-width: 1200px) {
+  /* At least two groups: one can't fill two columns. */
+  .page:has(> .col-group ~ .col-group) {
+    max-width: 1320px;
+    width: calc(100% - 80px);
+    column-count: 2;
+    column-gap: 64px;
+    column-rule: 1px solid #ddd;
+  }
+  .page:has(> .col-group ~ .col-group) > :not(.col-group) {
+    column-span: all;
+  }
+  /* A group never splits; if it doesn't fit in what's left of the first
+     column, it moves to the second. */
+  .page:has(> .col-group ~ .col-group) > .col-group {
+    break-inside: avoid;
+    padding-bottom: 60px;
+  }
+  /* The groups' bottom padding spaces them, so headings sit flush at the top
+     of both columns. */
+  .page:has(> .col-group ~ .col-group) > .col-group > h2,
+  .page:has(> .col-group ~ .col-group) > .col-group + h2 {
+    margin-top: 0;
+  }
+  /* A label beside its body is too tight in a column: stack them. */
+  .page:has(> .col-group ~ .col-group) > .col-group .section-two-col {
+    grid-template-columns: 1fr;
+    gap: 12px 0;
+  }
+  /* Up to four cards sit in one row under the columns; larger sets keep
+     their own grid. */
+  .page:has(> .col-group ~ .col-group) > .card-grid:not(:has(> .card:nth-child(5))) {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+  }
+  .page:has(> .col-group ~ .col-group) > .card-grid:not(:has(> .card:nth-child(5))) > .card {
+    grid-column: auto;
+    border-top: none;
+    border-right: 1px solid #ddd;
+    padding-left: 30px;
+    padding-right: 30px;
+  }
+  .page:has(> .col-group ~ .col-group) > .card-grid:not(:has(> .card:nth-child(5))) > .card:first-child {
+    padding-left: 0;
+  }
+  .page:has(> .col-group ~ .col-group) > .card-grid:not(:has(> .card:nth-child(5))) > .card:last-child {
+    border-right: none;
+    padding-right: 0;
+  }
+}
+
+/* Wider still, three columns, then four, for pages with enough sections to
+   fill them; each column stays about as wide as in two, and the gaps alone
+   separate them. */
+@media screen and (min-width: 1860px) {
+  .page:has(> .col-group ~ .col-group ~ .col-group) {
+    max-width: 1960px;
+    column-count: 3;
+    column-rule: none;
+  }
+}
+@media screen and (min-width: 2500px) {
+  .page:has(> .col-group ~ .col-group ~ .col-group ~ .col-group) {
+    max-width: 2600px;
+    column-count: 4;
+    column-rule: none;
+  }
+}
+
 /* Print */
 @media print {
   body { background: none; }

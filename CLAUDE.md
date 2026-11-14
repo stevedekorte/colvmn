@@ -91,7 +91,7 @@ Consecutive images marked `{.slideshow}` (`![Alt](a.jpg){.slideshow}`, in one pa
 Top-level keys in `_index.json` (or `_index.md` frontmatter) recognised by the engine:
 
 - `title`, `subtitle`, `topTitle`, `cardSubtitle` — header / intro / parent-card text
-- `pageLayout` — adds a `page-{value}` class to the `.page` div for layout variants
+- `pageLayout` — adds a `page-{value}` class to the `.page` div for layout variants. `"wide"` flows the page's titled sections into two columns on viewports 1200px and wider (three from 1860px and four from 2500px, given that many sections): `PageIndex` wraps each titled top-level `ContentText` or list (its `<h2>` and everything under it) in a `.col-group`, and style.css sets the page in two columns, each group whole in one, with everything else (intro, contents, cards, tables, untitled text, footer) spanning both and up to four cards in one row. Needs at least two titled sections; narrower viewports and print are unchanged.
 - `heroImage`, `heroLayout`, `heroAspect` — hero block configuration
 - `analytics: false` — omit the site's analytics snippets (from `colvmn.json`) on this page.
 - `llms: false` — leave this page and everything under it out of `llms.txt` / `llms-full.txt` (it is still generated and in the sitemap). Site-wide folder patterns go in `colvmn.json` as `llmsExclude`.

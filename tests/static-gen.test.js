@@ -345,3 +345,18 @@ test("ContentSlideshow builds the same slideshow in a JSON page, with its option
     }
 });
 
+test("pageLayout wide: each titled top-level section is wrapped in a .col-group; untitled text and cards are not", () => {
+    const site = makeSite({});
+    try {
+        writePage(site, "kept", "---\npageLayout: wide\n---\n# Kept Page\n\nAn intro line.\n\n## One\n\nFirst.\n\n## Two\n\nSecond.\n");
+        writePage(site, "guide", "# Guide\n\nGuide text.\n\n## One\n\nFirst.\n");
+        build(site);
+        const html = readFileSync(join(site, "kept", "index.html"), "utf-8");
+        assert.match(html, /class="page loaded page-wide"|class="page page-wide loaded"|page-wide/);
+        assert.match(html, /<div class="col-group"><h2 id="one">One<\/h2><div class="section"><div class="section-body"><p>First\.<\/p><\/div><\/div><\/div><div class="col-group"><h2 id="two">Two<\/h2>/);
+        assert.doesNotMatch(readFileSync(join(site, "guide", "index.html"), "utf-8"), /col-group/, "only wide pages");
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+

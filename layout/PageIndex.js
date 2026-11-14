@@ -236,6 +236,11 @@ export class PageIndex {
         };
     }
 
+    /** A block that flows into a column on a wide page: a titled text section or list. */
+    static isColumnGroup (json) {
+        return Boolean(json && json.title) && ["ContentText", "ContentUnorderedList", "ContentOrderedList"].includes(json.type);
+    }
+
     computePageHtml () {
         const heroImage = this.json.heroImage;
 
@@ -276,8 +281,15 @@ export class PageIndex {
             introHtml = `<div class="intro"><p>${this.json.subtitle}</p></div>`;
         }
 
-        // Content
-        const contentHtml = this.children.map(c => c.computeHtml()).join("");
+        // Content. With "pageLayout": "wide", each titled top-level section
+        // (its <h2> and everything under it) is wrapped in a .col-group; on
+        // wide viewports style.css flows those groups into two columns and
+        // lets everything else (cards, tables, untitled text) span both.
+        const wide = this.json.pageLayout === "wide";
+        const contentHtml = this.children.map(c => {
+            const html = c.computeHtml();
+            return wide && PageIndex.isColumnGroup(c.json) && html ? `<div class="col-group">${html}</div>` : html;
+        }).join("");
 
         // The footer, one line: the page's own "footerLinks" ([{ title, href }])
         // and its AI reviews link (set by static-gen for a page that opts in),
