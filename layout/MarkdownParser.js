@@ -285,15 +285,17 @@ const SLIDESHOW_PARAGRAPH = /^(?:\s*<img\b[^>]*\bclass="(?:[^"]*\s)?slideshow(?:
  * Consecutive images marked {.slideshow} (in one paragraph or several in a
  * row) as one slideshow: the images crossfade in one frame, with previous and
  * next buttons and a counter (layout/Slideshow.js). Each image is zoomable.
- * Options, as classes on any of its images: .autoplay (advance by itself)
- * and .no-controls (hide the arrows and count).
+ * Options, as classes on any of its images: .autoplay (advance by itself),
+ * .no-controls (hide the arrows and count) and .inset (a frame pressed into
+ * the page).
  * Without JavaScript the noscript style shows them stacked.
  */
-const SLIDESHOW_OPTIONS = ["autoplay", "no-controls"];
+const SLIDESHOW_OPTIONS = ["autoplay", "no-controls", "inset"];
 
 export function slideshowHtml (imgs) {
     const n = imgs.length;
-    // Options, as classes on any of its images: .autoplay advances by itself; .no-controls hides the arrows and count.
+    // Options, as classes on any of its images: .autoplay advances by itself; .no-controls hides the arrows and count;
+    // .inset sets the images in a frame pressed into the page.
     const options = new Set();
     const slides = imgs.map((img, k) => {
         let tag = img.replace(/\bclass="([^"]*)"/, (m, c) => {

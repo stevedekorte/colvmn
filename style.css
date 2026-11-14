@@ -1078,6 +1078,27 @@ p code, li code, p tt, li tt {
 .colvmn-slideshow.single .slideshow-edge {
   display: none;
 }
+/* .inset: the images sit in a frame pressed into the page: a mat of paper
+   with its shadow falling inside and light catching its lower edge, and the
+   picture recessed in a fine rule. */
+.colvmn-slideshow.inset .slideshow-frame {
+  padding: 6px;
+  background: #f2ede3;
+  box-shadow: inset 0 2px 5px rgba(40, 25, 10, 0.28), 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+.colvmn-slideshow.inset .slideshow-frame::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  z-index: 2;
+  pointer-events: none;
+  border: 1px solid #8d857b;
+  box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.55), inset 0 0 2px rgba(0, 0, 0, 0.6), inset 0 -1px 0 rgba(255, 255, 255, 0.12);
+}
+.colvmn-slideshow.inset .slideshow-edge {
+  z-index: 3;
+}
+
 .slideshow-controls {
   display: flex;
   align-items: center;
@@ -1201,12 +1222,17 @@ p code, li code, p tt, li tt {
     gap: 64px;
     margin-bottom: 60px;
   }
+  /* Space above the columns when something other than the page's header,
+     intro or contents comes before them (a heading in a column has none). */
+  .page > :not(.header, .hero, .intro, .toc) + .col-set {
+    margin-top: 60px;
+  }
   .col-set > .col {
     flex: 1 1 0;
     min-width: 0;
   }
   .col-set .col-group {
-    margin-bottom: 60px;
+    margin-bottom: 30px;
   }
   .col-set > .col > :last-child {
     margin-bottom: 0;
@@ -1222,7 +1248,10 @@ p code, li code, p tt, li tt {
     column-span: all;
   }
   .page.has-cols:not(.js-columns) > .col-group {
-    margin-bottom: 60px;
+    margin-bottom: 30px;
+  }
+  .page.has-cols:not(.js-columns) > :not(.header, .hero, .intro, .toc, .col-group) + .col-group {
+    margin-top: 60px;
   }
   .page.has-cols:not(.js-columns) > .col-group + :not(.col-group) {
     margin-top: 60px;
@@ -1235,8 +1264,8 @@ p code, li code, p tt, li tt {
     break-inside: avoid;
   }
 
-  /* Up to four cards sit in one row under the columns; larger sets keep
-     their own grid. */
+  /* Up to four cards sit in one row under the columns (five on pages wide
+     enough for three columns, below); larger sets keep their own grid. */
   .page.has-cols > .card-grid:not(:has(> .card:nth-child(5))) {
     grid-template-columns: none;
     grid-auto-flow: column;
@@ -1264,6 +1293,26 @@ p code, li code, p tt, li tt {
   .page.has-cols-3:not(.max-cols-2) {
     --cols: 3;
     max-width: 1960px;
+  }
+  /* Five cards in one row too, where the page is wide enough. */
+  .page.has-cols-3:not(.max-cols-2) > .card-grid:not(:has(> .card:nth-child(6))) {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+  }
+  .page.has-cols-3:not(.max-cols-2) > .card-grid:not(:has(> .card:nth-child(6))) > .card {
+    grid-column: auto;
+    border-top: none;
+    border-right: 1px solid #ddd;
+    padding-left: 30px;
+    padding-right: 30px;
+  }
+  .page.has-cols-3:not(.max-cols-2) > .card-grid:not(:has(> .card:nth-child(6))) > .card:first-child {
+    padding-left: 0;
+  }
+  .page.has-cols-3:not(.max-cols-2) > .card-grid:not(:has(> .card:nth-child(6))) > .card:last-child {
+    border-right: none;
+    padding-right: 0;
   }
 }
 @media screen and (min-width: 2500px) {

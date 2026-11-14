@@ -291,15 +291,17 @@ const SLIDESHOW_PARAGRAPH = /^(?:\s*<img\b[^>]*\bclass="(?:[^"]*\s)?slideshow(?:
  * Consecutive images marked {.slideshow} (in one paragraph or several in a
  * row) as one slideshow: the images crossfade in one frame, with previous and
  * next buttons and a counter (layout/Slideshow.js). Each image is zoomable.
- * Options, as classes on any of its images: .autoplay (advance by itself)
- * and .no-controls (hide the arrows and count).
+ * Options, as classes on any of its images: .autoplay (advance by itself),
+ * .no-controls (hide the arrows and count) and .inset (a frame pressed into
+ * the page).
  * Without JavaScript the noscript style shows them stacked.
  */
-const SLIDESHOW_OPTIONS = ["autoplay", "no-controls"];
+const SLIDESHOW_OPTIONS = ["autoplay", "no-controls", "inset"];
 
 function slideshowHtml (imgs) {
     const n = imgs.length;
-    // Options, as classes on any of its images: .autoplay advances by itself; .no-controls hides the arrows and count.
+    // Options, as classes on any of its images: .autoplay advances by itself; .no-controls hides the arrows and count;
+    // .inset sets the images in a frame pressed into the page.
     const options = new Set();
     const slides = imgs.map((img, k) => {
         let tag = img.replace(/\bclass="([^"]*)"/, (m, c) => {
@@ -1832,10 +1834,10 @@ class ContentComparisonTable extends ContentBase {
 
 // A slideshow in an _index.json page, the same one markdown builds from
 // images marked {.slideshow}:
-//   { "type": "ContentSlideshow", "autoplay": true, "controls": false,
+//   { "type": "ContentSlideshow", "autoplay": true, "controls": false, "inset": true,
 //     "images": [{ "src": "images/a.jpg", "alt": "…" }, …] }
 // "autoplay" (default false) advances by itself; "controls": false hides the
-// arrows and count. Behavior: layout/Slideshow.js.
+// arrows and count; "inset" sets the images in a frame pressed into the page. Behavior: layout/Slideshow.js.
 
 const escapeAttr = s => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
@@ -1843,7 +1845,7 @@ class ContentSlideshow extends ContentBase {
     computeHtml () {
         const images = this.json.images || [];
         if (images.length === 0) return "";
-        const options = [this.json.autoplay ? "autoplay" : "", this.json.controls === false ? "no-controls" : ""].filter(Boolean);
+        const options = [this.json.autoplay ? "autoplay" : "", this.json.controls === false ? "no-controls" : "", this.json.inset ? "inset" : ""].filter(Boolean);
         const imgs = images.map((im, k) => `<img src="${escapeAttr(im.src)}" alt="${escapeAttr(im.alt)}" class="${["slideshow", ...(k === 0 ? options : [])].join(" ")}">`);
         let html = "";
         if (this.json.title) html += `<h2>${this.json.title}</h2>`;
@@ -2615,7 +2617,7 @@ function initSlideshows (doc = document) {
 // when fonts or images load, and after a collapsed section opens or closes;
 // below two columns it puts the page back as it was built.
 
-const GAP = 60;     // px between sections in a column (style.css .col-set .col-group)
+const GAP = 30;     // px between sections in a column (style.css .col-set .col-group)
 
 const SLACK = 1.15;  // how much taller the columns may be to avoid continuing a section in the next column
 

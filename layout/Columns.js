@@ -18,7 +18,7 @@
 // when fonts or images load, and after a collapsed section opens or closes;
 // below two columns it puts the page back as it was built.
 
-const GAP = 60;     // px between sections in a column (style.css .col-set .col-group)
+const GAP = 30;     // px between sections in a column (style.css .col-set .col-group)
 
 const SLACK = 1.15;  // how much taller the columns may be to avoid continuing a section in the next column
 

@@ -86,7 +86,7 @@ The flag is opt-in per page — pages without it render no footer.
 
 ### Columns on wide screens — `maxColumns`
 
-On a wide screen, a page's titled sections are set in columns: two from 1200px, three from 1860px and four from 2500px, given enough sections and subsections to fill them. A section's heading always starts a column with its first subsection; a long section may continue in the next column between its subsections, which then line up with the text beside them. Everything else (the intro, contents, cards, tables, untitled text, the footer) spans them, and up to four cards sit in one row underneath. Narrower screens and print show the usual single column.
+On a wide screen, a page's titled sections are set in columns: two from 1200px, three from 1860px and four from 2500px, given enough sections and subsections to fill them. A section's heading always starts a column with its first subsection; a long section may continue in the next column between its subsections, which then line up with the text beside them. Everything else (the intro, contents, cards, tables, untitled text, the footer) spans them, and up to four cards sit in one row (five where the page has three or more columns) underneath. Narrower screens and print show the usual single column.
 
 It's on for every page. To cap it, set `maxColumns` (1 to 4) on a page, or in `colvmn.json` for the whole site; a page's own setting wins. `maxColumns: 1` keeps a page in one column.
 
@@ -115,13 +115,14 @@ Two options, as classes on any of the images:
 
 - `.autoplay` advances by itself every few seconds while on screen, pausing while you hover or interact.
 - `.no-controls` hides the buttons and count.
+- `.inset` sets the images in a frame pressed into the page: a paper mat with an inner shadow, and a fine rule around the picture.
 
 `![Light cycles](images/light-cycles.jpg){.slideshow .autoplay .no-controls}` makes a hands-off slideshow.
 
 In `_index.json`, use a `ContentSlideshow` block:
 
 ```json
-{ "type": "ContentSlideshow", "autoplay": true, "controls": false,
+{ "type": "ContentSlideshow", "autoplay": true, "controls": false, "inset": true,
   "images": [{ "src": "images/light-cycles.jpg", "alt": "Light cycles" }, { "src": "images/maze.jpg", "alt": "The maze" }] }
 ``` Without JavaScript, and in print, the images are stacked.
 

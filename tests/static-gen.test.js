@@ -334,11 +334,11 @@ test("slideshow options: .autoplay and .no-controls on any image go on the slide
 test("ContentSlideshow builds the same slideshow in a JSON page, with its options, and lists its images in llms-full.txt", () => {
     const site = makeSite({});
     try {
-        writeFileSync(join(site, "kept", "_index.json"), JSON.stringify({ title: "Kept Page", content: [{ type: "ContentSlideshow", autoplay: true, controls: false, images: [{ src: "a.jpg", alt: "One" }, { src: "b.jpg", alt: "Two" }] }] }));
+        writeFileSync(join(site, "kept", "_index.json"), JSON.stringify({ title: "Kept Page", content: [{ type: "ContentSlideshow", autoplay: true, controls: false, inset: true, images: [{ src: "a.jpg", alt: "One" }, { src: "b.jpg", alt: "Two" }] }] }));
         rmSync(join(site, "kept", "_index.md"));
         const { llmsFull } = build(site);
         const html = readFileSync(join(site, "kept", "index.html"), "utf-8");
-        assert.match(html, /<div class="colvmn-slideshow autoplay no-controls" role="region"[\s\S]*<img src="a\.jpg" alt="One" class="colvmn-zoomable-image">[\s\S]*<img loading="lazy" src="b\.jpg" alt="Two" class="colvmn-zoomable-image">/);
+        assert.match(html, /<div class="colvmn-slideshow autoplay no-controls inset" role="region"[\s\S]*<img src="a\.jpg" alt="One" class="colvmn-zoomable-image">[\s\S]*<img loading="lazy" src="b\.jpg" alt="Two" class="colvmn-zoomable-image">/);
         assert.match(llmsFull, /!\[One\]\(a\.jpg\)\n\n!\[Two\]\(b\.jpg\)/);
     } finally {
         rmSync(site, { recursive: true, force: true });

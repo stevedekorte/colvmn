@@ -63,7 +63,7 @@ These need no JSON: markdown marks them with a Pandoc-style `{…}` suffix.
 ![The maze from above](images/maze.jpg){.slideshow}
 ```
 
-With a mouse, arrows fade in at the image's left and right edges; on a touch screen, a tap on either half moves. Arrow keys, swipes and trackpad swipes work too, and a click on the middle enlarges the image. Below it, ‹ 1 / 2 › shows where you are. Two options, as classes on any of its images: `.autoplay` advances by itself every few seconds while it's on screen (pausing while you hover or interact), and `.no-controls` hides the ‹ 1 / 2 › line. Without JavaScript, and in print, the images are stacked.
+With a mouse, arrows fade in at the image's left and right edges; on a touch screen, a tap on either half moves. Arrow keys, swipes and trackpad swipes work too, and a click on the middle enlarges the image. Below it, ‹ 1 / 2 › shows where you are. Two options, as classes on any of its images: `.autoplay` advances by itself every few seconds while it's on screen (pausing while you hover or interact), `.no-controls` hides the ‹ 1 / 2 › line, and `.inset` sets the images in a frame pressed into the page. Without JavaScript, and in print, the images are stacked.
 
 **Collapsed sections.** Mark a section's heading `{.collapsed}` to have it start closed:
 
@@ -111,7 +111,7 @@ A grid of cards. `columns` is optional (it defaults to the item count, capped at
 
 ### ContentSlideshow
 
-The JSON form of a slideshow. `autoplay` (default `false`) advances by itself; `"controls": false` hides the ‹ 1 / 2 › line.
+The JSON form of a slideshow. `autoplay` (default `false`) advances by itself; `"controls": false` hides the ‹ 1 / 2 › line; `"inset": true` sets the images in a frame pressed into the page.
 
 ```json
 {
