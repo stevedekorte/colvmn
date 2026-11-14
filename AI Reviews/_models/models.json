@@ -1,0 +1,26 @@
+{
+    "Claude": {
+        "id": "claude-fable-5-2",
+        "name": "Claude Fable 5.2",
+        "source": "https://www.anthropic.com/claude/fable",
+        "why": "Anthropic released Fable 5.2 on all platforms on Nov 9, 2026, and calls it its strongest lead agent; its model docs recommend Fable 5.2 over Opus 5.5 for demanding reasoning and long-horizon work, and Mythos 5.2 is not in this account's list."
+    },
+    "ChatGPT": {
+        "id": "gpt-6-astra",
+        "name": "GPT-6 Astra",
+        "source": "https://developers.openai.com/api/docs/models",
+        "why": "OpenAI's current model docs call GPT-6 Astra its flagship model for complex reasoning and coding, and present the newer GPT-6.1 Sol as the cheaper option that comes close to Astra but does not match it."
+    },
+    "Gemini": {
+        "id": "gemini-4-carbon",
+        "name": "Gemini 4 Carbon",
+        "source": "https://x.com/GoogleAI/status/2120187753329791341",
+        "why": "Google made Gemini 4 Carbon available on Nov 10, 2026, and calls it its strongest frontier model for the hardest long-horizon work, ranking it above Argon, its default frontier model."
+    },
+    "Grok": {
+        "id": "grok-4.7",
+        "name": "Grok 4.7",
+        "source": "https://docs.x.ai/developers/release-notes",
+        "why": "xAI's release notes describe Grok 4.7 (Sept 2026) as its frontier model for coding, agentic tasks and knowledge work, and nothing newer has been released."
+    }
+}
