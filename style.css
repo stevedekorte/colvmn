@@ -1898,6 +1898,65 @@ nav.classdoc-toc a:hover { color: #2a2a2a; }
   .comp-info-table, .comp-feature-table { font-size: 12px; }
 }
 
+/* Image layout options. In markdown they are classes in an image's attribute
+   list (![Alt](a.png){.left .column}), which the parser writes as
+   colvmn-image-<option> so a page's own classes on images are left alone;
+   in JSON, ContentImage's "size" and "align"; in raw HTML, the
+   colvmn-image-<option> class itself.
+   Size: natural (the default: its own pixel size, shrunk to fit), fill (the
+   full width of where it sits, scaled up if need be) and column (its own
+   size, but no wider than one of the page's columns, so an image in a
+   full-width block matches the columns around it).
+   Placement: centered when it stands alone (an image alone in its paragraph,
+   marked .colvmn-image, or a ContentImage; one beside text stays inline),
+   left, and float-left / float-right (text wraps beside it; at most half
+   the width; on its own line on phones). center is the default made explicit. */
+.colvmn-image { text-align: center; }
+.colvmn-image img { margin-left: auto; margin-right: auto; }
+div.colvmn-image { margin: 20px 0; }
+div.colvmn-image img { max-width: 100%; height: auto; vertical-align: top; }
+.page img.colvmn-image-natural { max-width: 100%; height: auto; }
+.page img.colvmn-image-fill { display: block; width: 100%; max-width: none; height: auto; }
+/* column also caps any element, such as a <figure> holding an image and
+   its caption, or a figure in a row of them. */
+.page .colvmn-image-column {
+  max-width: calc((100% - (var(--cols, 1) - 1) * 64px) / var(--cols, 1));
+}
+.page img.colvmn-image-column {
+  display: block;
+  height: auto;
+}
+.col-set .colvmn-image-column,
+.page.has-cols:not(.js-columns) .col-group .colvmn-image-column {
+  max-width: 100%;
+}
+.page img.colvmn-image-center { display: block; margin-left: auto; margin-right: auto; }
+.page img.colvmn-image-left { display: block; margin-left: 0; margin-right: 0; }
+.page img.colvmn-image-float-left,
+.page img.colvmn-image-float-right {
+  max-width: 50%;
+  height: auto;
+  margin-top: 4px;
+  margin-bottom: 12px;
+}
+.page img.colvmn-image-float-left { float: left; margin-left: 0; margin-right: 24px; }
+.page img.colvmn-image-float-right { float: right; margin-left: 24px; margin-right: 0; }
+.section-body:has(img.colvmn-image-float-left, img.colvmn-image-float-right)::after,
+div.colvmn-image:has(img.colvmn-image-float-left, img.colvmn-image-float-right)::after {
+  content: "";
+  display: block;
+  clear: both;
+}
+@media (max-width: 600px) {
+  .page img.colvmn-image-float-left,
+  .page img.colvmn-image-float-right {
+    float: none;
+    display: block;
+    max-width: 100%;
+    margin: 0 auto 12px;
+  }
+}
+
 /* Zoomable images and diagrams (lightbox) — behavior in layout/Lightbox.js */
 img.colvmn-zoomable-image,
 .section-body svg {

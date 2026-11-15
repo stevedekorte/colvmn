@@ -46,7 +46,7 @@ How it works:
 - `layout/layout.js` — browser bootstrap; entry point for page-global runtime behavior
 - `layout/PageIndex.js` — page-level builder (`computePageHtml` for build; `render`/`postRender` for runtime — see "Rendering model")
 - `layout/ContentBase.js` — base class for content blocks (`computeHtml` = build markup; `postRender` = runtime behavior hook)
-- `layout/Content*.js` — content block renderers (Text, Cards, Table, Image, Timeline, Toc, KeyValue, UnorderedList, OrderedList)
+- `layout/Content*.js` — content block renderers (Text, Cards, Table, Image (see "Image layout"), Timeline, Toc, KeyValue, UnorderedList, OrderedList)
 - `layout/MarkdownParser.js` — frontmatter + markdown to page JSON
 - `layout/ContentSlideshow.js` — the slideshow block for `_index.json` pages
 - `layout/Columns.js` — builds a page's columns on wide viewports (see `maxColumns` under Page Metadata)
@@ -65,7 +65,7 @@ The markdown parser supports:
 - Standard markdown (headings, bold, italic, links, images, code blocks, lists)
 - Collapsed sections — `## Details {.collapsed}` (or `"collapsed": true` on a top-level `ContentText` in JSON) builds a section shown closed, whose heading opens it (see "Collapsed sections")
 - Slideshows — consecutive images marked `{.slideshow}` share one frame and crossfade (see "Slideshows")
-- Image attribute lists — a Pandoc-style `{…}` suffix on an image: `![alt](src){.class #id key=value}` (see "Zoomable images")
+- Image attribute lists — a Pandoc-style `{…}` suffix on an image: `![alt](src){.class #id key=value}` (see "Zoomable images" and "Image layout")
 - Tables (standard `| col | col |` pipe syntax)
 - Raw HTML blocks (passed through as-is)
 - YAML frontmatter for page metadata (string values, plus `true`/`false` coerced to booleans)
@@ -78,6 +78,14 @@ Any image can be made click-to-enlarge by giving it the class `colvmn-zoomable-i
 - **Raw HTML / `ContentText` body:** add the class directly — `<img class="colvmn-zoomable-image" src="screen.png" alt="…">`.
 
 It is progressive enhancement: the markup ships from the build, and the interactivity is attached at runtime by `layout/Lightbox.js` (`initLightbox`, wired in from `layout.js`). Because it is page-global behavior — not tied to any content block — it lives in `layout.js` rather than a `Content*` block, and uses event delegation so it works for images from any source (markdown, raw HTML, etc.). With no JS the image still renders normally. See "Rendering model" for why page-global behavior belongs in `layout.js`.
+
+## Image layout
+
+An image's size and placement are options, as classes in its attribute list (`![Chart](chart.png){.left .column}`), or `size` and `align` on a `ContentImage` block in `_index.json`. The parser writes each option as `colvmn-image-<option>` (`MarkdownParser.IMAGE_OPTIONS`), so the framework's styles never touch a class a page already gives its images; in raw HTML, use the prefixed class (`<img class="colvmn-image-left" …>`).
+
+- **Size:** `natural` (the default: the image's own pixel size, shrunk to fit), `fill` (the full width of where it sits, scaled up past its own size if need be), `column` (its own size, but no wider than one of the page's columns, so an image in a full-width block matches the columns; on a one-column page that is the page width; `colvmn-image-column` also caps any element, such as a raw-HTML `<figure>` with a caption). `width=480` (an HTML attribute) shows it at most 480px wide.
+- **Placement:** centered when it stands alone (an image alone in its paragraph, which the parser marks `<p class="colvmn-image">`, or a `ContentImage`; an image beside text stays inline), `left`, `float-left` / `float-right` (text wraps beside it; at most half the width; on its own line under 600px). `center` is the default made explicit.
+- **JSON:** `{ "type": "ContentImage", "src": "images/a.png", "alt": "…", "size": "column", "align": "left", "zoomable": true, "width": 480 }` (`title` adds a heading), in a `<div class="colvmn-image">`. Built by `layout/ContentImage.js`; the styles are style.css's "Image layout options". CSS only, no runtime behavior.
 
 ## Collapsed sections
 

@@ -10,6 +10,11 @@ export function slugify (text) {
         .replace(/^-+|-+$/g, "");
 }
 
+// Image layout options (style.css, "Image layout options"): written as
+// colvmn-image-<option>, so the framework's styles never touch a class a page
+// already gives its images for its own reasons.
+export const IMAGE_OPTIONS = ["natural", "fill", "column", "center", "left", "float-left", "float-right"];
+
 // Parse an optional Pandoc-style attribute list that may follow a markdown image,
 // e.g. ![alt](src){.colvmn-zoomable-image #id width=480}. Supports .class, #id, and
 // key=value (value may be quoted). Returns a string of HTML attributes with a
@@ -21,7 +26,10 @@ function imageAttrs (attrs) {
     const pairs = [];
     for (const tok of attrs.trim().split(/\s+/)) {
         if (!tok) continue;
-        if (tok[0] === ".") classes.push(tok.slice(1));
+        if (tok[0] === ".") {
+            const c = tok.slice(1);
+            classes.push(IMAGE_OPTIONS.includes(c) ? `colvmn-image-${c}` : c);
+        }
         else if (tok[0] === "#") id = tok.slice(1);
         else {
             const eq = tok.indexOf("=");
@@ -279,6 +287,11 @@ function parseBlocks (lines) {
     return blocks;
 }
 
+// A paragraph holding only one image (perhaps in a link), marked
+// .colvmn-image: centered by default (style.css, "Image layout options");
+// an image beside text stays inline.
+const LONE_IMAGE_PARAGRAPH = /^\s*(?:<a\b[^>]*>\s*<img\b[^>]*>\s*<\/a>|<img\b[^>]*>)\s*$/;
+
 // A paragraph holding only images marked {.slideshow}.
 const SLIDESHOW_PARAGRAPH = /^(?:\s*<img\b[^>]*\bclass="(?:[^"]*\s)?slideshow(?:\s[^"]*)?"[^>]*>\s*)+$/;
 
@@ -337,7 +350,7 @@ function blocksToHtml (blocks) {
     }
     return grouped.map(b => {
         switch (b.type) {
-            case "paragraph": return `<p>${b.text}</p>`;
+            case "paragraph": return LONE_IMAGE_PARAGRAPH.test(b.text) ? `<p class="colvmn-image">${b.text}</p>` : `<p>${b.text}</p>`;
             case "ul": return "<ul>" + b.items.map(i => `<li>${i}</li>`).join("") + "</ul>";
             case "ol": return (b.start === 1 ? "<ol>" : `<ol start="${b.start}">`) + b.items.map(i => `<li>${i}</li>`).join("") + "</ol>";
             case "html": return b.html;

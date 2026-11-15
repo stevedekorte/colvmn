@@ -311,7 +311,32 @@ test("consecutive images marked {.slideshow} become one slideshow of zoomable sl
         assert.match(html, /aria-label="3 of 3" aria-hidden="true"><img loading="lazy" src="c\.jpg" alt="Three" class="colvmn-zoomable-image">/);
         assert.match(html, /<span class="slideshow-count">1 \/ 3<\/span>/);
         assert.match(html, /<button class="slideshow-edge slideshow-edge-prev" type="button" tabindex="-1" aria-label="Previous image">[\s\S]*<button class="slideshow-edge slideshow-edge-next"[^>]*>.*?<\/button><\/div><div class="slideshow-controls">/);   // the image's sides, inside the frame
-        assert.match(html, /<p><img src="d\.jpg" alt="Alone"><\/p>/);
+        assert.match(html, /<p class="colvmn-image"><img src="d\.jpg" alt="Alone"><\/p>/);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
+test("image layout options: classes in markdown pass through; ContentImage builds them from size, align, zoomable and width", () => {
+    const site = makeSite({});
+    try {
+        writePage(site, "kept", "# Kept Page\n\n![Wide](w.png){.left .column .mine}\n\nSee ![icon](i.png) here.\n\n<img src=\"r.png\" class=\"left\">\n");
+        mkdirSync(join(site, "shots"), { recursive: true });
+        writeFileSync(join(site, "shots", "_index.json"), JSON.stringify({ title: "Shots", content: [
+            { type: "ContentImage", src: "a.png", alt: "A \"quoted\"", size: "column", align: "middle", zoomable: true, width: 480 },
+            { type: "ContentImage", src: "b.png", alt: "B", size: "huge", align: "float-right" },
+            { type: "ContentImage", alt: "No source" },
+        ] }));
+        writeFileSync(join(site, "shots", "index.html"), "");
+        build(site);
+        const md = readFileSync(join(site, "kept", "index.html"), "utf-8");
+        assert.match(md, /<p class="colvmn-image"><img src="w\.png" alt="Wide" class="colvmn-image-left colvmn-image-column mine"><\/p>/);   // options prefixed, a page's own class kept
+        assert.match(md, /<p>See <img src="i\.png" alt="icon"> here\.<\/p>/);   // beside text: inline, not centered
+        assert.match(md, /<img src="r\.png" class="left">/);   // raw HTML: the page's own class, untouched
+        const html = readFileSync(join(site, "shots", "index.html"), "utf-8");
+        assert.match(html, /<div class="colvmn-image"><img src="a\.png" alt="A &quot;quoted&quot;" class="colvmn-image-column colvmn-zoomable-image" width="480"><\/div>/);
+        assert.match(html, /<div class="colvmn-image"><img src="b\.png" alt="B" class="colvmn-image-float-right"><\/div>/);   // an unknown size or align is left out
+        assert.doesNotMatch(html.split("colvmn-prefetch")[0], /No source/);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }
