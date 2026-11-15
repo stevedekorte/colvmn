@@ -16,6 +16,11 @@ function slugify (text) {
         .replace(/^-+|-+$/g, "");
 }
 
+// Image layout options (style.css, "Image layout options"): written as
+// colvmn-image-<option>, so the framework's styles never touch a class a page
+// already gives its images for its own reasons.
+const IMAGE_OPTIONS = ["natural", "fill", "column", "center", "left", "float-left", "float-right"];
+
 // Parse an optional Pandoc-style attribute list that may follow a markdown image,
 // e.g. ![alt](src){.colvmn-zoomable-image #id width=480}. Supports .class, #id, and
 // key=value (value may be quoted). Returns a string of HTML attributes with a
@@ -27,7 +32,10 @@ function imageAttrs (attrs) {
     const pairs = [];
     for (const tok of attrs.trim().split(/\s+/)) {
         if (!tok) continue;
-        if (tok[0] === ".") classes.push(tok.slice(1));
+        if (tok[0] === ".") {
+            const c = tok.slice(1);
+            classes.push(IMAGE_OPTIONS.includes(c) ? `colvmn-image-${c}` : c);
+        }
         else if (tok[0] === "#") id = tok.slice(1);
         else {
             const eq = tok.indexOf("=");
@@ -285,6 +293,11 @@ function parseBlocks (lines) {
     return blocks;
 }
 
+// A paragraph holding only one image (perhaps in a link), marked
+// .colvmn-image: centered by default (style.css, "Image layout options");
+// an image beside text stays inline.
+const LONE_IMAGE_PARAGRAPH = /^\s*(?:<a\b[^>]*>\s*<img\b[^>]*>\s*<\/a>|<img\b[^>]*>)\s*$/;
+
 // A paragraph holding only images marked {.slideshow}.
 const SLIDESHOW_PARAGRAPH = /^(?:\s*<img\b[^>]*\bclass="(?:[^"]*\s)?slideshow(?:\s[^"]*)?"[^>]*>\s*)+$/;
 
@@ -343,7 +356,7 @@ function blocksToHtml (blocks) {
     }
     return grouped.map(b => {
         switch (b.type) {
-            case "paragraph": return `<p>${b.text}</p>`;
+            case "paragraph": return LONE_IMAGE_PARAGRAPH.test(b.text) ? `<p class="colvmn-image">${b.text}</p>` : `<p>${b.text}</p>`;
             case "ul": return "<ul>" + b.items.map(i => `<li>${i}</li>`).join("") + "</ul>";
             case "ol": return (b.start === 1 ? "<ol>" : `<ol start="${b.start}">`) + b.items.map(i => `<li>${i}</li>`).join("") + "</ol>";
             case "html": return b.html;
@@ -953,9 +966,37 @@ class ContentTable extends ContentBase {
 
 // ===== ContentImage.js =====
 
+
+// One image in an _index.json page, with the same layout options markdown
+// gives an image as classes in its attribute list:
+//   { "type": "ContentImage", "src": "images/a.png", "alt": "…",
+//     "size": "column", "align": "center", "zoomable": true, "width": 480 }
+// "size": "natural" (default: its own pixel size, shrunk to fit), "fill" (the
+// full width, scaled up if need be) or "column" (no wider than one column).
+// "align": "center" (default), "left", "float-left" or "float-right" (text
+// wraps beside it). "zoomable" makes it click-to-enlarge; "width" (pixels)
+// shows it at that width at most. Styles: style.css, "Image layout options".
+
+const escapeAttr = s => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+
+const SIZES = ["natural", "fill", "column"];
+const ALIGNS = ["center", "left", "float-left", "float-right"];
+
 class ContentImage extends ContentBase {
     computeHtml () {
-        return "<!-- ContentImage: not yet implemented -->";
+        const j = this.json;
+        const src = j.src || j.href;
+        if (!src) return "";
+        const classes = [];
+        if (SIZES.includes(j.size)) classes.push(`colvmn-image-${j.size}`);
+        if (ALIGNS.includes(j.align) && j.align !== "center") classes.push(`colvmn-image-${j.align}`);
+        if (j.zoomable) classes.push("colvmn-zoomable-image");
+        let attrs = `src="${escapeAttr(src)}" alt="${escapeAttr(j.alt)}"`;
+        if (classes.length) attrs += ` class="${classes.join(" ")}"`;
+        if (Number.isFinite(Number(j.width)) && j.width) attrs += ` width="${Number(j.width)}"`;
+        let html = "";
+        if (j.title) html += `<h2>${j.title}</h2>`;
+        return html + `<div class="colvmn-image"><img ${attrs}></div>`;
     }
 }
 
