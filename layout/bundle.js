@@ -116,7 +116,8 @@ function parseBlocks (lines) {
                 const htmlLines = [line];
                 i++;
                 const closingTag = `</${tagName}>`;
-                const isSingleLineSelfClosed = line.toLowerCase().includes(closingTag) || line.trim().endsWith("/>");
+                const voidElements = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"]);
+                const isSingleLineSelfClosed = voidElements.has(tagName) || line.toLowerCase().includes(closingTag) || line.trim().endsWith("/>");
                 if (!isSingleLineSelfClosed) {
                     while (i < lines.length) {
                         htmlLines.push(lines[i]);
