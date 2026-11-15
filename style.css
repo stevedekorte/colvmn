@@ -1957,6 +1957,42 @@ div.colvmn-image:has(img.colvmn-image-float-left, img.colvmn-image-float-right):
   }
 }
 
+/* Image rows: consecutive images marked {.row} in markdown (MarkdownParser
+   imageRowHtml), or a raw-HTML <div class="colvmn-image-row"> of <figure>s.
+   Side by side with a column gutter between them, each no wider than one of
+   the page's columns (so a row in a full-width block lines up with the
+   columns around it), bottoms aligned, captions centered beneath; they wrap
+   onto more lines when the page is too narrow for them. */
+.page .colvmn-image-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 48px 64px;
+  margin: 48px 0 56px;
+}
+.page .colvmn-image-row > figure {
+  flex: 1 1 240px;
+  max-width: calc((100% - (var(--cols, 1) - 1) * 64px) / var(--cols, 1));
+  margin: 0;
+}
+.col-set .colvmn-image-row > figure,
+.page.has-cols:not(.js-columns) .col-group .colvmn-image-row > figure {
+  max-width: 100%;
+}
+.page .colvmn-image-row img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0;
+}
+.page .colvmn-image-row figcaption {
+  margin-top: 8px;
+  font-size: 0.85em;
+  opacity: 0.7;
+  text-align: center;
+}
+
 /* Zoomable images and diagrams (lightbox) — behavior in layout/Lightbox.js */
 img.colvmn-zoomable-image,
 .section-body svg {

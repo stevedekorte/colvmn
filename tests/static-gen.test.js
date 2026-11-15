@@ -317,6 +317,20 @@ test("consecutive images marked {.slideshow} become one slideshow of zoomable sl
     }
 });
 
+test("consecutive images marked {.row} become one row of figures, titles as captions; image titles elsewhere stay titles", () => {
+    const site = makeSite({});
+    try {
+        writePage(site, "kept", "# Kept Page\n\nKept text.\n\n![One](a.png \"First one\"){.row}\n\n![Two](b%20c.png){.row .colvmn-zoomable-image}\n![Three](my d.png \"Third\"){.row}\n\n![Alone](e.png \"Tip\")\n");
+        build(site);
+        const html = readFileSync(join(site, "kept", "index.html"), "utf-8");
+        assert.equal((html.match(/class="colvmn-image-row"/g) || []).length, 1);
+        assert.match(html, /<div class="colvmn-image-row"><figure><img src="a\.png" alt="One"><figcaption>First one<\/figcaption><\/figure><figure><img src="b%20c\.png" alt="Two" class="colvmn-zoomable-image"><\/figure><figure><img src="my d\.png" alt="Three"><figcaption>Third<\/figcaption><\/figure><\/div>/);
+        assert.match(html, /<p class="colvmn-image"><img src="e\.png" alt="Alone" title="Tip"><\/p>/);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
 test("image layout options: classes in markdown pass through; ContentImage builds them from size, align, zoomable and width", () => {
     const site = makeSite({});
     try {

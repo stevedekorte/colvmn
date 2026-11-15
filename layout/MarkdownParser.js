@@ -84,8 +84,8 @@ function inlineMarkdown (text) {
         return `\u0000${codeSpans.length - 1}\u0000`;
     });
     return escapeNonHtmlTags(withoutCode)
-        .replace(/!\[([^\]]*)\]\(([^)]+)\)(?:\{([^}]*)\})?/g,
-            (m, alt, src, attrs) => `<img src="${src}" alt="${alt}"${imageAttrs(attrs)}>`)
+        .replace(/!\[([^\]]*)\]\(([^)]+?)(?:\s+"([^"]*)")?\)(?:\{([^}]*)\})?/g,
+            (m, alt, src, title, attrs) => `<img src="${src}" alt="${alt}"${title === undefined ? "" : ` title="${title}"`}${imageAttrs(attrs)}>`)
         .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
         .replace(/(^|[^"=])(https?:\/\/[^\s<>"]+)/g, '$1<a href="$2">$2</a>')
         .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
@@ -335,15 +335,41 @@ export function slideshowHtml (imgs) {
         + "</div>";
 }
 
+// A paragraph holding only images marked {.row}.
+const IMAGE_ROW_PARAGRAPH = /^(?:\s*<img\b[^>]*\bclass="(?:[^"]*\s)?row(?:\s[^"]*)?"[^>]*>\s*)+$/;
+
+/**
+ * Consecutive images marked {.row} (in one paragraph or several in a row) as
+ * one row of figures, side by side with a column gutter between them, each
+ * no wider than one of the page's columns, bottoms aligned; they wrap onto
+ * more lines when the page is too narrow. An image's markdown title
+ * (![Alt](a.png "Caption")) becomes its caption.
+ */
+export function imageRowHtml (imgs) {
+    const figures = imgs.map(img => {
+        let caption = "";
+        let tag = img.replace(/\s*\btitle="([^"]*)"/, (m, t) => { caption = t; return ""; });
+        tag = tag.replace(/\s*\bclass="([^"]*)"/, (m, c) => {
+            const classes = c.split(/\s+/).filter(x => x && x !== "row");
+            return classes.length ? ` class="${classes.join(" ")}"` : "";
+        });
+        return `<figure>${tag}${caption ? `<figcaption>${caption}</figcaption>` : ""}</figure>`;
+    }).join("");
+    return `<div class="colvmn-image-row">${figures}</div>`;
+}
+
 function blocksToHtml (blocks) {
-    // Gather consecutive slideshow paragraphs into one block first.
+    // Gather consecutive slideshow (and image row) paragraphs into one block first.
     const grouped = [];
     for (const b of blocks) {
-        if (b.type === "paragraph" && SLIDESHOW_PARAGRAPH.test(b.text)) {
+        const kind = b.type !== "paragraph" ? null
+            : SLIDESHOW_PARAGRAPH.test(b.text) ? "slideshow"
+            : IMAGE_ROW_PARAGRAPH.test(b.text) ? "imageRow" : null;
+        if (kind) {
             const imgs = b.text.match(/<img\b[^>]*>/g);
             const last = grouped[grouped.length - 1];
-            if (last && last.type === "slideshow") last.imgs.push(...imgs);
-            else grouped.push({ type: "slideshow", imgs });
+            if (last && last.type === kind) last.imgs.push(...imgs);
+            else grouped.push({ type: kind, imgs });
         } else {
             grouped.push(b);
         }
@@ -355,6 +381,7 @@ function blocksToHtml (blocks) {
             case "ol": return (b.start === 1 ? "<ol>" : `<ol start="${b.start}">`) + b.items.map(i => `<li>${i}</li>`).join("") + "</ol>";
             case "html": return b.html;
             case "slideshow": return slideshowHtml(b.imgs);
+            case "imageRow": return imageRowHtml(b.imgs);
             case "heading": return `<h${b.level} id="${slugify(b.text)}">${inlineMarkdown(b.text)}</h${b.level}>`;
             default: return "";
         }
