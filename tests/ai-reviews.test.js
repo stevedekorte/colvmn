@@ -294,7 +294,7 @@ test("reviews.js: a section is reviewed from its own llms-full.txt with its own 
         assert.equal(api.calls.reviews, 1, "only the guide");
         assert.match(r.out, /docs\/Guide: Claude: reviewed by claude-fable-5-2/);
         const sent = api.calls.lastBody.messages[0].content;
-        assert.match(sent, /^Read https:\/\/example\.com\/docs\/Guide\/llms-full\.txt\. Evaluate the "Guide" section of Example:/);
+        assert.match(sent, /^Read https:\/\/example\.com\/docs\/Guide\/llms-full\.txt\. Then review the "Guide" section of Example:\n\n1\. What is it/);
         assert.match(sent, /this section's llms-full\.txt[\s\S]*The guide only\./);
         assert.doesNotMatch(sent, /The docs\./);
         assert.match(readFileSync(join(site, "docs", "Guide", "AI Reviews", "Claude", "_index.md"), "utf8"), /summary: A clear guide\./);

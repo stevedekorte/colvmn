@@ -125,8 +125,10 @@ Every reviews folder is left out of `llms.txt` and every `llms-full.txt`, so a m
 
 A page's own `prompt` (in its frontmatter) comes first, then the site's `prompt` in `colvmn.json`, then a default:
 
-- **The root** asks the model to read the site's `llms-full.txt` and evaluate the site's subject: what it is, its strengths, weaknesses and risks, who should and shouldn't use it, and how it compares to alternatives.
-- **Any other page** asks it to read that page's `llms-full.txt` and evaluate that section the same way.
+- **The root** asks the model to read the site's `llms-full.txt` and review the site's subject.
+- **Any other page** asks it to read that page's `llms-full.txt` and review that section.
+
+Both then ask four questions: what it is and what it's trying to do; whether it's genuinely interesting, new or useful (where the value lies, how much full success would matter and to whom, and how well that's supported, saying plainly if the answer is "not much"); its strengths and weaknesses in order of importance, only those that materially affect the assessment, each weakness marked fundamental or repairable; and who it's for and not for, how it compares with the closest alternatives, and what would most change the assessment.
 
 A section often deserves its own question: `prompt: Evaluate this guide: is it accurate, clear and complete, and who is it for?`
 

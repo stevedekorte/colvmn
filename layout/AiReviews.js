@@ -18,7 +18,7 @@
  *
  * Only "folder" is needed: the name of the reviews subfolder in each
  * opted-in folder. A page's own "prompt" wins over the site's, which wins
- * over a default "Evaluate" prompt with the page as its subject; colvmn adds
+ * over a default prompt (REVIEW_QUESTIONS) with the page as its subject; colvmn adds
  * the answer format to it (ANSWER_FORMAT), because it reads the quoted build
  * stamp and the verdict from the answer. "homeCard" adds a card for the
  * root's reviews to the root page, when the root opts in. "schedule" is how
@@ -457,11 +457,19 @@ function promptHtml (prompt) {
     return `<blockquote class="review-prompt">${escapeHtml(prompt).split("\n").join("<br>")}</blockquote>`;
 }
 
+/** The questions every default prompt asks. */
+const REVIEW_QUESTIONS = [
+    "1. What is it, and what is it trying to do?",
+    "2. Is it genuinely interesting, new, or useful? Where does the value lie: one idea, several, or the sum of many parts? If it fully succeeded, how much would that matter, and to whom? How well supported is the claim that it does? Say so plainly if the answer is \"not much.\"",
+    "3. Strengths and weaknesses, in order of importance. Include only points that materially affect your assessment, and say why each one matters; leave out facts that are merely available. Is each weakness fundamental or repairable?",
+    "4. Who is it for and not for, how does it compare with the closest alternatives, and what would most change your assessment?",
+].join("\n");
+
 function defaultPrompt (site) {
     const url = site.siteUrl && site.siteUrl !== "/" ? site.siteUrl.replace(/\/?$/, "/") : null;
     const name = site.title || "this site's subject";
     const read = url ? `Read ${url}llms-full.txt.` : "Read this site's llms-full.txt.";
-    return `${read} Evaluate ${name}: what it is, its strengths, its weaknesses and risks, who should and shouldn't use it, and how it compares to alternatives.`;
+    return `${read} Then review ${name}:\n\n${REVIEW_QUESTIONS}`;
 }
 
 /** The default prompt for a page other than the root: its own llms-full.txt, and the page as the subject. */
@@ -470,7 +478,7 @@ function defaultScopePrompt (scope, site) {
     const path = scope.rel.split("/").map(encodeURIComponent).join("/") + "/";
     const read = url ? `Read ${url}${path}llms-full.txt.` : "Read this section's llms-full.txt.";
     const of = site.title ? ` of ${site.title}` : "";
-    return `${read} Evaluate the "${scope.title()}" section${of}: what it is, its strengths, its weaknesses and risks, who should and shouldn't use it, and how it compares to alternatives.`;
+    return `${read} Then review the "${scope.title()}" section${of}:\n\n${REVIEW_QUESTIONS}`;
 }
 
 /** Folders never searched for pages (as in static-gen.js), and nested sites, which have their own colvmn.json. */
