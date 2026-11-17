@@ -451,3 +451,15 @@ test("columns count a section's parts: one section with three subsections can fi
     }
 });
 
+
+test("a table header cell's {.nowrap} applies to its whole column", () => {
+    const site = makeSite({});
+    writePage(site, "kept", "# Kept Page\n\n| Who | Number {.nowrap} | Notes {.nowrap .wide} |\n| --- | --- | --- |\n| Poison | 1-800-222-1222 | Any time |\n");
+    const { llmsFull } = build(site);
+    const html = readFileSync(join(site, "kept", "index.html"), "utf-8").split('id="colvmn-prefetch"')[0];
+    assert.match(html, /<th>Who<\/th><th class="colvmn-table-nowrap">Number<\/th><th class="colvmn-table-nowrap wide">Notes<\/th>/);
+    assert.match(html, /<td>Poison<\/td><td class="colvmn-table-nowrap">1-800-222-1222<\/td><td class="colvmn-table-nowrap wide">Any time<\/td>/);
+    assert.doesNotMatch(html, /\{\.nowrap/);
+    assert.match(llmsFull, /\| Who \| Number \| Notes \|/);
+    rmSync(site, { recursive: true, force: true });
+});

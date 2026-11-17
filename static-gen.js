@@ -703,13 +703,19 @@ function readPageMeta (pageDir) {
     return null;
 }
 
-// A page's markdown for llms-full.txt: "## Title {.collapsed}" loses its
-// marker, except inside fenced code, where it is an example.
+// A page's markdown for llms-full.txt: "## Title {.collapsed}" and a table
+// header's column classes ("| Phone {.nowrap} |") lose their markers, except
+// inside fenced code, where they are examples.
 function withoutCollapsedMarkers (markdown) {
     let inFence = false;
-    return markdown.split("\n").map(line => {
+    const lines = markdown.split("\n");
+    return lines.map((line, i) => {
         if (/^\s*```/.test(line)) inFence = !inFence;
-        return inFence ? line : line.replace(/^(#{2,6} .*?)\s*\{\.collapsed\}[ \t]*$/, "$1");
+        if (inFence) return line;
+        if (line.trim().startsWith("|") && /^\s*\|[\s:-]+\|/.test(lines[i + 1] || "")) {
+            return line.replace(/\s*\{(?:\s*\.[\w-]+)+\s*\}\s*(?=\|)/g, " ");
+        }
+        return line.replace(/^(#{2,6} .*?)\s*\{\.collapsed\}[ \t]*$/, "$1");
     }).join("\n");
 }
 

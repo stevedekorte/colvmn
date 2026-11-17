@@ -21,6 +21,17 @@ function slugify (text) {
 // already gives its images for its own reasons.
 const IMAGE_OPTIONS = ["natural", "fill", "column", "center", "left", "float-left", "float-right"];
 
+// Table column options: a header cell ending in {.nowrap} gives every cell in
+// its column the class colvmn-table-nowrap. Other classes pass through as-is.
+const TABLE_COLUMN_OPTIONS = ["nowrap"];
+
+function tableColumnClass (list) {
+    return list.split(/\s+/).filter(Boolean).map(tok => {
+        const c = tok.replace(/^\./, "");
+        return TABLE_COLUMN_OPTIONS.includes(c) ? `colvmn-table-${c}` : c;
+    }).join(" ");
+}
+
 // Parse an optional Pandoc-style attribute list that may follow a markdown image,
 // e.g. ![alt](src){.colvmn-zoomable-image #id width=480}. Supports .class, #id, and
 // key=value (value may be quoted). Returns a string of HTML attributes with a
@@ -166,20 +177,29 @@ function parseBlocks (lines) {
 
         // Table
         if (line.trim().startsWith("|") && i + 1 < lines.length && lines[i + 1].match(/^\s*\|[\s:-]+\|/)) {
-            const parseRow = (row) =>
-                row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(c => inlineMarkdown(c.trim()));
-            const headers = parseRow(line);
+            const splitRow = (row) =>
+                row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(c => c.trim());
+            const parseRow = (row) => splitRow(row).map(c => inlineMarkdown(c));
+            // A header cell may end in a class list, e.g. "| Phone {.nowrap} |",
+            // which applies to every cell in that column (see TABLE_COLUMN_OPTIONS).
+            const columnClasses = [];
+            const headers = splitRow(line).map((h, col) => {
+                const m = h.match(/\s*\{((?:\s*\.[\w-]+)+)\s*\}$/);
+                columnClasses[col] = m ? tableColumnClass(m[1]) : "";
+                return inlineMarkdown(m ? h.slice(0, m.index) : h);
+            });
             i += 2; // skip header + separator
             const rows = [];
             while (i < lines.length && lines[i].trim().startsWith("|")) {
                 rows.push(parseRow(lines[i]));
                 i++;
             }
+            const cls = (col) => columnClasses[col] ? ` class="${columnClasses[col]}"` : "";
             let html = "<table><thead><tr>";
-            html += headers.map(h => `<th>${h}</th>`).join("");
+            html += headers.map((h, col) => `<th${cls(col)}>${h}</th>`).join("");
             html += "</tr></thead><tbody>";
             for (const row of rows) {
-                html += "<tr>" + row.map(c => `<td>${c}</td>`).join("") + "</tr>";
+                html += "<tr>" + row.map((c, col) => `<td${cls(col)}>${c}</td>`).join("") + "</tr>";
             }
             html += "</tbody></table>";
             blocks.push({ type: "html", html });

@@ -66,7 +66,7 @@ The markdown parser supports:
 - Collapsed sections — `## Details {.collapsed}` (or `"collapsed": true` on a top-level `ContentText` in JSON) builds a section shown closed, whose heading opens it (see "Collapsed sections")
 - Slideshows — consecutive images marked `{.slideshow}` share one frame and crossfade (see "Slideshows")
 - Image attribute lists — a Pandoc-style `{…}` suffix on an image: `![alt](src){.class #id key=value}` (see "Zoomable images" and "Image layout")
-- Tables (standard `| col | col |` pipe syntax)
+- Tables (standard `| col | col |` pipe syntax). A header cell may end in a class list that applies to its whole column: `| Phone {.nowrap} |` keeps that column's cells on one line (the parser writes `colvmn-table-nowrap`, from `MarkdownParser.TABLE_COLUMN_OPTIONS`; other classes pass through as-is)
 - Raw HTML blocks (passed through as-is)
 - YAML frontmatter for page metadata (string values, plus `true`/`false` coerced to booleans)
 

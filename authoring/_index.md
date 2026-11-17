@@ -46,7 +46,7 @@ A block is an object with a `type` and its own fields. Any block may also carry 
 
 Markdown pages produce `ContentText` blocks automatically; the rest are written in JSON or a frontmatter `content` array.
 
-## Images, slideshows and collapsed sections
+## Images, slideshows, collapsed sections and table columns
 
 These need no JSON: markdown marks them with a Pandoc-style `{…}` suffix.
 
@@ -73,7 +73,17 @@ With a mouse, arrows fade in at the image's left and right edges; on a touch scr
 
 The heading becomes a button with a plus that turns to a minus as the section slides open. A link to the section opens it. Without JavaScript, and in print, it shows open. In JSON, set `"collapsed": true` on a top-level `ContentText` block.
 
-Both markers are left out of `llms-full.txt`.
+**Table columns.** End a header cell with `{.nowrap}` to keep every cell in that column on one line, such as phone numbers or dates:
+
+```markdown
+| Who | Number {.nowrap} | Notes |
+| --- | --- | --- |
+| Poison Control | 1-800-222-1222 | 24 hours |
+```
+
+Other classes in the list are added to the column's cells as they are.
+
+The collapsed and table-column markers are left out of `llms-full.txt`.
 
 ### ContentText
 

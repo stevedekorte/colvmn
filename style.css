@@ -241,6 +241,11 @@ p code, li code, p tt, li tt {
   border-bottom: 1px solid #ddd;
 }
 
+/* A markdown table column marked {.nowrap} in its header */
+.section-body .colvmn-table-nowrap {
+  white-space: nowrap;
+}
+
 .section-body th {
   font-weight: 600;
   color: #2a2a2a;
