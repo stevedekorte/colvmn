@@ -43,6 +43,9 @@ export class ContentBase {
     static typeMap = {};
 
     static _fetchFn = null;
+    // Build time only: () => [{ name, isDir, isPage, size }] for the page being
+    // built, set by static-gen; read by the folder-listing blocks (ContentFolder.js).
+    static listDirFn = null;
     static _prefetchCache = null;
 
     static setFetchFn (fn) {

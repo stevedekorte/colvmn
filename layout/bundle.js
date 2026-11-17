@@ -495,8 +495,10 @@ function parseMarkdown (text) {
     });
 
     // Extract subtitle if first section is a single short untitled paragraph
+    // (Not when the frontmatter gives a subtitle: that one wins, and the
+    // paragraph stays in the body rather than being dropped.)
     let subtitle = "";
-    if (content.length > 0 && !content[0].title && content[0].body) {
+    if (typeof meta.subtitle !== "string" && content.length > 0 && !content[0].title && content[0].body) {
         const body = content[0].body;
         // A paragraph carrying embedded media must not be promoted to the
         // subtitle: stripping tags below measures only text length, so an
@@ -518,6 +520,29 @@ function parseMarkdown (text) {
     if (titledSections.length >= 4) {
         const toc = { type: "ContentToc", items: titledSections.map(c => c.title) };
         content.unshift(toc);
+    }
+
+    // Folder listings (ContentFolder.js), after the page's text, or with
+    // `cardsFirst: true` before its first titled section:
+    // `folderCards: true | newest-first` and `fileCards: true`.
+    const listings = [];
+    if (meta.folderCards) {
+        const entry = { type: "ContentFolderCards" };
+        if (meta.folderCards === "newest-first") entry.order = "newest-first";
+        if (meta.folderCardsTitle) entry.title = meta.folderCardsTitle;
+        listings.push(entry);
+    }
+    if (meta.fileCards) {
+        const entry = { type: "ContentFileCards" };
+        if (meta.fileCardsTitle) entry.title = meta.fileCardsTitle;
+        listings.push(entry);
+    }
+    if (meta.cardsFirst === true) {
+        let at = content.findIndex(c => c.title && c.type === "ContentText");
+        if (at === -1) at = content.length;
+        content.splice(at, 0, ...listings);
+    } else {
+        content.push(...listings);
     }
 
     const result = { title };
@@ -579,6 +604,9 @@ class ContentBase {
     static typeMap = {};
 
     static _fetchFn = null;
+    // Build time only: () => [{ name, isDir, isPage, size }] for the page being
+    // built, set by static-gen; read by the folder-listing blocks (ContentFolder.js).
+    static listDirFn = null;
     static _prefetchCache = null;
 
     static setFetchFn (fn) {
@@ -1949,6 +1977,127 @@ class ContentSlideshow extends ContentBase {
 }
 
 
+// ===== ContentFolder.js =====
+
+
+// Folder listings: cards built from what is in the page's own folder, so a
+// folder of records (one subfolder per job, say, or a folder of PDFs) stays a
+// folder on disk and its page lists whatever is in it.
+//
+// - ContentFolderCards: one card per subfolder that is a page (has _index.md
+//   or _index.json), titled and subtitled from that page, like ContentCards.
+// - ContentFileCards: one card per file, linking to the file, with its type
+//   and size; images show a thumbnail.
+//
+// In _index.md they are turned on by frontmatter (MarkdownParser appends the
+// blocks after the page's text): `folderCards: true` (or `newest-first`) and
+// `fileCards: true`; `folderCardsTitle` / `fileCardsTitle` give them headings.
+//
+// The listing needs the filesystem, so it is made at build time: static-gen
+// sets ContentBase.listDirFn for each page. In the browser the built markup is
+// already on the page (see CLAUDE.md, "Rendering model"), so no listing is needed.
+
+// Names never listed: the page's own files, hidden files, and _-prefixed files
+// (notes and tools kept beside a page but not part of it).
+function folderIsListed (name) {
+    return !(name.startsWith(".") || name.startsWith("_") || name === "index.html");
+}
+
+function folderCompareNames (a, b) {
+    return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+}
+
+function folderEscapeHtml (s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+async function folderListDir () {
+    const fn = ContentBase.listDirFn;
+    if (!fn) return [];
+    try {
+        return await fn();
+    } catch {
+        return [];
+    }
+}
+
+class ContentFolderCards extends ContentCards {
+    async resolve () {
+        const entries = await folderListDir();
+        const names = [];
+        for (const e of entries) {
+            if (!e.isDir || !folderIsListed(e.name) || !e.isPage) continue;
+            names.push(e.name);
+        }
+        names.sort(folderCompareNames);
+        if (this.json.order === "newest-first" || this.json.order === "desc") names.reverse();
+        this.json = { ...this.json, items: names };
+        await super.resolve();
+    }
+}
+
+const FOLDER_IMAGE_EXTS = new Set(["jpg", "jpeg", "png", "gif", "webp", "svg", "avif"]);
+const FOLDER_TYPE_NAMES = {
+    pdf: "PDF", jpg: "JPEG", jpeg: "JPEG", png: "PNG", gif: "GIF", webp: "WebP", svg: "SVG",
+    txt: "Text", md: "Text", rtf: "Rich text", doc: "Word", docx: "Word", xls: "Excel", xlsx: "Excel",
+    zip: "Zip archive", dwg: "AutoCAD drawing", obj: "3D model (OBJ)", skp: "SketchUp model",
+    mov: "Video", mp4: "Video", json: "JSON",
+};
+
+function folderFormatSize (bytes) {
+    if (bytes < 1024) return `${bytes} bytes`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+class ContentFileCards extends ContentBase {
+    constructor () {
+        super();
+        this.files = [];
+    }
+
+    async resolve () {
+        const entries = await folderListDir();
+        this.files = entries
+            .filter(e => !e.isDir && folderIsListed(e.name))
+            .sort((a, b) => folderCompareNames(a.name, b.name))
+            .map(e => {
+                const dot = e.name.lastIndexOf(".");
+                const ext = dot > 0 ? e.name.slice(dot + 1).toLowerCase() : "";
+                const title = dot > 0 ? e.name.slice(0, dot) : e.name;
+                const type = FOLDER_TYPE_NAMES[ext] || (ext ? ext.toUpperCase() : "File");
+                return {
+                    title,
+                    href: encodeURIComponent(e.name),
+                    detail: `${type} · ${folderFormatSize(e.size)}`,
+                    image: FOLDER_IMAGE_EXTS.has(ext),
+                };
+            });
+    }
+
+    computeHtml () {
+        if (!this.files.length) return "";
+        const columns = 3;
+        let html = "";
+        if (this.json.title) html += `<h2>${this.json.title}</h2>`;
+        html += '<div class="card-grid file-cards">';
+        this.files.forEach((f, idx) => {
+            const isLast = idx === this.files.length - 1;
+            const remainder = this.files.length % columns;
+            const spanClass = (isLast && remainder > 0) ? ` card-span-${columns - remainder + 1}` : "";
+            html += `<a class="card file-card${spanClass}" href="${f.href}">`;
+            if (f.image) html += `<img class="file-card-thumb" src="${f.href}" alt="" loading="lazy">`;
+            html += `<h3>${folderEscapeHtml(f.title)}</h3>`;
+            html += `<p>${f.detail}</p>`;
+            html += '<span class="arrow">Open &rarr;</span>';
+            html += "</a>";
+        });
+        html += "</div>";
+        return html;
+    }
+}
+
+
 // ===== PageIndex.js =====
 
 
@@ -2917,6 +3066,7 @@ function runLayout (doc, page, groups) {
 
 
 
+
 ContentBase.typeMap = {
     ContentText,
     ContentCards,
@@ -2931,6 +3081,8 @@ ContentBase.typeMap = {
     ContentClassDoc,
     ContentComparisonTable,
     ContentSlideshow,
+    ContentFolderCards,
+    ContentFileCards,
 };
 
 // Browser bootstrap. PageIndex.init() runs the runtime pass (loadPage + render);

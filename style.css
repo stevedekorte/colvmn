@@ -466,6 +466,20 @@ p code, li code, p tt, li tt {
   margin-bottom: 10px;
 }
 
+/* File cards (ContentFileCards): long file names wrap; images show a thumbnail */
+.file-card h3 {
+  overflow-wrap: anywhere;
+}
+
+.file-card-thumb {
+  display: block;
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  margin-bottom: 14px;
+  background: #f2f2ef;
+}
+
 /* ── Timeline page layout ── */
 .page-timeline {
   max-width: none;

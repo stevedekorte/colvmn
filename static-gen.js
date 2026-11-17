@@ -25,7 +25,7 @@
  */
 
 import { defaultSiteRoot } from "./update/SiteRoot.js";
-import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { join, relative, dirname, resolve, sep } from "node:path";
@@ -46,6 +46,7 @@ import { ContentFAQ } from "./layout/ContentFAQ.js";
 import { ContentClassDoc } from "./layout/ContentClassDoc.js";
 import { ContentComparisonTable } from "./layout/ContentComparisonTable.js";
 import { ContentSlideshow } from "./layout/ContentSlideshow.js";
+import { ContentFolderCards, ContentFileCards } from "./layout/ContentFolder.js";
 import { PageIndex } from "./layout/PageIndex.js";
 import { AiReviews } from "./layout/AiReviews.js";
 import { exposedSecretFiles, exposedMessage } from "./update/SecretFiles.js";
@@ -67,6 +68,8 @@ ContentBase.typeMap = {
     ContentClassDoc,
     ContentComparisonTable,
     ContentSlideshow,
+    ContentFolderCards,
+    ContentFileCards,
 };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -145,6 +148,7 @@ const BUNDLE_FILES = [
     "ContentClassDoc.js",
     "ContentComparisonTable.js",
     "ContentSlideshow.js",
+    "ContentFolder.js",
     "PageIndex.js",
     "Lightbox.js",
     "Collapsible.js",
@@ -211,6 +215,21 @@ function createFetchFn (pageDir) {
     };
     fn.cache = cache;
     return fn;
+}
+
+// What is in a page's folder, for the folder-listing blocks (ContentFolder.js):
+// each entry's name, whether it is a folder (and a page: has _index.*), and size.
+function listPageDir (pageDir) {
+    return readdirSync(pageDir, { withFileTypes: true }).map(e => {
+        const full = join(pageDir, e.name);
+        if (e.isDirectory()) {
+            const isPage = existsSync(join(full, "_index.md")) || existsSync(join(full, "_index.json"));
+            return { name: e.name, isDir: true, isPage, size: 0 };
+        }
+        let size = 0;
+        try { size = statSync(full).size; } catch { /* broken link */ }
+        return { name: e.name, isDir: false, isPage: false, size };
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -322,6 +341,7 @@ async function generatePage (pageDir) {
 
     const fetchFn = createFetchFn(pageDir);
     ContentBase.setFetchFn(fetchFn);
+    ContentBase.listDirFn = () => listPageDir(pageDir);
 
     const context = {
         isRoot: () => pageDir === localRoot,

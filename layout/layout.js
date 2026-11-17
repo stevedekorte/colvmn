@@ -12,6 +12,7 @@ import { ContentFAQ } from "./ContentFAQ.js";
 import { ContentClassDoc } from "./ContentClassDoc.js";
 import { ContentComparisonTable } from "./ContentComparisonTable.js";
 import { ContentSlideshow } from "./ContentSlideshow.js";
+import { ContentFolderCards, ContentFileCards } from "./ContentFolder.js";
 import { PageIndex } from "./PageIndex.js";
 import { initLightbox } from "./Lightbox.js";
 import { initCollapsibles } from "./Collapsible.js";
@@ -32,6 +33,8 @@ ContentBase.typeMap = {
     ContentClassDoc,
     ContentComparisonTable,
     ContentSlideshow,
+    ContentFolderCards,
+    ContentFileCards,
 };
 
 // Browser bootstrap. PageIndex.init() runs the runtime pass (loadPage + render);

@@ -49,6 +49,7 @@ How it works:
 - `layout/Content*.js` — content block renderers (Text, Cards, Table, Image (see "Image layout"), Timeline, Toc, KeyValue, UnorderedList, OrderedList)
 - `layout/MarkdownParser.js` — frontmatter + markdown to page JSON
 - `layout/ContentSlideshow.js` — the slideshow block for `_index.json` pages
+- `layout/ContentFolder.js` — folder listings (see "Folder listings"): `ContentFolderCards` and `ContentFileCards`
 - `layout/Columns.js` — builds a page's columns on wide viewports (see `maxColumns` under Page Metadata)
 - `layout/Slideshow.js` — slideshow behavior (see "Slideshows")
 - `layout/Collapsible.js` — open/close behavior for collapsed sections (page-global, event delegation; see "Collapsed sections")
@@ -68,7 +69,8 @@ The markdown parser supports:
 - Image attribute lists — a Pandoc-style `{…}` suffix on an image: `![alt](src){.class #id key=value}` (see "Zoomable images" and "Image layout")
 - Tables (standard `| col | col |` pipe syntax). A header cell may end in a class list that applies to its whole column: `| Phone {.nowrap} |` keeps that column's cells on one line (the parser writes `colvmn-table-nowrap`, from `MarkdownParser.TABLE_COLUMN_OPTIONS`; other classes pass through as-is)
 - Raw HTML blocks (passed through as-is)
-- YAML frontmatter for page metadata (string values, plus `true`/`false` coerced to booleans)
+- YAML frontmatter for page metadata (string values, plus `true`/`false` coerced to booleans). A frontmatter `subtitle` wins over the body: a short first paragraph is then kept as body text rather than promoted to the subtitle
+- Folder listings — `folderCards`, `fileCards` and `cardsFirst` in frontmatter (see "Folder listings")
 
 ## Zoomable images
 
@@ -87,6 +89,10 @@ An image's size and placement are options, as classes in its attribute list (`![
 - **Placement:** centered when it stands alone (an image alone in its paragraph, which the parser marks `<p class="colvmn-image">`, or a `ContentImage`; an image beside text stays inline), `left`, `float-left` / `float-right` (text wraps beside it; at most half the width; on its own line under 600px). `center` is the default made explicit.
 - **Rows:** consecutive images marked `{.row}` (in one paragraph or several in a row) become one row of figures (`MarkdownParser.imageRowHtml`): side by side with a column gutter between them, each no wider than one of the page's columns, bottoms aligned, wrapping onto more lines when the page is too narrow. An image's markdown title becomes its caption: `![Stock engine](stock.png "Stock — twin-turbo"){.row}`. In raw HTML, `<div class="colvmn-image-row">` around `<figure>`s (each an `<img>` and an optional `<figcaption>`) gets the same layout. The styles are style.css's "Image rows". CSS only, no runtime behavior.
 - **JSON:** `{ "type": "ContentImage", "src": "images/a.png", "alt": "…", "size": "column", "align": "left", "zoomable": true, "width": 480 }` (`title` adds a heading), in a `<div class="colvmn-image">`. Built by `layout/ContentImage.js`; the styles are style.css's "Image layout options". CSS only, no runtime behavior.
+
+## Folder listings
+
+A page can list what is in its own folder: `folderCards: true` (or `newest-first`) in `_index.md` frontmatter adds a `ContentFolderCards` block, a card for each subfolder that is a page (has `_index.md`/`_index.json`), titled and subtitled from it like a `ContentCards` folder card; `fileCards: true` adds a `ContentFileCards` block, a card for each file (name less extension, type and size, a thumbnail for images), linking to it. `folderCardsTitle` / `fileCardsTitle` give them headings. They go after the page's text, or before its first titled section with `cardsFirst: true` (`MarkdownParser.parseMarkdown`). Names starting with `.` or `_`, and `index.html`, are never listed. The listing needs the filesystem, so static-gen sets `ContentBase.listDirFn` for each page (`listPageDir`); in the browser it is unset and the blocks list nothing, which is fine since built pages are not re-rendered (see "Rendering model"). Styles: style.css's "File cards".
 
 ## Collapsed sections
 

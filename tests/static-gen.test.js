@@ -463,3 +463,29 @@ test("a table header cell's {.nowrap} applies to its whole column", () => {
     assert.match(llmsFull, /\| Who \| Number \| Notes \|/);
     rmSync(site, { recursive: true, force: true });
 });
+
+test("folderCards and fileCards list a folder's subpages and files as cards; cardsFirst puts them before the titled sections", () => {
+    const site = makeSite({});
+    try {
+        writePage(site, "jobs", "---\ntitle: Jobs\nsubtitle: All jobs.\nfolderCards: newest-first\ncardsFirst: true\n---\n\nHow to add a job.\n\n## Notes\n\nNote text.\n");
+        writePage(site, "jobs/2020-01 paint", "---\ntitle: Paint\nsubtitle: Jan 2020.\nfileCards: true\n---\n");
+        writePage(site, "jobs/2021-05 roof", "---\ntitle: Roof\n---\n");
+        mkdirSync(join(site, "jobs/not a page"));
+        writeFileSync(join(site, "jobs/2020-01 paint/Invoice #1.pdf"), "x".repeat(2048));
+        writeFileSync(join(site, "jobs/2020-01 paint/photo.jpg"), "jpg");
+        writeFileSync(join(site, "jobs/2020-01 paint/_notes.txt"), "hidden");
+        build(site);
+        const jobs = readFileSync(join(site, "jobs", "index.html"), "utf-8");
+        // the frontmatter subtitle wins, and the short first paragraph stays in the body
+        assert.match(jobs, /<p>How to add a job\.<\/p>/);
+        // newest first, only folders that are pages, before the Notes section
+        assert.match(jobs, /<h3>Roof<\/h3>[\s\S]*<h3>Paint<\/h3><p>Jan 2020\.<\/p>[\s\S]*<h2 id="notes">/);
+        assert.doesNotMatch(jobs, /not a page/);
+        const paint = readFileSync(join(site, "jobs/2020-01 paint", "index.html"), "utf-8");
+        assert.match(paint, /<a class="card file-card" href="Invoice%20%231\.pdf"><h3>Invoice #1<\/h3><p>PDF · 2 KB<\/p>/);
+        assert.match(paint, /<a class="card file-card[^"]*" href="photo\.jpg"><img class="file-card-thumb" src="photo\.jpg"/);
+        assert.doesNotMatch(paint, /_notes|index\.html"><h3>/);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});

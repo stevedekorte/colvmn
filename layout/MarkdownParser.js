@@ -489,8 +489,10 @@ export function parseMarkdown (text) {
     });
 
     // Extract subtitle if first section is a single short untitled paragraph
+    // (Not when the frontmatter gives a subtitle: that one wins, and the
+    // paragraph stays in the body rather than being dropped.)
     let subtitle = "";
-    if (content.length > 0 && !content[0].title && content[0].body) {
+    if (typeof meta.subtitle !== "string" && content.length > 0 && !content[0].title && content[0].body) {
         const body = content[0].body;
         // A paragraph carrying embedded media must not be promoted to the
         // subtitle: stripping tags below measures only text length, so an
@@ -512,6 +514,29 @@ export function parseMarkdown (text) {
     if (titledSections.length >= 4) {
         const toc = { type: "ContentToc", items: titledSections.map(c => c.title) };
         content.unshift(toc);
+    }
+
+    // Folder listings (ContentFolder.js), after the page's text, or with
+    // `cardsFirst: true` before its first titled section:
+    // `folderCards: true | newest-first` and `fileCards: true`.
+    const listings = [];
+    if (meta.folderCards) {
+        const entry = { type: "ContentFolderCards" };
+        if (meta.folderCards === "newest-first") entry.order = "newest-first";
+        if (meta.folderCardsTitle) entry.title = meta.folderCardsTitle;
+        listings.push(entry);
+    }
+    if (meta.fileCards) {
+        const entry = { type: "ContentFileCards" };
+        if (meta.fileCardsTitle) entry.title = meta.fileCardsTitle;
+        listings.push(entry);
+    }
+    if (meta.cardsFirst === true) {
+        let at = content.findIndex(c => c.title && c.type === "ContentText");
+        if (at === -1) at = content.length;
+        content.splice(at, 0, ...listings);
+    } else {
+        content.push(...listings);
     }
 
     const result = { title };

@@ -1,6 +1,6 @@
 # colvmn — Full Documentation
 
-Site build: colvmn · 2026-11-16 · 392b212
+Site build: colvmn · 2026-11-17 · 429c466
 
 colvmn (pronounced column) is a tiny layout engine for static sites. Pages are described by an _index.md with YAML frontmatter, or an _index.json. The engine renders each page to static HTML at build time and to live DOM in the browser, so content is visible to JavaScript-free crawlers and to readers with JavaScript enabled.
 
@@ -196,6 +196,9 @@ The same top-level keys work in markdown frontmatter and at the top of `_index.j
 | `aiReviews` | `true` has AI models review this page's folder (see [AI Reviews](../ai-reviews/index.html)). `prompt` sets its review prompt. Not inherited. |
 | `footerLinks` | `[{ "title": "…", "href": "…" }]`: links on one line at the left of the page footer, separated by middle dots. The AI reviews link joins them. |
 | `maxColumns` | On wide screens a page's titled sections are set in columns (two from 1200px, three from 1860px, four from 2500px, given enough sections and subsections to fill them). A heading always starts a column with its first subsection; a long section may continue in the next column between subsections. Everything else spans the columns. `maxColumns` (1 to 4) caps that for this page; set it in `colvmn.json` for the whole site. `1` keeps one column. |
+| `folderCards` | `true` (or `newest-first`) lists the page's subfolders that are pages as cards, after the page's text (see Folder listings below). `folderCardsTitle` gives the grid a heading. |
+| `fileCards` | `true` lists the files in the page's folder as cards, after the page's text. `fileCardsTitle` gives the grid a heading. |
+| `cardsFirst` | `true` puts the `folderCards` / `fileCards` grids before the page's first titled section instead of at the end. |
 | `nextSectionLink` | `true` adds a footer link to the next sibling in the parent's cards, or up to the parent after the last one. |
 
 ## Content blocks
@@ -206,6 +209,8 @@ A block is an object with a `type` and its own fields. Any block may also carry 
 | --- | --- |
 | `ContentText` | Headings, paragraphs, prose sections |
 | `ContentCards` | Grid of linked cards |
+| `ContentFolderCards` | Cards for the subfolders of the page's folder that are pages |
+| `ContentFileCards` | Cards for the files in the page's folder |
 | `ContentTable` | Tables with headers, rows, and an optional note |
 | `ContentImage` | One image |
 | `ContentSlideshow` | Images that crossfade in one frame |
@@ -290,6 +295,26 @@ A grid of cards. `columns` is optional (it defaults to the item count, capped at
 - A bare string is a **folder card**; its title and subtitle are read from that subfolder's own `_index`.
 - An object with `folder` is a folder card with an explicit `title` and `subtitle`.
 - An object with `href` is a **link card** to any URL; `arrow` sets the call-to-action label (it defaults to "View").
+
+### Folder listings: ContentFolderCards and ContentFileCards
+
+For a folder that holds a set of records (one subfolder per job, a folder of PDFs or photos), the page lists what is in its folder rather than repeating it by hand. The folders stay folders: add a subfolder or drop in a file and rebuild.
+
+```markdown
+---
+title: Projects
+subtitle: Jobs done on the house.
+folderCards: newest-first
+cardsFirst: true
+---
+```
+
+- **`ContentFolderCards`** (`folderCards: true`): a card for each subfolder that has an `_index.md` or `_index.json`, titled and subtitled from it like a `ContentCards` folder card, sorted by name (numbers in order); `"order": "newest-first"` reverses it, which suits folders named by date.
+- **`ContentFileCards`** (`fileCards: true`): a card for each file, titled with its name less the extension, with its type and size, linking to the file. Images show a thumbnail.
+- Names starting with `.` or `_`, and `index.html`, are never listed, so notes or tools can sit beside a page without appearing on it.
+- In JSON: `{ "type": "ContentFolderCards", "title": "Jobs", "order": "newest-first" }` and `{ "type": "ContentFileCards" }`.
+
+The listing is made at build time (the generator reads the folder), like the rest of the page.
 
 ### ContentSlideshow
 
