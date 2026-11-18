@@ -515,9 +515,9 @@ function parseMarkdown (text) {
         }
     }
 
-    // Generate table of contents if there are enough titled sections
+    // Generate table of contents if there are enough titled sections (`toc: false` turns it off)
     const titledSections = content.filter(c => c.title);
-    if (titledSections.length >= 4) {
+    if (titledSections.length >= 4 && meta.toc !== false) {
         const toc = { type: "ContentToc", items: titledSections.map(c => c.title) };
         content.unshift(toc);
     }
