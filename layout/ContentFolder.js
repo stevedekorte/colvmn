@@ -59,7 +59,7 @@ export class ContentFolderCards extends ContentCards {
         // `withFiles`: the folder's files share this grid, after the folders.
         if (this.json.withFiles) {
             const files = new ContentFileCards();
-            files.setJson({ type: "ContentFileCards" });
+            files.setJson({ type: "ContentFileCards", exclude: this.json.fileExclude, titles: this.json.fileTitles });
             await files.resolve();
             this.extraCardsHtml = files.files.map(f => files.cardHtml(f));
             // In a table, each file is a row: its name (linked), then its type and size.
@@ -110,6 +110,11 @@ export function folderFormatSize (bytes) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// `exclude` entries are file names or patterns with `*` (`*.skp`), any case.
+function folderMatches (patterns, name) {
+    return (patterns || []).some(p => new RegExp("^" + String(p).split("*").map(s => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*") + "$", "i").test(name));
+}
+
 export class ContentFileCards extends ContentBase {
     constructor () {
         super();
@@ -119,13 +124,15 @@ export class ContentFileCards extends ContentBase {
     async resolve () {
         const entries = await folderListDir();
         this.files = entries
-            .filter(e => !e.isDir && folderIsListed(e.name))
+            .filter(e => !e.isDir && folderIsListed(e.name) && !folderMatches(this.json.exclude, e.name))
             .sort((a, b) => folderCompareNames(a.name, b.name))
             .map(e => {
                 const dot = e.name.lastIndexOf(".");
                 const ext = dot > 0 ? e.name.slice(dot + 1).toLowerCase() : "";
-                const title = dot > 0 ? e.name.slice(0, dot) : e.name;
-                const type = FOLDER_TYPE_NAMES[ext] || (ext ? ext.toUpperCase() : "File");
+                // `titles` names a file for what it is ("3D Model"); its detail is then its format and size.
+                const given = (this.json.titles || {})[e.name];
+                const title = given || (dot > 0 ? e.name.slice(0, dot) : e.name);
+                const type = given && ext ? ext.toUpperCase() : (FOLDER_TYPE_NAMES[ext] || (ext ? ext.toUpperCase() : "File"));
                 // Files a browser can't show itself open in one of the engine's viewers.
                 const viewer = FOLDER_VIEWERS[ext];
                 const viewerHref = viewer && ContentBase.viewerHrefFn ? ContentBase.viewerHrefFn(viewer, e.name) : null;

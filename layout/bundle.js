@@ -542,14 +542,22 @@ function parseMarkdown (text) {
         if (meta.folderColumns) entry.tableColumns = String(meta.folderColumns).split(",").map(n => n.trim()).filter(Boolean);
         listings.push(entry);
     }
+    // `fileExclude: *.skp, notes.txt`: files left out of the file cards (names, or patterns with *).
+    const fileExclude = meta.fileExclude ? String(meta.fileExclude).split(",").map(n => n.trim()).filter(Boolean) : undefined;
+    // `fileTitles: model.obj=3D Model, model.dwg=2D Drawings`: a file's card title (its detail becomes format and size).
+    const fileTitles = meta.fileTitles ? Object.fromEntries(String(meta.fileTitles).split(",").map(n => n.split("=").map(x => x.trim())).filter(kv => kv.length === 2 && kv[0] && kv[1])) : undefined;
     // Both on and neither titled: one grid, the folder cards then the file cards.
     if (meta.folderCards && meta.fileCards && !meta.folderCardsTitle && !meta.fileCardsTitle) {
         listings[listings.length - 1].withFiles = true;
+        if (fileExclude) listings[listings.length - 1].fileExclude = fileExclude;
+        if (fileTitles) listings[listings.length - 1].fileTitles = fileTitles;
     } else if (meta.fileCards) {
         const entry = { type: "ContentFileCards" };
         if (meta.fileCardsTitle) entry.title = meta.fileCardsTitle;
         // `fileLayout: table`: one table row per file instead of a card grid.
         if (meta.fileLayout) entry.layout = String(meta.fileLayout).trim();
+        if (fileExclude) entry.exclude = fileExclude;
+        if (fileTitles) entry.titles = fileTitles;
         listings.push(entry);
     }
     if (meta.cardsFirst === true) {
@@ -2135,7 +2143,7 @@ class ContentFolderCards extends ContentCards {
         // `withFiles`: the folder's files share this grid, after the folders.
         if (this.json.withFiles) {
             const files = new ContentFileCards();
-            files.setJson({ type: "ContentFileCards" });
+            files.setJson({ type: "ContentFileCards", exclude: this.json.fileExclude, titles: this.json.fileTitles });
             await files.resolve();
             this.extraCardsHtml = files.files.map(f => files.cardHtml(f));
             // In a table, each file is a row: its name (linked), then its type and size.
@@ -2186,6 +2194,11 @@ function folderFormatSize (bytes) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// `exclude` entries are file names or patterns with `*` (`*.skp`), any case.
+function folderMatches (patterns, name) {
+    return (patterns || []).some(p => new RegExp("^" + String(p).split("*").map(s => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*") + "$", "i").test(name));
+}
+
 class ContentFileCards extends ContentBase {
     constructor () {
         super();
@@ -2195,13 +2208,15 @@ class ContentFileCards extends ContentBase {
     async resolve () {
         const entries = await folderListDir();
         this.files = entries
-            .filter(e => !e.isDir && folderIsListed(e.name))
+            .filter(e => !e.isDir && folderIsListed(e.name) && !folderMatches(this.json.exclude, e.name))
             .sort((a, b) => folderCompareNames(a.name, b.name))
             .map(e => {
                 const dot = e.name.lastIndexOf(".");
                 const ext = dot > 0 ? e.name.slice(dot + 1).toLowerCase() : "";
-                const title = dot > 0 ? e.name.slice(0, dot) : e.name;
-                const type = FOLDER_TYPE_NAMES[ext] || (ext ? ext.toUpperCase() : "File");
+                // `titles` names a file for what it is ("3D Model"); its detail is then its format and size.
+                const given = (this.json.titles || {})[e.name];
+                const title = given || (dot > 0 ? e.name.slice(0, dot) : e.name);
+                const type = given && ext ? ext.toUpperCase() : (FOLDER_TYPE_NAMES[ext] || (ext ? ext.toUpperCase() : "File"));
                 // Files a browser can't show itself open in one of the engine's viewers.
                 const viewer = FOLDER_VIEWERS[ext];
                 const viewerHref = viewer && ContentBase.viewerHrefFn ? ContentBase.viewerHrefFn(viewer, e.name) : null;

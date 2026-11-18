@@ -536,14 +536,22 @@ export function parseMarkdown (text) {
         if (meta.folderColumns) entry.tableColumns = String(meta.folderColumns).split(",").map(n => n.trim()).filter(Boolean);
         listings.push(entry);
     }
+    // `fileExclude: *.skp, notes.txt`: files left out of the file cards (names, or patterns with *).
+    const fileExclude = meta.fileExclude ? String(meta.fileExclude).split(",").map(n => n.trim()).filter(Boolean) : undefined;
+    // `fileTitles: model.obj=3D Model, model.dwg=2D Drawings`: a file's card title (its detail becomes format and size).
+    const fileTitles = meta.fileTitles ? Object.fromEntries(String(meta.fileTitles).split(",").map(n => n.split("=").map(x => x.trim())).filter(kv => kv.length === 2 && kv[0] && kv[1])) : undefined;
     // Both on and neither titled: one grid, the folder cards then the file cards.
     if (meta.folderCards && meta.fileCards && !meta.folderCardsTitle && !meta.fileCardsTitle) {
         listings[listings.length - 1].withFiles = true;
+        if (fileExclude) listings[listings.length - 1].fileExclude = fileExclude;
+        if (fileTitles) listings[listings.length - 1].fileTitles = fileTitles;
     } else if (meta.fileCards) {
         const entry = { type: "ContentFileCards" };
         if (meta.fileCardsTitle) entry.title = meta.fileCardsTitle;
         // `fileLayout: table`: one table row per file instead of a card grid.
         if (meta.fileLayout) entry.layout = String(meta.fileLayout).trim();
+        if (fileExclude) entry.exclude = fileExclude;
+        if (fileTitles) entry.titles = fileTitles;
         listings.push(entry);
     }
     if (meta.cardsFirst === true) {
