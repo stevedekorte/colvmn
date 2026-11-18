@@ -537,6 +537,8 @@ function parseMarkdown (text) {
         // `folderLayout: table`: one table row per folder instead of a card grid.
         if (meta.folderLayout) entry.layout = String(meta.folderLayout).trim();
         // `folderColumns: Date=line1, Record=title, Summary=line2`: the table's columns (ContentCards.tableColumns).
+        // `folderSort: Date desc`: order the listing by a column or frontmatter key (ContentFolderCards.sortItems).
+        if (meta.folderSort) entry.sort = String(meta.folderSort).trim();
         if (meta.folderColumns) entry.tableColumns = String(meta.folderColumns).split(",").map(n => n.trim()).filter(Boolean);
         listings.push(entry);
     }
@@ -847,11 +849,12 @@ class ContentCards extends ContentBase {
                 let title = displayName;
                 let subtitle = "";
                 let lines = [];
+                let meta = {};
                 let completion;
                 try {
                     const resp = await ContentBase.asyncFetch(`${encoded}/_index.json`);
                     if (resp.ok) {
-                        const meta = await resp.json();
+                        meta = await resp.json();
                         title = meta.title || displayName;
                         subtitle = ContentCards.cardSubtitle(meta);
                         lines = ContentCards.subtitleLines(meta);
@@ -859,7 +862,7 @@ class ContentCards extends ContentBase {
                     } else {
                         const mdResp = await ContentBase.asyncFetch(`${encoded}/_index.md`);
                         if (mdResp.ok) {
-                            const meta = parseMarkdown(await mdResp.text());
+                            meta = parseMarkdown(await mdResp.text());
                             title = meta.title || displayName;
                             subtitle = ContentCards.cardSubtitle(meta);
                             lines = ContentCards.subtitleLines(meta);
@@ -881,6 +884,7 @@ class ContentCards extends ContentBase {
                     title,
                     subtitle,
                     lines,
+                    meta,
                     completion,
                     href,
                     arrow: "View",
@@ -910,8 +914,9 @@ class ContentCards extends ContentBase {
     }
 
     // Listing table columns: `columns` is a list of "Header" or "Header=source",
-    // where source is `title` (the page title, linked) or `lineN` (line N of the
-    // page's subtitle, split at <br>). Bare headers take title, line1, line2… in
+    // where source is `title` (the page title, linked), `lineN` (line N of the
+    // page's subtitle, split at <br>), or any other key in the page's frontmatter
+    // (`date`, `type`, `summary`…). Bare headers take title, line1, line2… in
     // turn. With no columns given: Title, then one column per subtitle line.
     tableColumns (rows) {
         let specs = this.json.tableColumns;
@@ -922,21 +927,27 @@ class ContentCards extends ContentBase {
         return specs.map((spec, i) => {
             const eq = String(spec).lastIndexOf("=");
             const header = eq === -1 ? String(spec).trim() : String(spec).slice(0, eq).trim();
-            const source = eq === -1 ? (i === 0 ? "title" : `line${i}`) : String(spec).slice(eq + 1).trim().toLowerCase();
+            const source = eq === -1 ? (i === 0 ? "title" : `line${i}`) : String(spec).slice(eq + 1).trim();
             return { header, source };
         });
     }
 
-    tableCellHtml (row, source) {
-        if (source === "title") {
-            return row.link ? `<a href="${row.href}">${row.title}</a>` : row.title;
-        }
-        const m = /^line(\d+)$/.exec(source);
+    // A row's value for a column source (see tableColumns), unlinked.
+    static rowValue (row, source) {
+        if (source.toLowerCase() === "title") return row.title || "";
+        const m = /^line(\d+)$/i.exec(source);
         if (m) {
             const lines = row.lines || (row.subtitle ? [row.subtitle] : []);
             return lines[Number(m[1]) - 1] || "";
         }
-        return "";
+        const v = row.meta ? row.meta[source] : undefined;
+        return v === undefined || v === null ? "" : String(v);
+    }
+
+    tableCellHtml (row, source) {
+        const value = ContentCards.rowValue(row, source);
+        if (source.toLowerCase() === "title" && row.link) return `<a href="${row.href}">${value}</a>`;
+        return value;
     }
 
     computeTableHtml () {
@@ -951,7 +962,7 @@ class ContentCards extends ContentBase {
         }
         html += "<tbody>";
         for (const row of rows) {
-            html += "<tr>" + columns.map(c => `<td class="listing-${c.source}">${this.tableCellHtml(row, c.source)}</td>`).join("") + "</tr>";
+            html += "<tr>" + columns.map(c => `<td class="listing-${c.source.toLowerCase().replace(/[^a-z0-9-]/g, "-")}">${this.tableCellHtml(row, c.source)}</td>`).join("") + "</tr>";
         }
         html += "</tbody></table></div></div>";
         return html;
@@ -2129,6 +2140,30 @@ class ContentFolderCards extends ContentCards {
             this.extraRows = files.files.map(f => ({ title: folderEscapeHtml(f.title), href: f.href, link: true, lines: [f.detail] }));
         }
         await super.resolve();
+        this.sortItems(first);
+    }
+
+    // `sort: "Date desc"`: order the rows by a column (named by its header in
+    // tableColumns, or by its source: title, lineN or a frontmatter key), A to Z
+    // with numbers by value, or Z to A with `desc`. Pages with no value go last;
+    // ties keep folder-name order. Folders pinned by `first` stay at the top.
+    sortItems (first) {
+        const spec = String(this.json.sort || "").trim();
+        if (!spec) return;
+        const m = /^(.*?)(?:\s+(asc|desc))?$/i.exec(spec);
+        const name = m[1].trim();
+        const desc = (m[2] || "").toLowerCase() === "desc";
+        const col = this.tableColumns(this.resolvedItems).find(c => c.header.toLowerCase() === name.toLowerCase());
+        const source = col ? col.source : name;
+        const pinned = this.resolvedItems.filter(r => first.includes(r.folder));
+        const rest = this.resolvedItems.filter(r => !first.includes(r.folder));
+        const keyed = rest.map((r, i) => ({ r, i, k: ContentCards.rowValue(r, source).replace(/<[^>]*>/g, "").trim() }));
+        keyed.sort((a, b) => {
+            if (!a.k !== !b.k) return a.k ? -1 : 1;
+            const c = folderCompareNames(a.k, b.k) * (desc ? -1 : 1);
+            return c || a.i - b.i;
+        });
+        this.resolvedItems = [...pinned, ...keyed.map(x => x.r)];
     }
 }
 

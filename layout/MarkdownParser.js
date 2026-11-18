@@ -531,6 +531,8 @@ export function parseMarkdown (text) {
         // `folderLayout: table`: one table row per folder instead of a card grid.
         if (meta.folderLayout) entry.layout = String(meta.folderLayout).trim();
         // `folderColumns: Date=line1, Record=title, Summary=line2`: the table's columns (ContentCards.tableColumns).
+        // `folderSort: Date desc`: order the listing by a column or frontmatter key (ContentFolderCards.sortItems).
+        if (meta.folderSort) entry.sort = String(meta.folderSort).trim();
         if (meta.folderColumns) entry.tableColumns = String(meta.folderColumns).split(",").map(n => n.trim()).filter(Boolean);
         listings.push(entry);
     }

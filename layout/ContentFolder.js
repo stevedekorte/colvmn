@@ -66,6 +66,30 @@ export class ContentFolderCards extends ContentCards {
             this.extraRows = files.files.map(f => ({ title: folderEscapeHtml(f.title), href: f.href, link: true, lines: [f.detail] }));
         }
         await super.resolve();
+        this.sortItems(first);
+    }
+
+    // `sort: "Date desc"`: order the rows by a column (named by its header in
+    // tableColumns, or by its source: title, lineN or a frontmatter key), A to Z
+    // with numbers by value, or Z to A with `desc`. Pages with no value go last;
+    // ties keep folder-name order. Folders pinned by `first` stay at the top.
+    sortItems (first) {
+        const spec = String(this.json.sort || "").trim();
+        if (!spec) return;
+        const m = /^(.*?)(?:\s+(asc|desc))?$/i.exec(spec);
+        const name = m[1].trim();
+        const desc = (m[2] || "").toLowerCase() === "desc";
+        const col = this.tableColumns(this.resolvedItems).find(c => c.header.toLowerCase() === name.toLowerCase());
+        const source = col ? col.source : name;
+        const pinned = this.resolvedItems.filter(r => first.includes(r.folder));
+        const rest = this.resolvedItems.filter(r => !first.includes(r.folder));
+        const keyed = rest.map((r, i) => ({ r, i, k: ContentCards.rowValue(r, source).replace(/<[^>]*>/g, "").trim() }));
+        keyed.sort((a, b) => {
+            if (!a.k !== !b.k) return a.k ? -1 : 1;
+            const c = folderCompareNames(a.k, b.k) * (desc ? -1 : 1);
+            return c || a.i - b.i;
+        });
+        this.resolvedItems = [...pinned, ...keyed.map(x => x.r)];
     }
 }
 

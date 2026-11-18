@@ -35,11 +35,12 @@ export class ContentCards extends ContentBase {
                 let title = displayName;
                 let subtitle = "";
                 let lines = [];
+                let meta = {};
                 let completion;
                 try {
                     const resp = await ContentBase.asyncFetch(`${encoded}/_index.json`);
                     if (resp.ok) {
-                        const meta = await resp.json();
+                        meta = await resp.json();
                         title = meta.title || displayName;
                         subtitle = ContentCards.cardSubtitle(meta);
                         lines = ContentCards.subtitleLines(meta);
@@ -47,7 +48,7 @@ export class ContentCards extends ContentBase {
                     } else {
                         const mdResp = await ContentBase.asyncFetch(`${encoded}/_index.md`);
                         if (mdResp.ok) {
-                            const meta = parseMarkdown(await mdResp.text());
+                            meta = parseMarkdown(await mdResp.text());
                             title = meta.title || displayName;
                             subtitle = ContentCards.cardSubtitle(meta);
                             lines = ContentCards.subtitleLines(meta);
@@ -69,6 +70,7 @@ export class ContentCards extends ContentBase {
                     title,
                     subtitle,
                     lines,
+                    meta,
                     completion,
                     href,
                     arrow: "View",
@@ -98,8 +100,9 @@ export class ContentCards extends ContentBase {
     }
 
     // Listing table columns: `columns` is a list of "Header" or "Header=source",
-    // where source is `title` (the page title, linked) or `lineN` (line N of the
-    // page's subtitle, split at <br>). Bare headers take title, line1, line2… in
+    // where source is `title` (the page title, linked), `lineN` (line N of the
+    // page's subtitle, split at <br>), or any other key in the page's frontmatter
+    // (`date`, `type`, `summary`…). Bare headers take title, line1, line2… in
     // turn. With no columns given: Title, then one column per subtitle line.
     tableColumns (rows) {
         let specs = this.json.tableColumns;
@@ -110,21 +113,27 @@ export class ContentCards extends ContentBase {
         return specs.map((spec, i) => {
             const eq = String(spec).lastIndexOf("=");
             const header = eq === -1 ? String(spec).trim() : String(spec).slice(0, eq).trim();
-            const source = eq === -1 ? (i === 0 ? "title" : `line${i}`) : String(spec).slice(eq + 1).trim().toLowerCase();
+            const source = eq === -1 ? (i === 0 ? "title" : `line${i}`) : String(spec).slice(eq + 1).trim();
             return { header, source };
         });
     }
 
-    tableCellHtml (row, source) {
-        if (source === "title") {
-            return row.link ? `<a href="${row.href}">${row.title}</a>` : row.title;
-        }
-        const m = /^line(\d+)$/.exec(source);
+    // A row's value for a column source (see tableColumns), unlinked.
+    static rowValue (row, source) {
+        if (source.toLowerCase() === "title") return row.title || "";
+        const m = /^line(\d+)$/i.exec(source);
         if (m) {
             const lines = row.lines || (row.subtitle ? [row.subtitle] : []);
             return lines[Number(m[1]) - 1] || "";
         }
-        return "";
+        const v = row.meta ? row.meta[source] : undefined;
+        return v === undefined || v === null ? "" : String(v);
+    }
+
+    tableCellHtml (row, source) {
+        const value = ContentCards.rowValue(row, source);
+        if (source.toLowerCase() === "title" && row.link) return `<a href="${row.href}">${value}</a>`;
+        return value;
     }
 
     computeTableHtml () {
@@ -139,7 +148,7 @@ export class ContentCards extends ContentBase {
         }
         html += "<tbody>";
         for (const row of rows) {
-            html += "<tr>" + columns.map(c => `<td class="listing-${c.source}">${this.tableCellHtml(row, c.source)}</td>`).join("") + "</tr>";
+            html += "<tr>" + columns.map(c => `<td class="listing-${c.source.toLowerCase().replace(/[^a-z0-9-]/g, "-")}">${this.tableCellHtml(row, c.source)}</td>`).join("") + "</tr>";
         }
         html += "</tbody></table></div></div>";
         return html;
