@@ -17,9 +17,13 @@
     #bar a, #bar button { color: #666; text-decoration: none; background: none; border: 0; font: inherit; cursor: pointer; padding: 0; }
     #bar a:hover, #bar button:hover { color: #2a2a2a; }
     #name { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    #status { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; color: #999; padding: 0 24px; text-align: center; }
-    #hint { position: fixed; bottom: 10px; left: 16px; color: #999; font-size: 12px; }
-    #stage { position: fixed; inset: 0; background: #1d1f21; touch-action: none; cursor: grab; }
+    #status { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(255, 255, 255, 0.75); padding: 0 24px; text-align: center; }
+    #hint { position: fixed; bottom: 10px; left: 16px; color: rgba(255, 255, 255, 0.65); font-size: 12px; }
+    /* Blueprint: white lines on blueprint blue, whatever colors the drawing uses. */
+    html, body { background: #1f4e8c; }
+    #stage { position: fixed; top: 46px; right: 0; bottom: 0; left: 0; background: #1f4e8c; touch-action: none; cursor: grab; }
+    #stage svg * { stroke: #fff !important; }
+    #stage svg text, #stage svg [fill]:not([fill="none"]) { fill: #fff !important; }
     #stage.dragging { cursor: grabbing; }
     #stage svg { width: 100%; height: 100%; display: block; }
   </style>
@@ -128,11 +132,17 @@
         svg.removeAttribute("width");
         svg.removeAttribute("height");
         svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+        // Fit what is actually drawn (a drawing's saved extents can be stale),
+        // with a 6% margin all round; fall back to the SVG's own viewBox.
         const vb = svg.viewBox.baseVal;
-        home = vb && vb.width ? { x: vb.x, y: vb.y, w: vb.width, h: vb.height } : (() => {
-            const b = svg.getBBox();
-            return { x: b.x, y: b.y, w: b.width, h: b.height };
-        })();
+        let b = null;
+        try { b = svg.getBBox(); } catch { /* not rendered */ }
+        if (b && b.width && b.height) {
+            const m = 0.06 * Math.max(b.width, b.height);
+            home = { x: b.x - m, y: b.y - m, w: b.width + 2 * m, h: b.height + 2 * m };
+        } else {
+            home = { x: vb.x, y: vb.y, w: vb.width, h: vb.height };
+        }
         setView({ ...home });
         attachControls();
         status.remove();
