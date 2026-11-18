@@ -619,10 +619,10 @@ class ContentBase {
     static viewerHrefFn = null;
     static _prefetchCache = null;
 
-    // Columns for a folder-listing grid of n cards: two for 2 or 4 cards, so
+    // Columns for a folder-listing grid of n cards: two for 2, 4 or 8 cards, so
     // every row is full and the cards share the width; three otherwise.
     static listingColumns (n) {
-        return (n === 2 || n === 4) ? 2 : 3;
+        return (n === 2 || n === 4 || n === 8) ? 2 : 3;
     }
 
     static setFetchFn (fn) {
@@ -900,7 +900,7 @@ class ContentCards extends ContentBase {
         const title = this.json.title || "";
         const items = this.resolvedItems;
         // Folder listings keep every card one column wide (no stretched last
-        // card); 2 or 4 cards share the width in two columns, others use three.
+        // card); 2, 4 or 8 cards share the width in two columns, others use three.
         const listing = this.json.listing === true;
         // Cards appended after the items in the same grid (a folder listing's file cards).
         const extra = this.extraCardsHtml || [];

@@ -51,10 +51,10 @@ export class ContentBase {
     static viewerHrefFn = null;
     static _prefetchCache = null;
 
-    // Columns for a folder-listing grid of n cards: two for 2 or 4 cards, so
+    // Columns for a folder-listing grid of n cards: two for 2, 4 or 8 cards, so
     // every row is full and the cards share the width; three otherwise.
     static listingColumns (n) {
-        return (n === 2 || n === 4) ? 2 : 3;
+        return (n === 2 || n === 4 || n === 8) ? 2 : 3;
     }
 
     static setFetchFn (fn) {

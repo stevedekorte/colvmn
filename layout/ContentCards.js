@@ -92,7 +92,7 @@ export class ContentCards extends ContentBase {
         const title = this.json.title || "";
         const items = this.resolvedItems;
         // Folder listings keep every card one column wide (no stretched last
-        // card); 2 or 4 cards share the width in two columns, others use three.
+        // card); 2, 4 or 8 cards share the width in two columns, others use three.
         const listing = this.json.listing === true;
         // Cards appended after the items in the same grid (a folder listing's file cards).
         const extra = this.extraCardsHtml || [];
