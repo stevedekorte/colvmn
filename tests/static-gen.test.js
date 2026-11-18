@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join, dirname, resolve, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ANSWER_FORMAT } from "../layout/AiReviews.js";
+import { linkPhoneNumbers } from "../layout/MarkdownParser.js";
 
 const staticGen = join(dirname(fileURLToPath(import.meta.url)), "..", "static-gen.js");
 
@@ -458,7 +459,7 @@ test("a table header cell's {.nowrap} applies to its whole column", () => {
     const { llmsFull } = build(site);
     const html = readFileSync(join(site, "kept", "index.html"), "utf-8").split('id="colvmn-prefetch"')[0];
     assert.match(html, /<th>Who<\/th><th class="colvmn-table-nowrap">Number<\/th><th class="colvmn-table-nowrap wide">Notes<\/th>/);
-    assert.match(html, /<td>Poison<\/td><td class="colvmn-table-nowrap">1-800-222-1222<\/td><td class="colvmn-table-nowrap wide">Any time<\/td>/);
+    assert.match(html, /<td>Poison<\/td><td class="colvmn-table-nowrap"><a class="colvmn-tel" href="tel:\+18002221222">1-800-222-1222<\/a><\/td><td class="colvmn-table-nowrap wide">Any time<\/td>/);
     assert.doesNotMatch(html, /\{\.nowrap/);
     assert.match(llmsFull, /\| Who \| Number \| Notes \|/);
     rmSync(site, { recursive: true, force: true });
@@ -629,4 +630,25 @@ test("layout/bundle.js parses as a classic script", async () => {
     const vm = await import("node:vm");
     const bundle = readFileSync(join(dirname(staticGen), "layout", "bundle.js"), "utf-8");
     assert.doesNotThrow(() => new vm.Script(bundle, { filename: "layout/bundle.js" }));
+});
+
+test("phone numbers in table cells link to the phone app; dates, permit numbers and existing links don't", () => {
+    const tel = (n, href) => `<a class="colvmn-tel" href="tel:${href}">${n}</a>`;
+    assert.equal(linkPhoneNumbers("(415) 435-3266"), tel("(415) 435-3266", "+14154353266"));
+    assert.equal(linkPhoneNumbers("Ring support 1-800-656-1918"), "Ring support " + tel("1-800-656-1918", "+18006561918"));
+    assert.equal(linkPhoneNumbers("415.945.1400; office 415-435-1501"), tel("415.945.1400", "+14159451400") + "; office " + tel("415-435-1501", "+14154351501"));
+    assert.equal(linkPhoneNumbers(" 911 "), " " + tel("911", "911") + " ");
+    for (const s of ["2017 11 21", "Permit 2011-050", "060-201-03", "Tiburon, CA 94920-2549", "license 0H08075", "Call 911 first", "<a href=\"x\">(415) 435-3266</a>", "<img alt=\"415-435-3266\">"]) {
+        assert.equal(linkPhoneNumbers(s), s, s);
+    }
+    const site = makeSite({});
+    try {
+        writePage(site, "contacts", "# Contacts\n\n| Who | Phone |\n| --- | --- |\n| Police | (415) 435-3266 |\n| Emergency | 911 |\n");
+        build(site);
+        const html = readFileSync(join(site, "contacts", "index.html"), "utf-8");
+        assert.match(html, /<td><a class="colvmn-tel" href="tel:\+14154353266">\(415\) 435-3266<\/a><\/td>/);
+        assert.match(html, /<td><a class="colvmn-tel" href="tel:911">911<\/a><\/td>/);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
 });

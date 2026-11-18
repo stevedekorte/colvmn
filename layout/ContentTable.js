@@ -1,4 +1,5 @@
 import { ContentBase } from "./ContentBase.js";
+import { linkPhoneNumbers } from "./MarkdownParser.js";
 
 const TH_STYLE = "text-align: left; font-size: 12px; font-weight: 600; padding: 12px 16px 12px 0; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; letter-spacing: 0.3px; color: #555;";
 const TD_STYLE = "padding: 10px 16px 10px 0; border-bottom: 1px solid #eee; color: #555; vertical-align: top;";
@@ -6,10 +7,10 @@ const TD_LAST_STYLE = "padding: 10px 16px 10px 0; border-bottom: 1px solid #ccc;
 
 function renderCell (value) {
     if (Array.isArray(value)) {
-        const items = value.map(v => `<li>${v}</li>`).join("");
+        const items = value.map(v => `<li>${linkPhoneNumbers(v)}</li>`).join("");
         return `<ul style="margin:0; padding-left:18px;">${items}</ul>`;
     }
-    return value || "";
+    return linkPhoneNumbers(value || "");
 }
 
 export class ContentTable extends ContentBase {

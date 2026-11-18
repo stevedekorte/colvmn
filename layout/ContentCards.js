@@ -1,5 +1,5 @@
 import { ContentBase } from "./ContentBase.js";
-import { parseMarkdown } from "./MarkdownParser.js";
+import { parseMarkdown, linkPhoneNumbers } from "./MarkdownParser.js";
 
 export class ContentCards extends ContentBase {
     constructor () {
@@ -133,7 +133,7 @@ export class ContentCards extends ContentBase {
     tableCellHtml (row, source) {
         const value = ContentCards.rowValue(row, source);
         if (source.toLowerCase() === "title" && row.link) return `<a href="${row.href}">${value}</a>`;
-        return value;
+        return linkPhoneNumbers(value);
     }
 
     computeTableHtml () {

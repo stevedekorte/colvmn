@@ -90,6 +90,30 @@ function escapeNonHtmlTags (text) {
         htmlElementNames.has(name.toLowerCase()) ? m : `&lt;${slash}${name}`);
 }
 
+// US phone numbers in table cells link to the phone app (tel:), at build
+// time, so they work without JS: (415) 435-3266, 415-435-3266, 1-866-743-0335,
+// +1 415 435 3266, and a cell that is just 911. Text already inside a link is
+// left alone, as are tags and their attributes. Dates (2017 11 21), permit and
+// parcel numbers (2011-050, 060-201-03) and ZIP+4 codes don't match.
+const PHONE_RE = /(?<![\w/+-])(?:\+?1[-. ])?(?:\(\d{3}\)\s?|\d{3}[-. ])\d{3}[-. ]\d{4}(?![\w-])/g;
+
+function linkPhoneNumbers (html) {
+    let inLink = 0;
+    return String(html ?? "").split(/(<[^>]*>)/).map(part => {
+        if (part.startsWith("<")) {
+            if (/^<a[\s>]/i.test(part)) inLink++;
+            else if (/^<\/a\s*>/i.test(part)) inLink = Math.max(0, inLink - 1);
+            return part;
+        }
+        if (inLink) return part;
+        if (part.trim() === "911") return part.replace("911", '<a class="colvmn-tel" href="tel:911">911</a>');
+        return part.replace(PHONE_RE, m => {
+            const digits = m.replace(/\D/g, "");
+            return `<a class="colvmn-tel" href="tel:+${digits.length === 11 ? digits : "1" + digits}">${m}</a>`;
+        });
+    }).join("");
+}
+
 function inlineMarkdown (text) {
     // Code spans are extracted first so their content is HTML-escaped verbatim
     // and never processed by the link/emphasis rules (a URL in backticks must
@@ -199,7 +223,7 @@ function parseBlocks (lines) {
             html += headers.map((h, col) => `<th${cls(col)}>${h}</th>`).join("");
             html += "</tr></thead><tbody>";
             for (const row of rows) {
-                html += "<tr>" + row.map((c, col) => `<td${cls(col)}>${c}</td>`).join("") + "</tr>";
+                html += "<tr>" + row.map((c, col) => `<td${cls(col)}>${linkPhoneNumbers(c)}</td>`).join("") + "</tr>";
             }
             html += "</tbody></table>";
             blocks.push({ type: "html", html });
@@ -965,7 +989,7 @@ class ContentCards extends ContentBase {
     tableCellHtml (row, source) {
         const value = ContentCards.rowValue(row, source);
         if (source.toLowerCase() === "title" && row.link) return `<a href="${row.href}">${value}</a>`;
-        return value;
+        return linkPhoneNumbers(value);
     }
 
     computeTableHtml () {
@@ -1083,16 +1107,17 @@ class ContentOrderedList extends ContentBase {
 
 // ===== ContentTable.js =====
 
+
 const TH_STYLE = "text-align: left; font-size: 12px; font-weight: 600; padding: 12px 16px 12px 0; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; letter-spacing: 0.3px; color: #555;";
 const TD_STYLE = "padding: 10px 16px 10px 0; border-bottom: 1px solid #eee; color: #555; vertical-align: top;";
 const TD_LAST_STYLE = "padding: 10px 16px 10px 0; border-bottom: 1px solid #ccc; color: #555; vertical-align: top;";
 
 function renderCell (value) {
     if (Array.isArray(value)) {
-        const items = value.map(v => `<li>${v}</li>`).join("");
+        const items = value.map(v => `<li>${linkPhoneNumbers(v)}</li>`).join("");
         return `<ul style="margin:0; padding-left:18px;">${items}</ul>`;
     }
-    return value || "";
+    return linkPhoneNumbers(value || "");
 }
 
 class ContentTable extends ContentBase {
