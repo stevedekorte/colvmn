@@ -2206,7 +2206,7 @@ class ContentFileCards extends ContentBase {
                 return {
                     title,
                     href: viewerHref || encodeURIComponent(e.name),
-                    arrow: viewerHref ? "View" : "Open",
+                    arrow: viewerHref ? "View in browser" : "Open",
                     detail: `${type} · ${folderFormatSize(e.size)}`,
                     image: FOLDER_IMAGE_EXTS.has(ext),
                     drawing: ext === "svg",

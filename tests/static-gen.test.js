@@ -510,7 +510,7 @@ test("file cards for OBJ, DWG and DXF files open the engine's viewer pages, with
             ["model.html", join(pageDir, "house.obj")],
         ]);
         assert.ok(existsSync(join(dirname(staticGen), "viewers", "drawing.html")));
-        assert.match(html, /<h3>Floor 1<\/h3><p>AutoCAD drawing · 3 bytes<\/p><span class="arrow">View &rarr;/);
+        assert.match(html, /<h3>Floor 1<\/h3><p>AutoCAD drawing · 3 bytes<\/p><span class="arrow">View in browser &rarr;/);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }
