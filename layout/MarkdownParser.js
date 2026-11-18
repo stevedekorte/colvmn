@@ -525,6 +525,8 @@ export function parseMarkdown (text) {
         if (meta.folderCards === "newest-first") entry.order = "newest-first";
         // `folderOrder: overview, history, photos`: these folders first, in this order; the rest follow sorted.
         if (meta.folderOrder) entry.first = String(meta.folderOrder).split(",").map(n => n.trim()).filter(Boolean);
+        // `folderExclude: drafts, design-ideas`: subfolders left out of the cards (link them from the text instead).
+        if (meta.folderExclude) entry.exclude = String(meta.folderExclude).split(",").map(n => n.trim()).filter(Boolean);
         if (meta.folderCardsTitle) entry.title = meta.folderCardsTitle;
         listings.push(entry);
     }

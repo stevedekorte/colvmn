@@ -48,6 +48,7 @@ export class ContentFolderCards extends ContentCards {
         const names = [];
         for (const e of entries) {
             if (!e.isDir || !folderIsListed(e.name) || !e.isPage) continue;
+            if (Array.isArray(this.json.exclude) && this.json.exclude.includes(e.name)) continue;
             names.push(e.name);
         }
         names.sort(folderCompareNames);
