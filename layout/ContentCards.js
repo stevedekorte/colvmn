@@ -18,6 +18,11 @@ export class ContentCards extends ContentBase {
         return br !== -1 ? s.slice(0, br) : s;
     }
 
+    // A page's subtitle as lines (split at <br>), for listing tables.
+    static subtitleLines (meta) {
+        return String(meta.subtitle || "").split(/<br\s*\/?>/i).map(l => l.trim()).filter(Boolean);
+    }
+
     async resolve () {
         const items = this.json.items || [];
         this.resolvedItems = [];
@@ -29,6 +34,7 @@ export class ContentCards extends ContentBase {
                 const displayName = folder.split("/").pop();
                 let title = displayName;
                 let subtitle = "";
+                let lines = [];
                 let completion;
                 try {
                     const resp = await ContentBase.asyncFetch(`${encoded}/_index.json`);
@@ -36,6 +42,7 @@ export class ContentCards extends ContentBase {
                         const meta = await resp.json();
                         title = meta.title || displayName;
                         subtitle = ContentCards.cardSubtitle(meta);
+                        lines = ContentCards.subtitleLines(meta);
                         completion = meta.completion;
                     } else {
                         const mdResp = await ContentBase.asyncFetch(`${encoded}/_index.md`);
@@ -43,6 +50,7 @@ export class ContentCards extends ContentBase {
                             const meta = parseMarkdown(await mdResp.text());
                             title = meta.title || displayName;
                             subtitle = ContentCards.cardSubtitle(meta);
+                            lines = ContentCards.subtitleLines(meta);
                             completion = meta.completion;
                         }
                     }
@@ -60,6 +68,7 @@ export class ContentCards extends ContentBase {
                     folder,
                     title,
                     subtitle,
+                    lines,
                     completion,
                     href,
                     arrow: "View",
@@ -88,7 +97,56 @@ export class ContentCards extends ContentBase {
         await super.resolve();
     }
 
+    // Listing table columns: `columns` is a list of "Header" or "Header=source",
+    // where source is `title` (the page title, linked) or `lineN` (line N of the
+    // page's subtitle, split at <br>). Bare headers take title, line1, line2… in
+    // turn. With no columns given: Title, then one column per subtitle line.
+    tableColumns (rows) {
+        let specs = this.json.tableColumns;
+        if (!Array.isArray(specs) || !specs.length) {
+            const n = Math.max(1, ...rows.map(r => (r.lines || []).length));
+            specs = ["Title", ...Array.from({ length: n }, () => "")];
+        }
+        return specs.map((spec, i) => {
+            const eq = String(spec).lastIndexOf("=");
+            const header = eq === -1 ? String(spec).trim() : String(spec).slice(0, eq).trim();
+            const source = eq === -1 ? (i === 0 ? "title" : `line${i}`) : String(spec).slice(eq + 1).trim().toLowerCase();
+            return { header, source };
+        });
+    }
+
+    tableCellHtml (row, source) {
+        if (source === "title") {
+            return row.link ? `<a href="${row.href}">${row.title}</a>` : row.title;
+        }
+        const m = /^line(\d+)$/.exec(source);
+        if (m) {
+            const lines = row.lines || (row.subtitle ? [row.subtitle] : []);
+            return lines[Number(m[1]) - 1] || "";
+        }
+        return "";
+    }
+
+    computeTableHtml () {
+        const rows = [...this.resolvedItems, ...(this.extraRows || [])];
+        if (!rows.length) return "";
+        const columns = this.tableColumns(rows);
+        let html = "";
+        if (this.json.title) html += `<h2>${this.json.title}</h2>`;
+        html += '<div class="section listing-table"><div class="section-body"><table>';
+        if (columns.some(c => c.header)) {
+            html += "<thead><tr>" + columns.map(c => `<th>${c.header}</th>`).join("") + "</tr></thead>";
+        }
+        html += "<tbody>";
+        for (const row of rows) {
+            html += "<tr>" + columns.map(c => `<td class="listing-${c.source}">${this.tableCellHtml(row, c.source)}</td>`).join("") + "</tr>";
+        }
+        html += "</tbody></table></div></div>";
+        return html;
+    }
+
     computeHtml () {
+        if (this.json.layout === "table") return this.computeTableHtml();
         const title = this.json.title || "";
         const items = this.resolvedItems;
         // Folder listings keep every card one column wide (no stretched last

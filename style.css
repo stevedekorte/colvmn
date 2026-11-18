@@ -466,6 +466,15 @@ p code, li code, p tt, li tt {
   margin-bottom: 10px;
 }
 
+/* Folder listings as a table (folderLayout: table): the first column stays on one line */
+.listing-table td:first-child {
+  white-space: nowrap;
+}
+
+.listing-table td.listing-title a {
+  font-weight: 500;
+}
+
 /* File cards (ContentFileCards): long file names wrap; images show a thumbnail */
 .file-card h3 {
   overflow-wrap: anywhere;

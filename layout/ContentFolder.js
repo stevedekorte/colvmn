@@ -62,6 +62,8 @@ export class ContentFolderCards extends ContentCards {
             files.setJson({ type: "ContentFileCards" });
             await files.resolve();
             this.extraCardsHtml = files.files.map(f => files.cardHtml(f));
+            // In a table, each file is a row: its name (linked), then its type and size.
+            this.extraRows = files.files.map(f => ({ title: folderEscapeHtml(f.title), href: f.href, link: true, lines: [f.detail] }));
         }
         await super.resolve();
     }

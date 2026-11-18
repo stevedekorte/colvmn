@@ -528,6 +528,10 @@ export function parseMarkdown (text) {
         // `folderExclude: drafts, design-ideas`: subfolders left out of the cards (link them from the text instead).
         if (meta.folderExclude) entry.exclude = String(meta.folderExclude).split(",").map(n => n.trim()).filter(Boolean);
         if (meta.folderCardsTitle) entry.title = meta.folderCardsTitle;
+        // `folderLayout: table`: one table row per folder instead of a card grid.
+        if (meta.folderLayout) entry.layout = String(meta.folderLayout).trim();
+        // `folderColumns: Date=line1, Record=title, Summary=line2`: the table's columns (ContentCards.tableColumns).
+        if (meta.folderColumns) entry.tableColumns = String(meta.folderColumns).split(",").map(n => n.trim()).filter(Boolean);
         listings.push(entry);
     }
     // Both on and neither titled: one grid, the folder cards then the file cards.
