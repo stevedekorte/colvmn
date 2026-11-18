@@ -94,7 +94,9 @@ export class ContentCards extends ContentBase {
         // Folder listings keep every card one column wide (no stretched last
         // card); 2 or 4 cards share the width in two columns, others use three.
         const listing = this.json.listing === true;
-        const columns = this.json.columns || (listing ? ContentBase.listingColumns(items.length) : Math.min(items.length, 3));
+        // Cards appended after the items in the same grid (a folder listing's file cards).
+        const extra = this.extraCardsHtml || [];
+        const columns = this.json.columns || (listing ? ContentBase.listingColumns(items.length + extra.length) : Math.min(items.length, 3));
         const colsClass = (columns === 2 ? " cols-2" : "") + (listing ? " listing" : "");
 
         let html = "";
@@ -125,6 +127,7 @@ export class ContentCards extends ContentBase {
             }
             html += `</${tag}>`;
         }
+        html += extra.join("");
 
         html += "</div>";
         return html;

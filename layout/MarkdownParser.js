@@ -528,7 +528,10 @@ export function parseMarkdown (text) {
         if (meta.folderCardsTitle) entry.title = meta.folderCardsTitle;
         listings.push(entry);
     }
-    if (meta.fileCards) {
+    // Both on and neither titled: one grid, the folder cards then the file cards.
+    if (meta.folderCards && meta.fileCards && !meta.folderCardsTitle && !meta.fileCardsTitle) {
+        listings[listings.length - 1].withFiles = true;
+    } else if (meta.fileCards) {
         const entry = { type: "ContentFileCards" };
         if (meta.fileCardsTitle) entry.title = meta.fileCardsTitle;
         listings.push(entry);

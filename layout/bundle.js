@@ -534,7 +534,10 @@ function parseMarkdown (text) {
         if (meta.folderCardsTitle) entry.title = meta.folderCardsTitle;
         listings.push(entry);
     }
-    if (meta.fileCards) {
+    // Both on and neither titled: one grid, the folder cards then the file cards.
+    if (meta.folderCards && meta.fileCards && !meta.folderCardsTitle && !meta.fileCardsTitle) {
+        listings[listings.length - 1].withFiles = true;
+    } else if (meta.fileCards) {
         const entry = { type: "ContentFileCards" };
         if (meta.fileCardsTitle) entry.title = meta.fileCardsTitle;
         listings.push(entry);
@@ -897,7 +900,9 @@ class ContentCards extends ContentBase {
         // Folder listings keep every card one column wide (no stretched last
         // card); 2 or 4 cards share the width in two columns, others use three.
         const listing = this.json.listing === true;
-        const columns = this.json.columns || (listing ? ContentBase.listingColumns(items.length) : Math.min(items.length, 3));
+        // Cards appended after the items in the same grid (a folder listing's file cards).
+        const extra = this.extraCardsHtml || [];
+        const columns = this.json.columns || (listing ? ContentBase.listingColumns(items.length + extra.length) : Math.min(items.length, 3));
         const colsClass = (columns === 2 ? " cols-2" : "") + (listing ? " listing" : "");
 
         let html = "";
@@ -928,6 +933,7 @@ class ContentCards extends ContentBase {
             }
             html += `</${tag}>`;
         }
+        html += extra.join("");
 
         html += "</div>";
         return html;
@@ -2048,6 +2054,13 @@ class ContentFolderCards extends ContentCards {
         const first = Array.isArray(this.json.first) ? this.json.first.filter(n => names.includes(n)) : [];
         if (first.length) names.splice(0, names.length, ...first, ...names.filter(n => !first.includes(n)));
         this.json = { ...this.json, items: names, listing: true };
+        // `withFiles`: the folder's files share this grid, after the folders.
+        if (this.json.withFiles) {
+            const files = new ContentFileCards();
+            files.setJson({ type: "ContentFileCards" });
+            await files.resolve();
+            this.extraCardsHtml = files.files.map(f => files.cardHtml(f));
+        }
         await super.resolve();
     }
 }
@@ -2105,15 +2118,18 @@ class ContentFileCards extends ContentBase {
         if (this.json.title) html += `<h2>${this.json.title}</h2>`;
         const colsClass = ContentBase.listingColumns(this.files.length) === 2 ? " cols-2" : "";
         html += `<div class="card-grid file-cards listing${colsClass}">`;
-        for (const f of this.files) {
-            html += `<a class="card file-card" href="${f.href}">`;
-            if (f.image) html += `<img class="file-card-thumb${f.drawing ? " drawing" : ""}" src="${f.href}" alt="" loading="lazy">`;
-            html += `<h3>${folderEscapeHtml(f.title)}</h3>`;
-            html += `<p>${f.detail}</p>`;
-            html += `<span class="arrow">${f.arrow} &rarr;</span>`;
-            html += "</a>";
-        }
+        for (const f of this.files) html += this.cardHtml(f);
         html += "</div>";
+        return html;
+    }
+
+    cardHtml (f) {
+        let html = `<a class="card file-card" href="${f.href}">`;
+        if (f.image) html += `<img class="file-card-thumb${f.drawing ? " drawing" : ""}" src="${f.href}" alt="" loading="lazy">`;
+        html += `<h3>${folderEscapeHtml(f.title)}</h3>`;
+        html += `<p>${f.detail}</p>`;
+        html += `<span class="arrow">${f.arrow} &rarr;</span>`;
+        html += "</a>";
         return html;
     }
 }

@@ -55,6 +55,13 @@ export class ContentFolderCards extends ContentCards {
         const first = Array.isArray(this.json.first) ? this.json.first.filter(n => names.includes(n)) : [];
         if (first.length) names.splice(0, names.length, ...first, ...names.filter(n => !first.includes(n)));
         this.json = { ...this.json, items: names, listing: true };
+        // `withFiles`: the folder's files share this grid, after the folders.
+        if (this.json.withFiles) {
+            const files = new ContentFileCards();
+            files.setJson({ type: "ContentFileCards" });
+            await files.resolve();
+            this.extraCardsHtml = files.files.map(f => files.cardHtml(f));
+        }
         await super.resolve();
     }
 }
@@ -112,15 +119,18 @@ export class ContentFileCards extends ContentBase {
         if (this.json.title) html += `<h2>${this.json.title}</h2>`;
         const colsClass = ContentBase.listingColumns(this.files.length) === 2 ? " cols-2" : "";
         html += `<div class="card-grid file-cards listing${colsClass}">`;
-        for (const f of this.files) {
-            html += `<a class="card file-card" href="${f.href}">`;
-            if (f.image) html += `<img class="file-card-thumb${f.drawing ? " drawing" : ""}" src="${f.href}" alt="" loading="lazy">`;
-            html += `<h3>${folderEscapeHtml(f.title)}</h3>`;
-            html += `<p>${f.detail}</p>`;
-            html += `<span class="arrow">${f.arrow} &rarr;</span>`;
-            html += "</a>";
-        }
+        for (const f of this.files) html += this.cardHtml(f);
         html += "</div>";
+        return html;
+    }
+
+    cardHtml (f) {
+        let html = `<a class="card file-card" href="${f.href}">`;
+        if (f.image) html += `<img class="file-card-thumb${f.drawing ? " drawing" : ""}" src="${f.href}" alt="" loading="lazy">`;
+        html += `<h3>${folderEscapeHtml(f.title)}</h3>`;
+        html += `<p>${f.detail}</p>`;
+        html += `<span class="arrow">${f.arrow} &rarr;</span>`;
+        html += "</a>";
         return html;
     }
 }
