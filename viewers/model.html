@@ -115,7 +115,51 @@
         if (camera) renderer.render(scene, camera);
     }
 
-    new OBJLoader().load(url.href, obj => {
+    // OBJLoader splits each polygon into a fan of triangles from its first
+    // corner, which is wrong for a concave polygon (a wall face cut around
+    // windows, an L-shaped deck): triangles spill over the openings, and their
+    // stray edges show as diagonal lines. So polygons of four or more corners
+    // are split here first, with three's earcut triangulation, laid flat on the
+    // plane they face; each triangle keeps the polygon's winding (its front).
+    function triangulateObj (text) {
+        const verts = [];
+        const out = [];
+        for (const line of text.split(/\r?\n/)) {
+            if (line.startsWith("v ")) {
+                const p = line.trim().split(/\s+/);
+                verts.push([+p[1], +p[2], +p[3]]);
+                out.push(line);
+                continue;
+            }
+            const toks = line.startsWith("f ") ? line.trim().split(/\s+/).slice(1) : null;
+            if (!toks || toks.length < 4) { out.push(line); continue; }
+            const pts = toks.map(t => { const i = parseInt(t, 10); return verts[i < 0 ? verts.length + i : i - 1]; });
+            if (pts.some(p => !p)) { out.push(line); continue; }
+            // Newell's method: the polygon's normal; drop its largest axis.
+            let nx = 0, ny = 0, nz = 0;
+            for (let i = 0; i < pts.length; i++) {
+                const a = pts[i], b = pts[(i + 1) % pts.length];
+                nx += (a[1] - b[1]) * (a[2] + b[2]);
+                ny += (a[2] - b[2]) * (a[0] + b[0]);
+                nz += (a[0] - b[0]) * (a[1] + b[1]);
+            }
+            const ax = Math.abs(nx), ay = Math.abs(ny), az = Math.abs(nz);
+            const [u, v] = ax >= ay && ax >= az ? [1, 2] : ay >= az ? [2, 0] : [0, 1];
+            const flat2d = pts.map(p => new THREE.Vector2(p[u], p[v]));
+            const area = THREE.ShapeUtils.area(flat2d);
+            const tris = THREE.ShapeUtils.triangulateShape(flat2d.map(q => q.clone()), []);
+            if (!tris.length) { out.push(line); continue; }
+            for (let [a, b, c] of tris) {
+                const t = THREE.ShapeUtils.area([flat2d[a], flat2d[b], flat2d[c]]);
+                if ((t < 0) !== (area < 0)) [b, c] = [c, b];
+                out.push(`f ${toks[a]} ${toks[b]} ${toks[c]}`);
+            }
+        }
+        return out.join("\n");
+    }
+
+    new THREE.FileLoader().load(url.href, text => {
+        const obj = new OBJLoader().parse(triangulateObj(text));
         status.remove();
         const box = new THREE.Box3().setFromObject(obj);
         const size = box.getSize(new THREE.Vector3());
