@@ -102,6 +102,13 @@ function escapeHtml (s) {
 }
 
 export class ContentComparisonTable extends ContentBase {
+    static defaultInfoRows = [
+        { label: "Website", field: "website", format: "link" },
+        { label: "Founded", field: "creationDate", format: "date" },
+        { label: "Users", field: "guestimatedUserBase", format: "count" },
+        { label: "License", field: "openOrClosedSource", format: "source" }
+    ];
+
     constructor () {
         super();
         this.entities = [];
@@ -190,13 +197,7 @@ export class ContentComparisonTable extends ContentBase {
         // Info table columns (one per attribute; entities are rows). Defaults
         // preserve the product/competitor layout; any site can override via
         // an `infoRows` array of { label, field, format } in the JSON.
-        const defaultInfoRows = [
-            { label: "Website", field: "website", format: "link" },
-            { label: "Founded", field: "creationDate", format: "date" },
-            { label: "Users", field: "guestimatedUserBase", format: "count" },
-            { label: "License", field: "openOrClosedSource", format: "source" }
-        ];
-        const infoRowDefs = this.json.infoRows || defaultInfoRows;
+        const infoRowDefs = this.json.infoRows || ContentComparisonTable.defaultInfoRows;
         const infoRows = infoRowDefs.map(def => ({
             label: def.label,
             render: c => {

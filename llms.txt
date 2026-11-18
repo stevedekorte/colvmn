@@ -2,7 +2,7 @@
 
 > A minimal static-site layout engine.
 
-Site build: colvmn · 2026-11-17 · 3968343
+Site build: colvmn · 2026-11-17 · a047023
 
 ## AI Reviews
 
@@ -18,7 +18,7 @@ Site build: colvmn · 2026-11-17 · 3968343
 
 ## Quick Start
 
-- [Quick Start](/quick-start/)
+- [Quick Start](/quick-start/): A two-page site in a few minutes: a home page, a child page, and a build that links them.
 
 ## Scheduled Updates
 

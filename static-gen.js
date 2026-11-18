@@ -228,12 +228,14 @@ function createFetchFn (pageDir) {
 }
 
 // What is in a page's folder, for the folder-listing blocks (ContentFolder.js):
-// each entry's name, whether it is a folder (and a page: has _index.*), and size.
+// each entry's name, whether it is a folder (and a page: one the build
+// generates, as findLayoutPages finds them, so never the colvmn engine), and size.
 function listPageDir (pageDir) {
     return readdirSync(pageDir, { withFileTypes: true }).map(e => {
         const full = join(pageDir, e.name);
         if (e.isDirectory()) {
-            const isPage = existsSync(join(full, "_index.md")) || existsSync(join(full, "_index.json"));
+            const isPage = !skipDirs.has(e.name) && existsSync(join(full, "index.html")) &&
+                (existsSync(join(full, "_index.md")) || existsSync(join(full, "_index.json")));
             return { name: e.name, isDir: true, isPage, size: 0 };
         }
         let size = 0;
@@ -377,6 +379,10 @@ async function generatePage (pageDir) {
         console.log(`  skipped (no content): ${relPath}`);
         return;
     }
+
+    // The page's own resolved blocks, for llms-full.txt (before any AI
+    // reviews parts are added below: those stay out of the llms files).
+    builtBlocks.set(pageDir, page.children);
 
     // An AI Reviews page gets its generated parts (cards, review header,
     // archive list), and the root page its home card, resolved like the
@@ -760,12 +766,25 @@ function withoutCollapsedMarkers (markdown) {
     }).join("\n");
 }
 
+// The page's "# Title" line (outside fenced code, where it is an example),
+// as { index, 0: line } like a regex match, or null.
+function firstH1 (body) {
+    let inFence = false;
+    let at = 0;
+    for (const line of body.split("\n")) {
+        if (/^\s*```/.test(line)) inFence = !inFence;
+        else if (!inFence && /^# /.test(line)) return { index: at, 0: line + "\n" };
+        at += line.length + 1;
+    }
+    return null;
+}
+
 // A markdown page's text for llms-full.txt: its frontmatter settings are left
 // out, but a title or subtitle set there is kept, as the page shows it.
 function llmsMarkdown (raw) {
     const { meta, body } = splitFrontmatter(raw);
     const subtitle = meta.subtitle ? htmlToPlain(String(meta.subtitle)) + "\n\n" : "";
-    const h1 = body.match(/^# .*\n?/m);
+    const h1 = firstH1(body);
     if (h1) {
         const at = h1.index + h1[0].length;
         return (body.slice(0, at) + (subtitle ? "\n" + subtitle : "") + body.slice(at).replace(/^\n+/, subtitle ? "" : "\n")).trim();
@@ -825,6 +844,10 @@ function contentEntryToMarkdown (entry, depth = 0) {
             (entry.items || []).forEach((item, i) => {
                 const text = typeof item === "string" ? item : (item.text || "");
                 md += `${marker(i)} ${htmlToPlain(text)}\n`;
+                if (item && Array.isArray(item.content)) {
+                    const nested = item.content.map(c => contentEntryToMarkdown(c, depth + 1)).join("").trim();
+                    if (nested) md += nested.split("\n").map(l => l ? "  " + l : l).join("\n") + "\n";
+                }
             });
             return md + "\n";
         }
@@ -858,10 +881,12 @@ function contentEntryToMarkdown (entry, depth = 0) {
         case "ContentImage": {
             const alt = entry.alt || entry.title || "";
             const src = entry.src || entry.href || "";
-            return src ? `![${alt}](${src})\n\n` : "";
+            return src ? (title ? `${heading} ${title}\n\n` : "") + `![${alt}](${src})\n\n` : "";
         }
-        case "ContentSlideshow":
-            return (entry.images || []).filter(im => im.src).map(im => `![${im.alt || ""}](${im.src})\n\n`).join("");
+        case "ContentSlideshow": {
+            const images = (entry.images || []).filter(im => im.src);
+            return images.length ? (title ? `${heading} ${title}\n\n` : "") + images.map(im => `![${im.alt || ""}](${im.src})\n\n`).join("") : "";
+        }
         case "ContentToc":
             return "";
         default:
@@ -869,12 +894,114 @@ function contentEntryToMarkdown (entry, depth = 0) {
     }
 }
 
-function jsonPageToMarkdown (json) {
+// Each built page's resolved blocks (generatePage), so llms-full.txt is made
+// from what the page shows: cards with their pages' titles, folder listings,
+// comparison tables with their fetched rows. Every block's meaningful text
+// must reach llms-full.txt, since AI reviewers read only that file; a block
+// type with no case below falls back to its rendered HTML as text.
+const builtBlocks = new Map();
+
+function cardLine (row) {
+    const title = htmlToPlain(String(row.title || row.folder || ""));
+    let line = row.link && row.href ? `- [${title}](${row.href})` : `- **${title}**`;
+    if (row.date) line += ` (${row.date})`;
+    const detail = row.subtitle ? htmlToPlain(row.subtitle) : (row.lines || []).map(l => htmlToPlain(String(l))).filter(Boolean).join("; ");
+    if (detail) line += ` — ${detail}`;
+    return line + "\n";
+}
+
+function blockToMarkdown (block, depth = 0) {
+    const json = block.json || {};
+    const heading = depth === 0 ? "##" : "###";
+    const head = json.title ? `${heading} ${htmlToPlain(String(json.title))}\n\n` : "";
+
+    switch (json.type) {
+        case "ContentText": {
+            let md = head;
+            if (json.body) md += htmlToMarkdown(json.body) + "\n\n";
+            for (const child of block.children || []) md += blockToMarkdown(child, depth + 1);
+            return md;
+        }
+        case "ContentCards":
+        case "ContentFolderCards": {
+            const rows = [...(block.resolvedItems || []), ...(block.extraRows || [])];
+            if (!rows.length) return "";
+            return head + rows.map(cardLine).join("") + "\n";
+        }
+        case "ContentFileCards": {
+            const files = block.files || [];
+            if (!files.length) return "";
+            return head + files.map(f => `- [${f.title}](${f.href}) — ${f.detail}\n`).join("") + "\n";
+        }
+        case "ContentFAQ": {
+            let md = head;
+            for (const item of json.items || []) {
+                md += `**${htmlToPlain(item.q || "")}**\n\n${htmlToMarkdown(item.a || "")}\n\n`;
+            }
+            return md;
+        }
+        case "ContentClassDoc": {
+            const sections = json.sections || [];
+            let md = head;
+            for (const section of sections) {
+                if (sections.length > 1 && section.name) md += `${heading} ${section.name}\n\n`;
+                for (const category of section.categories || []) {
+                    if (category.name) md += `**${category.name}**\n\n`;
+                    for (const m of category.members || []) {
+                        md += `- \`${m.name}${m.signature ? " " + htmlToPlain(m.signature) : ""}\``;
+                        if (m.description) md += `: ${htmlToPlain(m.description)}`;
+                        md += "\n";
+                    }
+                    md += "\n";
+                }
+            }
+            return md;
+        }
+        case "ContentComparisonTable": {
+            const entities = block.entities || [];
+            if (!entities.length) return "";
+            const infoRows = json.infoRows || ContentComparisonTable.defaultInfoRows;
+            const featureRows = json.featureRows || [];
+            const universal = [...(json.universalFeatures || []), ...featureRows].filter(f => block.isUniversal(f.key));
+            const features = featureRows.filter(f => !universal.some(u => u.key === f.key));
+            const label = json.itemsLabel || json.competitorsLabel || "Competitors";
+            const cell = v => htmlToPlain(String(v ?? "")).replace(/\|/g, "\\|");
+            const feature = f => {
+                if (!f) return "no";
+                const value = f.value === true ? "yes" : f.value === false ? "no" : String(f.value ?? "no");
+                return cell([value, f.summary, f.notes].filter(Boolean).join(" — "));
+            };
+            const cols = [label, ...infoRows.map(r => r.label), ...features.map(f => f.label)];
+            let md = head + "| " + cols.map(cell).join(" | ") + " |\n| " + cols.map(() => "---").join(" | ") + " |\n";
+            for (const e of entities) {
+                const cells = [cell(e._name), ...infoRows.map(r => cell(e[r.field])), ...features.map(f => feature(e.features && e.features[f.key]))];
+                md += "| " + cells.join(" | ") + " |\n";
+            }
+            if (universal.length) md += `\nAll ${label.toLowerCase()} also support ${universal.map(f => f.label).join(" and ")}.\n`;
+            return md + "\n";
+        }
+        case "ContentKeyValue":
+        case "ContentUnorderedList":
+        case "ContentOrderedList":
+        case "ContentTable":
+        case "ContentTimeline":
+        case "ContentImage":
+        case "ContentSlideshow":
+        case "ContentToc":
+            return contentEntryToMarkdown(json, depth);
+        default:
+            return htmlToMarkdown(block.computeHtml()) + "\n\n";
+    }
+}
+
+function jsonPageToMarkdown (json, blocks = null) {
     let md = "";
     if (json.title) md += `# ${json.title}\n\n`;
     if (json.subtitle) md += htmlToPlain(json.subtitle) + "\n\n";
-    for (const entry of json.content || []) {
-        md += contentEntryToMarkdown(entry, 0);
+    if (blocks) {
+        for (const block of blocks) md += blockToMarkdown(block, 0);
+    } else {
+        for (const entry of json.content || []) md += contentEntryToMarkdown(entry, 0);
     }
     return md.trim() + "\n";
 }
@@ -980,10 +1107,15 @@ function generateLlmsFull (pages, scope = null) {
         out += `<!-- Page: ${pathLabel} -->\n`;
         out += `Source: ${url}\n\n`;
 
+        const blocks = builtBlocks.get(pageDir) || null;
         if (meta.rawMarkdown) {
             out += withoutCollapsedMarkers(llmsMarkdown(meta.rawMarkdown).trim()) + "\n";
+            // Folder listings come from frontmatter, not the text: add what they list.
+            const listings = (blocks || []).filter(b => /^Content(Folder|File)Cards$/.test(b.json.type));
+            const listed = listings.map(b => blockToMarkdown(b, 0)).join("").trim();
+            if (listed) out += "\n" + listed + "\n";
         } else {
-            out += jsonPageToMarkdown(meta.json);
+            out += jsonPageToMarkdown(meta.json, blocks);
         }
     }
 
@@ -1079,6 +1211,23 @@ async function main () {
     const pages = findLayoutPages(siteRoot);
     if (!pages.includes(siteRoot)) {
         console.error(`Static gen: no root page at ${siteRoot} - its _index.* needs an index.html beside it.`);
+        process.exit(1);
+    }
+
+    // A markdown page whose frontmatter can't be read would ship without what
+    // the author wrote there; stop and say where.
+    const unreadable = [];
+    for (const pageDir of pages) {
+        const mdPath = join(pageDir, "_index.md");
+        if (existsSync(join(pageDir, "_index.json")) || !existsSync(mdPath)) continue;
+        try {
+            splitFrontmatter(readFileSync(mdPath, "utf-8"));
+        } catch (e) {
+            unreadable.push(`${relative(process.cwd(), mdPath)}: ${e.message}`);
+        }
+    }
+    if (unreadable.length) {
+        for (const line of unreadable) console.error(`Static gen: ${line}`);
         process.exit(1);
     }
 

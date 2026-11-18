@@ -516,6 +516,112 @@ test("file cards for OBJ, DWG and DXF files open the engine's viewer pages, with
     }
 });
 
+// One sample of every content block type, each with marker text that must
+// reach both the page and llms-full.txt (AI reviewers read only that file).
+const BLOCK_SAMPLES = {
+    ContentText: { type: "ContentText", title: "Text Mk1", body: "<p>Text Mk2</p>", content: [{ type: "ContentUnorderedList", items: ["Text Mk3"] }] },
+    ContentCards: { type: "ContentCards", title: "Cards Mk1", items: ["child", { title: "Cards Mk2", subtitle: "Cards Mk3", href: "https://example.com/" }] },
+    ContentKeyValue: { type: "ContentKeyValue", title: "KV Mk1", items: { "KV Mk2": "KV Mk3" } },
+    ContentUnorderedList: { type: "ContentUnorderedList", title: "UL Mk1", items: ["UL Mk2", { text: "UL Mk3", content: [{ type: "ContentUnorderedList", items: ["UL Mk4"] }] }] },
+    ContentOrderedList: { type: "ContentOrderedList", title: "OL Mk1", items: ["OL Mk2"] },
+    ContentTable: { type: "ContentTable", title: "Tbl Mk1", subtitle: "Tbl Mk2", columns: ["Tbl Mk3"], rows: [["Tbl Mk4"]], note: "Tbl Mk5" },
+    ContentImage: { type: "ContentImage", title: "Img Mk1", src: "img-mk2.png", alt: "Img Mk3" },
+    ContentTimeline: { type: "ContentTimeline", title: "TL Mk1", items: [{ date: "2020", title: "TL Mk2", subtitle: "TL Mk3" }] },
+    ContentToc: { type: "ContentToc", items: ["Text Mk1"] },
+    ContentFAQ: { type: "ContentFAQ", title: "FAQ Mk1", items: [{ q: "FAQ Mk2", a: "<p>FAQ Mk3</p>" }] },
+    ContentClassDoc: { type: "ContentClassDoc", sections: [
+        { name: "CD Mk1", categories: [{ name: "CD Mk2", members: [{ name: "cdMk3", signature: "(cdMk4)", description: "CD Mk5" }] }] },
+        { name: "CD Mk6", categories: [{ members: [{ name: "cdMk7" }] }] },
+    ] },
+    ContentComparisonTable: { type: "ContentComparisonTable", title: "Cmp Mk1", items: ["acme-mk2"], itemsLabel: "Tools",
+        infoRows: [{ label: "Cmp Mk3", field: "tagline" }],
+        featureRows: [{ key: "f", label: "Cmp Mk4" }, { key: "u", label: "Cmp Mk5" }] },
+    ContentSlideshow: { type: "ContentSlideshow", title: "Show Mk1", images: [{ src: "show-mk2.png", alt: "Show Mk3" }] },
+    ContentFolderCards: { type: "ContentFolderCards", title: "Folders Mk1" },
+    ContentFileCards: { type: "ContentFileCards", title: "Files Mk1" },
+};
+// Text that comes from elsewhere: the child page, the comparison's _info.json, the folder's file.
+const SAMPLE_SOURCE_MARKERS = ["Child Mk1", "Child Mk2", "Cmp Mk6", "Cmp Mk7", "Cmp Mk8", "files-mk1"];
+
+test("every content block's text reaches both the page and llms-full.txt", () => {
+    const registered = readFileSync(staticGen, "utf-8").match(/ContentBase\.typeMap = \{([\s\S]*?)\};/)[1].match(/\w+/g);
+    assert.deepEqual(Object.keys(BLOCK_SAMPLES).sort(), [...registered].sort(), "a sample for every registered block type");
+
+    const site = makeSite({});
+    try {
+        const dir = join(site, "blocks");
+        mkdirSync(join(dir, "acme-mk2"), { recursive: true });
+        writeFileSync(join(dir, "_index.json"), JSON.stringify({ title: "Blocks", content: Object.values(BLOCK_SAMPLES) }));
+        writeFileSync(join(dir, "index.html"), "");
+        writePage(site, "blocks/child", "---\nsubtitle: Child Mk2\n---\n# Child Mk1\n");
+        writeFileSync(join(dir, "acme-mk2", "_info.json"), JSON.stringify({ tagline: "Cmp Mk6", features: {
+            f: { value: "partial", summary: "Cmp Mk7", notes: "Cmp Mk8" }, u: { value: true },
+        } }));
+        writeFileSync(join(dir, "files-mk1.pdf"), "pdf");
+        const { llmsFull } = build(site);
+        const html = readFileSync(join(dir, "index.html"), "utf-8").split('id="colvmn-prefetch"')[0];
+        const markers = [...JSON.stringify(BLOCK_SAMPLES).matchAll(/[A-Za-z]+ ?Mk\d|[a-z]+-mk\d/gi)].map(m => m[0]);
+        for (const marker of [...new Set(markers), ...SAMPLE_SOURCE_MARKERS]) {
+            assert.ok(html.includes(marker), `page shows ${marker}`);
+            assert.ok(llmsFull.includes(marker), `llms-full.txt has ${marker}`);
+        }
+        // the universal feature is a note, not a column, in both
+        assert.match(llmsFull, /All tools also support Cmp Mk5\./);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
+test("a markdown page's folder and file listings reach llms-full.txt; the colvmn engine folder is never a folder card", () => {
+    const site = makeSite({});
+    try {
+        writePage(site, "jobs", "---\ntitle: Jobs\nfolderCards: true\nfileCards: true\nfileCardsTitle: Documents\n---\nJob notes.\n");
+        writePage(site, "jobs/roof", "---\nsubtitle: New roof, 2021.\n---\n# Roof\n");
+        writeFileSync(join(site, "jobs", "Contract.pdf"), "pdf");
+        writeFileSync(join(site, "_index.md"), "---\ntopTitle: Example\nfolderCards: true\n---\n# Example\n\nThe root page.\n");
+        mkdirSync(join(site, "colvmn"));
+        writeFileSync(join(site, "colvmn", "_index.json"), JSON.stringify({ title: "Engine Docs" }));
+        writeFileSync(join(site, "colvmn", "index.html"), "");
+        const { llmsFull, rootHtml } = build(site);
+        const jobs = llmsFull.split("<!-- Page: jobs -->")[1].split("<!-- Page:")[0];
+        assert.match(jobs, /- \[Roof\]\(roof\/index\.html\) — New roof, 2021\./);
+        assert.match(jobs, /## Documents\n\n- \[Contract\]\(Contract\.pdf\) — PDF · 3 bytes/);
+        assert.match(rootHtml, /<h3>Kept Page<\/h3>/);
+        assert.doesNotMatch(rootHtml + llmsFull, /Engine Docs/);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
+test("frontmatter that isn't one-line key: value settings stops the build, naming the file and line", () => {
+    const site = makeSite({});
+    try {
+        writePage(site, "kept", "---\ntitle: Kept\ncontent:\n  - type: ContentText\n    body: Lost text\n---\n# Kept Page\n");
+        let stderr = "";
+        try {
+            execFileSync("node", [staticGen, site], { stdio: "pipe", encoding: "utf-8", cwd: site });
+            assert.fail("the build should fail");
+        } catch (e) {
+            stderr = String(e.stderr || "");
+        }
+        assert.match(stderr, /kept\/_index\.md: frontmatter line 4 \("- type: ContentText"\) is not a one-line "key: value" setting/);
+        assert.match(stderr, /_index\.json/);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
+test("a markdown page's # line inside fenced code is an example, not its title, in llms-full.txt", () => {
+    const site = makeSite({});
+    try {
+        writePage(site, "kept", "---\ntitle: Real Title\n---\n\nIntro.\n\n```markdown\n# Example Title\n```\n");
+        const { llmsFull } = build(site);
+        assert.match(llmsFull, /Source: \/kept\/\n\n# Real Title\n\nIntro\.\n\n```markdown\n# Example Title\n```/);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
 // bundle.js joins the layout files into one scope: if two declare the same
 // top-level name, the browser rejects the whole bundle and no runtime
 // behavior (columns, lightbox, collapsibles, slideshows) runs on any page.

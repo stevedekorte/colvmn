@@ -37,6 +37,7 @@ How it works:
 - Markup must be emitted by the build path (`computeHtml()` / `computePageHtml()`), since that is what ships. Don't rely on browser-side DOM construction.
 - Interactivity belongs in `postRender(page)` (per-block) or, for page-global behavior not tied to a block, in `layout.js`'s `DOMContentLoaded` handler. Prefer event delegation so it works regardless of which blocks are present.
 - There is no static/dynamic markup to keep in sync: the build is the single source of the HTML; the runtime only enhances it.
+- Every block's meaningful text must also reach `llms-full.txt` (AI agents and AI reviews read only that). `static-gen.js` builds it from each page's resolved blocks (`blockToMarkdown`); a new block type gets a case there (without one, its rendered HTML is stripped to text), and a sample in the "every content block's text reaches both" test in `tests/static-gen.test.js`.
 
 ## Structure
 
@@ -70,7 +71,7 @@ The markdown parser supports:
 - Image attribute lists — a Pandoc-style `{…}` suffix on an image: `![alt](src){.class #id key=value}` (see "Zoomable images" and "Image layout")
 - Tables (standard `| col | col |` pipe syntax). A header cell may end in a class list that applies to its whole column: `| Phone {.nowrap} |` keeps that column's cells on one line (the parser writes `colvmn-table-nowrap`, from `MarkdownParser.TABLE_COLUMN_OPTIONS`; other classes pass through as-is)
 - Raw HTML blocks (passed through as-is)
-- YAML frontmatter for page metadata (string values, plus `true`/`false` coerced to booleans). A frontmatter `subtitle` wins over the body: a short first paragraph is then kept as body text rather than promoted to the subtitle
+- YAML frontmatter for page metadata: one-line `key: value` settings only (string values, plus `true`/`false` coerced to booleans). Any other line (a YAML list or nested block) throws, and `static-gen.js` stops the build naming the file and line, so nothing written there is silently dropped; content blocks go in `_index.json`. A frontmatter `subtitle` wins over the body: a short first paragraph is then kept as body text rather than promoted to the subtitle
 - Folder listings — `folderCards`, `fileCards` and `cardsFirst` in frontmatter (see "Folder listings")
 
 ## Zoomable images

@@ -8,7 +8,7 @@ Every page is a directory with two files: a thin `index.html` shell and a conten
 
 Reach for `_index.md` on prose-heavy pages: YAML frontmatter for metadata, then ordinary markdown. The parser turns each `##` section into a `ContentText` block, so a markdown page is really just a convenient way to write a sequence of text blocks.
 
-Reach for `_index.json` when a page needs structure markdown can't express — a card grid, a table, a two-column layout, or a specific mix of blocks. The same blocks are also available from a `content` array in markdown frontmatter, but that array *replaces* the markdown body rather than merging with it, so pick one authoring path per page.
+Reach for `_index.json` when a page needs structure markdown can't express — a card grid, a table, an FAQ, or a specific mix of blocks. Markdown frontmatter is one-line `key: value` settings only: a YAML list or nested block there stops the build with an error naming the file and line, rather than being silently dropped. So write content blocks in `_index.json`.
 
 ## Page metadata
 
@@ -19,7 +19,7 @@ The same top-level keys work in markdown frontmatter and at the top of `_index.j
 | `title` | The page heading. An empty string hides it — useful on the root, where only the brand shows. |
 | `topTitle` | The brand shown at the top of every page; inherited down the directory tree when unset. |
 | `subtitle` | A tagline rendered just under the header. |
-| `content` | An array of content blocks. In JSON this is the body; in markdown frontmatter it replaces the body. |
+| `content` | `_index.json` only: the page's array of content blocks. A markdown page's body is its content. |
 | `llms` | `false` leaves the page and everything under it out of `llms.txt` and `llms-full.txt`. It is still generated and in the sitemap. |
 | `aiReviews` | `true` has AI models review this page's folder (see [AI Reviews](../ai-reviews/index.html)). `prompt` sets its review prompt. Not inherited. |
 | `footerLinks` | `[{ "title": "…", "href": "…" }]`: links on one line at the left of the page footer, separated by middle dots. The AI reviews link joins them. |
@@ -49,7 +49,7 @@ A block is an object with a `type` and its own fields. Any block may also carry 
 | `ContentFAQ` | Question/answer entries |
 | `ContentToc` | Table of contents (usually generated automatically) |
 
-Markdown pages produce `ContentText` blocks automatically; the rest are written in JSON or a frontmatter `content` array.
+Markdown pages produce `ContentText` blocks automatically (and the folder listings, from frontmatter settings); the rest are written in `_index.json`. Every block's text also goes into `llms-full.txt`, which AI agents and AI reviews read.
 
 ## Images, slideshows, collapsed sections and table columns
 
