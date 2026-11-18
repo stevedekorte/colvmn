@@ -91,8 +91,11 @@ export class ContentCards extends ContentBase {
     computeHtml () {
         const title = this.json.title || "";
         const items = this.resolvedItems;
-        const columns = this.json.columns || Math.min(items.length, 3);
-        const colsClass = columns === 2 ? " cols-2" : "";
+        // Folder listings keep every card one column wide (no stretched last
+        // card), in a 3-column grid even when there are fewer cards.
+        const listing = this.json.listing === true;
+        const columns = this.json.columns || (listing ? 3 : Math.min(items.length, 3));
+        const colsClass = (columns === 2 ? " cols-2" : "") + (listing ? " listing" : "");
 
         let html = "";
         if (title) html += `<h2>${title}</h2>`;
@@ -106,7 +109,7 @@ export class ContentCards extends ContentBase {
             // Last item spans remaining columns if row is partial
             const isLast = idx === items.length - 1;
             const remainder = items.length % columns;
-            const spanClass = (isLast && remainder > 0) ? ` card-span-${columns - remainder + 1}` : "";
+            const spanClass = (isLast && remainder > 0 && !listing) ? ` card-span-${columns - remainder + 1}` : "";
 
             html += `<${tag} class="card${spanClass}"${hrefAttr}>`;
             html += `<h3>${item.title}</h3>`;

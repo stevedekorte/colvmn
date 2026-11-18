@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model viewer</title>
+  <!--
+    colvmn's 3D viewer for OBJ files. File cards (layout/ContentFolder.js)
+    link here as viewers/model.html?src=<path to the file, relative to this page>.
+    Flat files (2D drawings exported as OBJ) open in a top-down view with
+    rotation off; 3D models open in a three-quarter view.
+  -->
+  <style>
+    html, body { margin: 0; height: 100%; background: #f4f3ef; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; color: #2a2a2a; }
+    #bar { position: fixed; top: 0; left: 0; right: 0; display: flex; gap: 16px; align-items: center; padding: 12px 16px; background: rgba(244, 243, 239, 0.92); border-bottom: 1px solid #ddd; z-index: 1; }
+    #bar a, #bar button { color: #666; text-decoration: none; background: none; border: 0; font: inherit; cursor: pointer; padding: 0; }
+    #bar a:hover, #bar button:hover { color: #2a2a2a; }
+    #name { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #status { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; color: #999; pointer-events: none; }
+    #hint { position: fixed; bottom: 10px; left: 16px; color: #999; font-size: 12px; }
+    canvas { display: block; }
+  </style>
+  <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    } }
+  </script>
+</head>
+<body>
+  <div id="bar">
+    <a id="back" href="javascript:history.back()">&larr; Back</a>
+    <span id="name"></span>
+    <button id="up" type="button" title="Turn the model if it lies on its side">Turn upright</button>
+    <button id="reset" type="button">Reset view</button>
+    <a id="download">Download</a>
+  </div>
+  <div id="status">Loading…</div>
+  <div id="hint"></div>
+  <script type="module">
+    import * as THREE from "three";
+    import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+    const src = new URLSearchParams(location.search).get("src") || "";
+    const url = new URL(src, location.href);
+    const fileName = decodeURIComponent(url.pathname.split("/").pop());
+    document.getElementById("name").textContent = fileName;
+    document.title = fileName;
+    const download = document.getElementById("download");
+    download.href = url.href;
+    download.setAttribute("download", fileName);
+    const status = document.getElementById("status");
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setClearColor(0xf4f3ef);
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8478, 2.2));
+    const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+    scene.add(sun);
+
+    let camera, controls, model, flat = false, resetView;
+
+    function resize () {
+        const w = window.innerWidth, h = window.innerHeight;
+        renderer.setSize(w, h);
+        if (!camera) return;
+        if (camera.isOrthographicCamera) {
+            const half = camera.userData.half, aspect = w / h;
+            camera.left = -half * aspect; camera.right = half * aspect;
+            camera.top = half; camera.bottom = -half;
+        } else {
+            camera.aspect = w / h;
+        }
+        camera.updateProjectionMatrix();
+    }
+    window.addEventListener("resize", resize);
+
+    function frame () {
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        const radius = size.length() / 2 || 1;
+        if (flat) {
+            const aspect = window.innerWidth / window.innerHeight;
+            const half = Math.max(size.y / 2, size.x / 2 / aspect) * 1.08;
+            camera = new THREE.OrthographicCamera(-half * aspect, half * aspect, half, -half, -radius * 10, radius * 10);
+            camera.userData.half = half;
+            camera.position.set(center.x, center.y, center.z + radius);
+        } else {
+            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, radius / 500, radius * 50);
+            camera.position.copy(center).add(new THREE.Vector3(1, 0.7, 1.2).normalize().multiplyScalar(radius * 2.6));
+            sun.position.copy(center).add(new THREE.Vector3(1, 2, 1.5).multiplyScalar(radius));
+        }
+        camera.lookAt(center);
+        controls?.dispose();
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.copy(center);
+        controls.enableRotate = !flat;
+        controls.screenSpacePanning = true;
+        if (flat) controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
+        controls.update();
+        resize();
+        document.getElementById("hint").textContent = flat
+            ? "Drag to move · scroll or pinch to zoom"
+            : "Drag to turn · right-drag or two fingers to move · scroll or pinch to zoom";
+    }
+
+    function animate () {
+        requestAnimationFrame(animate);
+        if (controls) controls.update();
+        if (camera) renderer.render(scene, camera);
+    }
+
+    new OBJLoader().load(url.href, obj => {
+        status.remove();
+        const box = new THREE.Box3().setFromObject(obj);
+        const size = box.getSize(new THREE.Vector3());
+        flat = size.z < Math.max(size.x, size.y) * 1e-3;
+        obj.traverse(child => {
+            if (child.isMesh) {
+                child.material = flat
+                    ? new THREE.MeshBasicMaterial({ color: 0x2a2a2a, side: THREE.DoubleSide })
+                    : new THREE.MeshStandardMaterial({ color: 0xe4dfd4, roughness: 0.85, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+                if (!flat) {
+                    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(child.geometry, 25), new THREE.LineBasicMaterial({ color: 0x6b665c }));
+                    child.add(edges);
+                }
+            } else if (child.isLine || child.isPoints) {
+                child.material = new THREE.LineBasicMaterial({ color: 0x2a2a2a });
+            }
+        });
+        model = obj;
+        scene.add(model);
+        if (flat) document.getElementById("up").remove();
+        frame();
+        animate();
+    }, xhr => {
+        if (xhr.total) status.textContent = `Loading… ${Math.round(xhr.loaded / xhr.total * 100)}%`;
+    }, () => {
+        status.textContent = location.protocol === "file:"
+            ? "The 3D viewer needs the site to be served (npm run dev, or the live site); browsers block it from file://."
+            : "Couldn't load this model.";
+    });
+
+    // SketchUp and other z-up exports lie on their side in three.js's y-up world.
+    document.getElementById("up").addEventListener("click", () => {
+        model.rotation.x = model.rotation.x === 0 ? -Math.PI / 2 : 0;
+        frame();
+    });
+    document.getElementById("reset").addEventListener("click", () => model && frame());
+  </script>
+</body>
+</html>

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drawing viewer</title>
+  <!--
+    colvmn's viewer for AutoCAD DWG and DXF files. File cards
+    (layout/ContentFolder.js) link here as viewers/drawing.html?src=<path to
+    the file, relative to this page>. The drawing is read in the browser by
+    LibreDWG compiled to WebAssembly (@mlightcad/libredwg-web, GPL), converted
+    to SVG, and shown with drag to pan and scroll or pinch to zoom.
+  -->
+  <style>
+    html, body { margin: 0; height: 100%; background: #f4f3ef; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; color: #2a2a2a; overflow: hidden; }
+    #bar { position: fixed; top: 0; left: 0; right: 0; display: flex; gap: 16px; align-items: center; padding: 12px 16px; background: rgba(244, 243, 239, 0.92); border-bottom: 1px solid #ddd; z-index: 1; }
+    #bar a, #bar button { color: #666; text-decoration: none; background: none; border: 0; font: inherit; cursor: pointer; padding: 0; }
+    #bar a:hover, #bar button:hover { color: #2a2a2a; }
+    #name { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #status { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; color: #999; padding: 0 24px; text-align: center; }
+    #hint { position: fixed; bottom: 10px; left: 16px; color: #999; font-size: 12px; }
+    #stage { position: fixed; inset: 0; background: #1d1f21; touch-action: none; cursor: grab; }
+    #stage.dragging { cursor: grabbing; }
+    #stage svg { width: 100%; height: 100%; display: block; }
+  </style>
+</head>
+<body>
+  <div id="stage"></div>
+  <div id="bar">
+    <a href="javascript:history.back()">&larr; Back</a>
+    <span id="name"></span>
+    <button id="reset" type="button">Reset view</button>
+    <a id="download">Download</a>
+  </div>
+  <div id="status">Loading…</div>
+  <div id="hint"></div>
+  <script type="module">
+    import { LibreDwg, Dwg_File_Type } from "https://cdn.jsdelivr.net/npm/@mlightcad/libredwg-web@0.9.0/dist/libredwg-web.js";
+
+    const WASM_DIR = "https://cdn.jsdelivr.net/npm/@mlightcad/libredwg-web@0.9.0/wasm";
+    const src = new URLSearchParams(location.search).get("src") || "";
+    const url = new URL(src, location.href);
+    const fileName = decodeURIComponent(url.pathname.split("/").pop());
+    document.getElementById("name").textContent = fileName;
+    document.title = fileName;
+    const download = document.getElementById("download");
+    download.href = url.href;
+    download.setAttribute("download", fileName);
+    const status = document.getElementById("status");
+    const stage = document.getElementById("stage");
+
+    function fail (message) {
+        status.textContent = message;
+    }
+
+    let svg, home, view;
+
+    function setView (v) {
+        view = v;
+        svg.setAttribute("viewBox", `${v.x} ${v.y} ${v.w} ${v.h}`);
+    }
+
+    // Zoom by factor k about a point given in screen pixels.
+    function zoomAt (k, px, py) {
+        const r = stage.getBoundingClientRect();
+        const scale = Math.max(view.w / r.width, view.h / r.height);
+        const ox = view.x + (px - r.left - (r.width - view.w / scale) / 2) * scale;
+        const oy = view.y + (py - r.top - (r.height - view.h / scale) / 2) * scale;
+        setView({ x: ox - (ox - view.x) / k, y: oy - (oy - view.y) / k, w: view.w / k, h: view.h / k });
+    }
+
+    function pan (dx, dy) {
+        const r = stage.getBoundingClientRect();
+        const scale = Math.max(view.w / r.width, view.h / r.height);
+        setView({ ...view, x: view.x - dx * scale, y: view.y - dy * scale });
+    }
+
+    function attachControls () {
+        stage.addEventListener("wheel", e => {
+            e.preventDefault();
+            zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002)), e.clientX, e.clientY);
+        }, { passive: false });
+        const pointers = new Map();
+        let pinch = null;
+        stage.addEventListener("pointerdown", e => {
+            stage.setPointerCapture(e.pointerId);
+            pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            stage.classList.add("dragging");
+        });
+        stage.addEventListener("pointermove", e => {
+            const last = pointers.get(e.pointerId);
+            if (!last) return;
+            const now = { x: e.clientX, y: e.clientY };
+            pointers.set(e.pointerId, now);
+            if (pointers.size === 2) {
+                const [a, b] = [...pointers.values()];
+                const d = Math.hypot(a.x - b.x, a.y - b.y);
+                if (pinch) zoomAt(d / pinch, (a.x + b.x) / 2, (a.y + b.y) / 2);
+                pinch = d;
+            } else if (pointers.size === 1) {
+                pan(now.x - last.x, now.y - last.y);
+            }
+        });
+        const up = e => {
+            pointers.delete(e.pointerId);
+            pinch = null;
+            if (!pointers.size) stage.classList.remove("dragging");
+        };
+        stage.addEventListener("pointerup", up);
+        stage.addEventListener("pointercancel", up);
+        document.getElementById("reset").addEventListener("click", () => setView({ ...home }));
+    }
+
+    try {
+        status.textContent = "Loading the drawing reader…";
+        const [libredwg, response] = await Promise.all([LibreDwg.create(WASM_DIR), fetch(url.href)]);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const buffer = await response.arrayBuffer();
+        status.textContent = "Reading the drawing…";
+        const type = fileName.toLowerCase().endsWith(".dxf") ? Dwg_File_Type.DXF : Dwg_File_Type.DWG;
+        const dwg = libredwg.dwg_read_data(buffer, type);
+        if (!dwg) throw new Error("unreadable drawing");
+        const db = libredwg.convert(dwg);
+        libredwg.dwg_free(dwg);
+        stage.innerHTML = libredwg.dwg_to_svg(db);
+        svg = stage.querySelector("svg");
+        if (!svg) throw new Error("no drawing produced");
+        svg.removeAttribute("width");
+        svg.removeAttribute("height");
+        svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+        const vb = svg.viewBox.baseVal;
+        home = vb && vb.width ? { x: vb.x, y: vb.y, w: vb.width, h: vb.height } : (() => {
+            const b = svg.getBBox();
+            return { x: b.x, y: b.y, w: b.width, h: b.height };
+        })();
+        setView({ ...home });
+        attachControls();
+        status.remove();
+        document.getElementById("hint").textContent = "Drag to move · scroll or pinch to zoom";
+    } catch (err) {
+        fail(location.protocol === "file:"
+            ? "The drawing viewer needs the site to be served (npm run dev, or the live site); browsers block it from file://."
+            : `Couldn't show this drawing (${err.message}). Use Download to open it in a CAD program.`);
+    }
+  </script>
+</body>
+</html>

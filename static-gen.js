@@ -232,6 +232,16 @@ function listPageDir (pageDir) {
     });
 }
 
+// A link from a page to one of the engine's file viewers (viewers/<viewer>.html),
+// with the file's path relative to the viewer page as ?src=.
+function viewerHref (localRoot, pageDir, viewer, fileName) {
+    const viewersDir = join(engineDirFor(localRoot), "viewers");
+    const toUrl = p => p.split(sep).map(seg => (seg === ".." ? seg : encodeURIComponent(seg))).join("/");
+    const page = toUrl(relative(pageDir, join(viewersDir, `${viewer}.html`)));
+    const src = relative(viewersDir, join(pageDir, fileName)).split(sep).join("/");
+    return `${page}?src=${encodeURIComponent(src)}`;
+}
+
 // ---------------------------------------------------------------------------
 // Directory walker — finds pages that have both index.html and _index content
 // ---------------------------------------------------------------------------
@@ -342,6 +352,7 @@ async function generatePage (pageDir) {
     const fetchFn = createFetchFn(pageDir);
     ContentBase.setFetchFn(fetchFn);
     ContentBase.listDirFn = () => listPageDir(pageDir);
+    ContentBase.viewerHrefFn = (viewer, fileName) => viewerHref(localRoot, pageDir, viewer, fileName);
 
     const context = {
         isRoot: () => pageDir === localRoot,

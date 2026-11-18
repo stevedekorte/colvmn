@@ -138,7 +138,7 @@ cardsFirst: true
 ```
 
 - **`ContentFolderCards`** (`folderCards: true`): a card for each subfolder that has an `_index.md` or `_index.json`, titled and subtitled from it like a `ContentCards` folder card, sorted by name (numbers in order); `"order": "newest-first"` reverses it, which suits folders named by date.
-- **`ContentFileCards`** (`fileCards: true`): a card for each file, titled with its name less the extension, with its type and size, linking to the file. Images show a thumbnail.
+- **`ContentFileCards`** (`fileCards: true`): a card for each file, titled with its name less the extension, with its type and size, linking to the file. Images show a thumbnail. 3D models (`.obj`) open in colvmn's 3D viewer and CAD drawings (`.dwg`, `.dxf`) in its drawing viewer, both in the browser (served over HTTP; they load three.js and LibreDWG from a CDN).
 - Names starting with `.` or `_`, and `index.html`, are never listed, so notes or tools can sit beside a page without appearing on it.
 - In JSON: `{ "type": "ContentFolderCards", "title": "Jobs", "order": "newest-first" }` and `{ "type": "ContentFileCards" }`.
 

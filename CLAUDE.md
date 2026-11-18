@@ -50,6 +50,7 @@ How it works:
 - `layout/MarkdownParser.js` — frontmatter + markdown to page JSON
 - `layout/ContentSlideshow.js` — the slideshow block for `_index.json` pages
 - `layout/ContentFolder.js` — folder listings (see "Folder listings"): `ContentFolderCards` and `ContentFileCards`
+- `viewers/` — standalone viewer pages that file cards open for files a browser can't show: `model.html` (OBJ, three.js) and `drawing.html` (DWG/DXF, LibreDWG as WebAssembly, rendered to SVG). Both load their libraries from jsdelivr at pinned versions and take `?src=` (the file's path relative to the viewer page); they need the site served over HTTP, not `file://`
 - `layout/Columns.js` — builds a page's columns on wide viewports (see `maxColumns` under Page Metadata)
 - `layout/Slideshow.js` — slideshow behavior (see "Slideshows")
 - `layout/Collapsible.js` — open/close behavior for collapsed sections (page-global, event delegation; see "Collapsed sections")
@@ -92,7 +93,7 @@ An image's size and placement are options, as classes in its attribute list (`![
 
 ## Folder listings
 
-A page can list what is in its own folder: `folderCards: true` (or `newest-first`) in `_index.md` frontmatter adds a `ContentFolderCards` block, a card for each subfolder that is a page (has `_index.md`/`_index.json`), titled and subtitled from it like a `ContentCards` folder card; `fileCards: true` adds a `ContentFileCards` block, a card for each file (name less extension, type and size, a thumbnail for images), linking to it. `folderCardsTitle` / `fileCardsTitle` give them headings. They go after the page's text, or before its first titled section with `cardsFirst: true` (`MarkdownParser.parseMarkdown`). Names starting with `.` or `_`, and `index.html`, are never listed. The listing needs the filesystem, so static-gen sets `ContentBase.listDirFn` for each page (`listPageDir`); in the browser it is unset and the blocks list nothing, which is fine since built pages are not re-rendered (see "Rendering model"). Styles: style.css's "File cards".
+A page can list what is in its own folder: `folderCards: true` (or `newest-first`) in `_index.md` frontmatter adds a `ContentFolderCards` block, a card for each subfolder that is a page (has `_index.md`/`_index.json`), titled and subtitled from it like a `ContentCards` folder card; `fileCards: true` adds a `ContentFileCards` block, a card for each file (name less extension, type and size, a thumbnail for images), linking to it. `folderCardsTitle` / `fileCardsTitle` give them headings. They go after the page's text, or before its first titled section with `cardsFirst: true` (`MarkdownParser.parseMarkdown`). Names starting with `.` or `_`, and `index.html`, are never listed. The listing needs the filesystem, so static-gen sets `ContentBase.listDirFn` for each page (`listPageDir`); in the browser it is unset and the blocks list nothing, which is fine since built pages are not re-rendered (see "Rendering model"). Files a browser can't show (`FOLDER_VIEWERS`: OBJ, DWG, DXF) link to a viewer page in `viewers/` instead, through `ContentBase.viewerHrefFn` (static-gen's `viewerHref`). Listing grids keep every card one column wide (`listing: true` on `ContentCards`, class `.listing`). Styles: style.css's "File cards".
 
 ## Collapsed sections
 

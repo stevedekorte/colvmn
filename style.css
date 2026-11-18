@@ -480,6 +480,27 @@ p code, li code, p tt, li tt {
   background: #f2f2ef;
 }
 
+/* Drawings (SVG) are shown whole, not cropped */
+.file-card-thumb.drawing {
+  object-fit: contain;
+  background: #fff;
+}
+
+/* Folder listings: the last card in a partial row draws no divider into the empty space */
+.card-grid.listing > .card:last-child {
+  border-right: none !important;
+}
+
+/* ...and each card draws its own bottom rule, so a partial last row is closed off */
+.card-grid.listing {
+  border-bottom: none;
+}
+
+.card-grid.listing > .card {
+  border-top: none !important;
+  border-bottom: 1px solid #ddd;
+}
+
 /* ── Timeline page layout ── */
 .page-timeline {
   max-width: none;

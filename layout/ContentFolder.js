@@ -52,7 +52,7 @@ export class ContentFolderCards extends ContentCards {
         }
         names.sort(folderCompareNames);
         if (this.json.order === "newest-first" || this.json.order === "desc") names.reverse();
-        this.json = { ...this.json, items: names };
+        this.json = { ...this.json, items: names, listing: true };
         await super.resolve();
     }
 }
@@ -64,6 +64,9 @@ const FOLDER_TYPE_NAMES = {
     zip: "Zip archive", dwg: "AutoCAD drawing", obj: "3D model (OBJ)", skp: "SketchUp model",
     mov: "Video", mp4: "Video", json: "JSON",
 };
+
+// File types opened in a viewer page (viewers/<name>.html) rather than directly.
+const FOLDER_VIEWERS = { obj: "model", dwg: "drawing", dxf: "drawing" };
 
 export function folderFormatSize (bytes) {
     if (bytes < 1024) return `${bytes} bytes`;
@@ -87,32 +90,33 @@ export class ContentFileCards extends ContentBase {
                 const ext = dot > 0 ? e.name.slice(dot + 1).toLowerCase() : "";
                 const title = dot > 0 ? e.name.slice(0, dot) : e.name;
                 const type = FOLDER_TYPE_NAMES[ext] || (ext ? ext.toUpperCase() : "File");
+                // Files a browser can't show itself open in one of the engine's viewers.
+                const viewer = FOLDER_VIEWERS[ext];
+                const viewerHref = viewer && ContentBase.viewerHrefFn ? ContentBase.viewerHrefFn(viewer, e.name) : null;
                 return {
                     title,
-                    href: encodeURIComponent(e.name),
+                    href: viewerHref || encodeURIComponent(e.name),
+                    arrow: viewerHref ? "View" : "Open",
                     detail: `${type} · ${folderFormatSize(e.size)}`,
                     image: FOLDER_IMAGE_EXTS.has(ext),
+                    drawing: ext === "svg",
                 };
             });
     }
 
     computeHtml () {
         if (!this.files.length) return "";
-        const columns = 3;
         let html = "";
         if (this.json.title) html += `<h2>${this.json.title}</h2>`;
-        html += '<div class="card-grid file-cards">';
-        this.files.forEach((f, idx) => {
-            const isLast = idx === this.files.length - 1;
-            const remainder = this.files.length % columns;
-            const spanClass = (isLast && remainder > 0) ? ` card-span-${columns - remainder + 1}` : "";
-            html += `<a class="card file-card${spanClass}" href="${f.href}">`;
-            if (f.image) html += `<img class="file-card-thumb" src="${f.href}" alt="" loading="lazy">`;
+        html += '<div class="card-grid file-cards listing">';
+        for (const f of this.files) {
+            html += `<a class="card file-card" href="${f.href}">`;
+            if (f.image) html += `<img class="file-card-thumb${f.drawing ? " drawing" : ""}" src="${f.href}" alt="" loading="lazy">`;
             html += `<h3>${folderEscapeHtml(f.title)}</h3>`;
             html += `<p>${f.detail}</p>`;
-            html += '<span class="arrow">Open &rarr;</span>';
+            html += `<span class="arrow">${f.arrow} &rarr;</span>`;
             html += "</a>";
-        });
+        }
         html += "</div>";
         return html;
     }

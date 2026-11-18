@@ -4,10 +4,10 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, symlinkSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join, dirname } from "node:path";
+import { join, dirname, resolve, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ANSWER_FORMAT } from "../layout/AiReviews.js";
 
@@ -485,6 +485,32 @@ test("folderCards and fileCards list a folder's subpages and files as cards; car
         assert.match(paint, /<a class="card file-card" href="Invoice%20%231\.pdf"><h3>Invoice #1<\/h3><p>PDF · 2 KB<\/p>/);
         assert.match(paint, /<a class="card file-card[^"]*" href="photo\.jpg"><img class="file-card-thumb" src="photo\.jpg"/);
         assert.doesNotMatch(paint, /_notes|index\.html"><h3>/);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
+test("file cards for OBJ, DWG and DXF files open the engine's viewer pages, with the file's path relative to the viewer", () => {
+    const site = makeSite({});
+    try {
+        writePage(site, "cad/house plans", "---\ntitle: Plans\nfileCards: true\n---\n");
+        writeFileSync(join(site, "cad/house plans/Floor 1.dwg"), "dwg");
+        writeFileSync(join(site, "cad/house plans/house.obj"), "obj");
+        build(site);
+        const pageDir = join(site, "cad/house plans");
+        const html = readFileSync(join(pageDir, "index.html"), "utf-8");
+        const hrefs = [...html.matchAll(/<a class="card file-card" href="([^"]+)">/g)].map(m => m[1]);
+        const resolved = hrefs.map(h => {
+            const [page, query] = h.split("?");
+            const viewerPage = resolve(pageDir, decodeURIComponent(page));
+            return [basename(viewerPage), resolve(dirname(viewerPage), new URLSearchParams(query).get("src"))];
+        });
+        assert.deepEqual(resolved, [
+            ["drawing.html", join(pageDir, "Floor 1.dwg")],
+            ["model.html", join(pageDir, "house.obj")],
+        ]);
+        assert.ok(existsSync(join(dirname(staticGen), "viewers", "drawing.html")));
+        assert.match(html, /<h3>Floor 1<\/h3><p>AutoCAD drawing · 3 bytes<\/p><span class="arrow">View &rarr;/);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }

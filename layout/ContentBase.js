@@ -46,6 +46,9 @@ export class ContentBase {
     // Build time only: () => [{ name, isDir, isPage, size }] for the page being
     // built, set by static-gen; read by the folder-listing blocks (ContentFolder.js).
     static listDirFn = null;
+    // Build time only: (viewer, fileName) => href of viewers/<viewer>.html for a
+    // file in the page's folder, set by static-gen (see ContentFolder.js).
+    static viewerHrefFn = null;
     static _prefetchCache = null;
 
     static setFetchFn (fn) {
