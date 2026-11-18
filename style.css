@@ -491,14 +491,36 @@ p code, li code, p tt, li tt {
   border-right: none !important;
 }
 
-/* ...and each card draws its own bottom rule, so a partial last row is closed off */
+/* ...and each card draws its own rules, so a partial row is closed off and no
+   line runs over the empty space beside it */
 .card-grid.listing {
+  border-top: none;
   border-bottom: none;
 }
 
 .card-grid.listing > .card {
   border-top: none !important;
   border-bottom: 1px solid #ddd;
+}
+
+/* The top rule is a 1px shadow just above each card: over the first row it is
+   the grid's top line, and below a card it falls on that card's bottom rule,
+   so it never doubles, in any column count or on phones. */
+.card-grid.listing > .card {
+  box-shadow: 0 -1px 0 #ddd;
+}
+
+/* Every card has the same inset on both sides, first and last columns too
+   (one column on phones, flush with the text) */
+.card-grid.listing > .card {
+  padding-left: 30px !important;
+  padding-right: 30px !important;
+}
+@media (max-width: 700px) {
+  .card-grid.listing > .card {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
 }
 
 /* ── Timeline page layout ── */

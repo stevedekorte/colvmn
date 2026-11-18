@@ -52,6 +52,8 @@ export class ContentFolderCards extends ContentCards {
         }
         names.sort(folderCompareNames);
         if (this.json.order === "newest-first" || this.json.order === "desc") names.reverse();
+        const first = Array.isArray(this.json.first) ? this.json.first.filter(n => names.includes(n)) : [];
+        if (first.length) names.splice(0, names.length, ...first, ...names.filter(n => !first.includes(n)));
         this.json = { ...this.json, items: names, listing: true };
         await super.resolve();
     }
@@ -108,7 +110,8 @@ export class ContentFileCards extends ContentBase {
         if (!this.files.length) return "";
         let html = "";
         if (this.json.title) html += `<h2>${this.json.title}</h2>`;
-        html += '<div class="card-grid file-cards listing">';
+        const colsClass = ContentBase.listingColumns(this.files.length) === 2 ? " cols-2" : "";
+        html += `<div class="card-grid file-cards listing${colsClass}">`;
         for (const f of this.files) {
             html += `<a class="card file-card" href="${f.href}">`;
             if (f.image) html += `<img class="file-card-thumb${f.drawing ? " drawing" : ""}" src="${f.href}" alt="" loading="lazy">`;

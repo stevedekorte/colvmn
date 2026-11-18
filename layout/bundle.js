@@ -529,6 +529,8 @@ function parseMarkdown (text) {
     if (meta.folderCards) {
         const entry = { type: "ContentFolderCards" };
         if (meta.folderCards === "newest-first") entry.order = "newest-first";
+        // `folderOrder: overview, history, photos`: these folders first, in this order; the rest follow sorted.
+        if (meta.folderOrder) entry.first = String(meta.folderOrder).split(",").map(n => n.trim()).filter(Boolean);
         if (meta.folderCardsTitle) entry.title = meta.folderCardsTitle;
         listings.push(entry);
     }
@@ -611,6 +613,12 @@ class ContentBase {
     // file in the page's folder, set by static-gen (see ContentFolder.js).
     static viewerHrefFn = null;
     static _prefetchCache = null;
+
+    // Columns for a folder-listing grid of n cards: two for 2 or 4 cards, so
+    // every row is full and the cards share the width; three otherwise.
+    static listingColumns (n) {
+        return (n === 2 || n === 4) ? 2 : 3;
+    }
 
     static setFetchFn (fn) {
         ContentBase._fetchFn = fn;
@@ -887,9 +895,9 @@ class ContentCards extends ContentBase {
         const title = this.json.title || "";
         const items = this.resolvedItems;
         // Folder listings keep every card one column wide (no stretched last
-        // card), in a 3-column grid even when there are fewer cards.
+        // card); 2 or 4 cards share the width in two columns, others use three.
         const listing = this.json.listing === true;
-        const columns = this.json.columns || (listing ? 3 : Math.min(items.length, 3));
+        const columns = this.json.columns || (listing ? ContentBase.listingColumns(items.length) : Math.min(items.length, 3));
         const colsClass = (columns === 2 ? " cols-2" : "") + (listing ? " listing" : "");
 
         let html = "";
@@ -2037,6 +2045,8 @@ class ContentFolderCards extends ContentCards {
         }
         names.sort(folderCompareNames);
         if (this.json.order === "newest-first" || this.json.order === "desc") names.reverse();
+        const first = Array.isArray(this.json.first) ? this.json.first.filter(n => names.includes(n)) : [];
+        if (first.length) names.splice(0, names.length, ...first, ...names.filter(n => !first.includes(n)));
         this.json = { ...this.json, items: names, listing: true };
         await super.resolve();
     }
@@ -2093,7 +2103,8 @@ class ContentFileCards extends ContentBase {
         if (!this.files.length) return "";
         let html = "";
         if (this.json.title) html += `<h2>${this.json.title}</h2>`;
-        html += '<div class="card-grid file-cards listing">';
+        const colsClass = ContentBase.listingColumns(this.files.length) === 2 ? " cols-2" : "";
+        html += `<div class="card-grid file-cards listing${colsClass}">`;
         for (const f of this.files) {
             html += `<a class="card file-card" href="${f.href}">`;
             if (f.image) html += `<img class="file-card-thumb${f.drawing ? " drawing" : ""}" src="${f.href}" alt="" loading="lazy">`;
