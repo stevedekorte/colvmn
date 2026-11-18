@@ -125,7 +125,12 @@ export class ContentFileCards extends ContentBase {
         const entries = await folderListDir();
         this.files = entries
             .filter(e => !e.isDir && folderIsListed(e.name) && !folderMatches(this.json.exclude, e.name))
-            .sort((a, b) => folderCompareNames(a.name, b.name))
+            .sort((a, b) => {
+                if (this.json.order !== "newest-first") return folderCompareNames(a.name, b.name);
+                // Newest first by a leading date; same-day files (and undated ones) A to Z.
+                const da = /^\d{4}[ -]\d{2}[ -]\d{2}/.exec(a.name)?.[0] || "", db = /^\d{4}[ -]\d{2}[ -]\d{2}/.exec(b.name)?.[0] || "";
+                return folderCompareNames(db, da) || folderCompareNames(a.name, b.name);
+            })
             .map(e => {
                 const dot = e.name.lastIndexOf(".");
                 const ext = dot > 0 ? e.name.slice(dot + 1).toLowerCase() : "";
@@ -136,8 +141,13 @@ export class ContentFileCards extends ContentBase {
                 // Files a browser can't show itself open in one of the engine's viewers.
                 const viewer = FOLDER_VIEWERS[ext];
                 const viewerHref = viewer && ContentBase.viewerHrefFn ? ContentBase.viewerHrefFn(viewer, e.name) : null;
+                // A name starting with a date ("2017 11 21 - Transfer disclosure
+                // statement") gives the table a Date column and a shorter name.
+                const dated = /^(\d{4}[ -]\d{2}[ -]\d{2})\s+-\s+(.+)$/.exec(title);
                 return {
                     title,
+                    date: dated ? dated[1].replace(/-/g, " ") : "",
+                    name: dated ? dated[2] : title,
                     href: viewerHref || encodeURIComponent(e.name),
                     arrow: viewerHref ? "View in browser" : "Open",
                     type,
@@ -167,9 +177,12 @@ export class ContentFileCards extends ContentBase {
         let html = "";
         if (this.json.title) html += `<h2>${this.json.title}</h2>`;
         html += '<div class="section listing-table file-table"><div class="section-body"><table>';
-        html += "<thead><tr><th>File</th><th>Type</th><th>Size</th><th></th></tr></thead><tbody>";
+        const dates = this.files.some(f => f.date);
+        html += `<thead><tr>${dates ? "<th>Date</th>" : ""}<th>File</th><th>Type</th><th>Size</th><th></th></tr></thead><tbody>`;
         for (const f of this.files) {
-            html += `<tr><td class="listing-title"><a href="${f.href}">${folderEscapeHtml(f.title)}</a></td>`;
+            html += "<tr>";
+            if (dates) html += `<td class="listing-date">${f.date}</td>`;
+            html += `<td class="listing-title"><a href="${f.href}">${folderEscapeHtml(dates ? f.name : f.title)}</a></td>`;
             html += `<td class="listing-type">${f.type}</td><td class="listing-size">${f.size}</td>`;
             html += `<td class="listing-action"><a href="${f.href}">${f.arrow}&nbsp;&rarr;</a></td></tr>`;
         }

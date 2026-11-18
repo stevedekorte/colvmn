@@ -476,9 +476,13 @@ p code, li code, p tt, li tt {
 }
 
 /* File tables (fileLayout: table): names wrap; type, size and link stay on one line */
-.file-table td:first-child {
+.file-table td.listing-title {
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+.file-table td.listing-date {
+  white-space: nowrap;
 }
 
 .file-table td.listing-type, .file-table td.listing-size, .file-table td.listing-action {

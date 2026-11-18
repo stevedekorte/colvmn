@@ -557,6 +557,7 @@ export function parseMarkdown (text) {
         if (meta.fileCardsTitle) entry.title = meta.fileCardsTitle;
         // `fileLayout: table`: one table row per file instead of a card grid.
         if (meta.fileLayout) entry.layout = String(meta.fileLayout).trim();
+        if (meta.fileCards === "newest-first") entry.order = "newest-first";
         if (fileExclude) entry.exclude = fileExclude;
         if (fileTitles) entry.titles = fileTitles;
         listings.push(entry);
