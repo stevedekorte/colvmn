@@ -172,6 +172,14 @@
         const front = new THREE.MeshStandardMaterial({ color: 0xe4dfd4, roughness: 0.85, side: THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
         const back = new THREE.MeshStandardMaterial({ color: 0xe4dfd4, roughness: 0.85, side: THREE.BackSide, polygonOffset: true, polygonOffsetFactor: 4, polygonOffsetUnits: 8 });
         const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x6b665c });
+        // Glass (a material named for glass, a window or translucency, like
+        // SketchUp's Translucent_Glass_Gray) is nearly clear, seen from both
+        // sides, and hides nothing behind it; the back-face pass skips it.
+        const glass = new THREE.MeshStandardMaterial({ color: 0xcfd8dc, roughness: 0.2, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide });
+        const hidden = new THREE.MeshBasicMaterial({ visible: false });
+        const isGlass = m => /glass|window|translucent/i.test((m && m.name) || "");
+        const pick = (m, solid) => isGlass(m) ? (solid === back ? hidden : glass) : solid;
+        const assign = (m, solid) => Array.isArray(m) ? m.map(x => pick(x, solid)) : pick(m, solid);
         const meshes = [];
         obj.traverse(child => {
             if (child.isMesh) meshes.push(child);
@@ -182,8 +190,9 @@
                 mesh.material = new THREE.MeshBasicMaterial({ color: 0x2a2a2a, side: THREE.DoubleSide });
                 continue;
             }
-            mesh.material = front;
-            mesh.add(new THREE.Mesh(mesh.geometry, back));
+            const original = mesh.material;
+            mesh.material = assign(original, front);
+            mesh.add(new THREE.Mesh(mesh.geometry, assign(original, back)));
             mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 25), edgeMaterial));
         }
         model = obj;
