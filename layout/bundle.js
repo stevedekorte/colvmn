@@ -414,12 +414,19 @@ function blocksToHtml (blocks) {
     }).join("");
 }
 
+// Frontmatter is one-line `key: value` settings. Anything else (a YAML list or
+// nested block, say) is an error rather than silently dropped, so a page never
+// ships without something its author wrote. Blank lines and # comments are fine.
 function parseFrontmatter (lines) {
     if (lines.length === 0 || lines[0].trim() !== "---") return { meta: {}, rest: lines };
     let i = 1;
     const meta = {};
     while (i < lines.length && lines[i].trim() !== "---") {
         const m = lines[i].match(/^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$/);
+        if (!m && lines[i].trim() !== "" && !lines[i].trim().startsWith("#") && lines.slice(i + 1).some(l => l.trim() === "---")) {
+            throw new Error(`frontmatter line ${i + 1} ("${lines[i].trim()}") is not a one-line "key: value" setting. ` +
+                "Frontmatter takes one-line settings only (no YAML lists or nested blocks); write content blocks in an _index.json page.");
+        }
         if (m) {
             let value = m[2].trim();
             if ((value.startsWith('"') && value.endsWith('"')) ||
@@ -1813,6 +1820,13 @@ function escapeHtml (s) {
 }
 
 class ContentComparisonTable extends ContentBase {
+    static defaultInfoRows = [
+        { label: "Website", field: "website", format: "link" },
+        { label: "Founded", field: "creationDate", format: "date" },
+        { label: "Users", field: "guestimatedUserBase", format: "count" },
+        { label: "License", field: "openOrClosedSource", format: "source" }
+    ];
+
     constructor () {
         super();
         this.entities = [];
@@ -1901,13 +1915,7 @@ class ContentComparisonTable extends ContentBase {
         // Info table columns (one per attribute; entities are rows). Defaults
         // preserve the product/competitor layout; any site can override via
         // an `infoRows` array of { label, field, format } in the JSON.
-        const defaultInfoRows = [
-            { label: "Website", field: "website", format: "link" },
-            { label: "Founded", field: "creationDate", format: "date" },
-            { label: "Users", field: "guestimatedUserBase", format: "count" },
-            { label: "License", field: "openOrClosedSource", format: "source" }
-        ];
-        const infoRowDefs = this.json.infoRows || defaultInfoRows;
+        const infoRowDefs = this.json.infoRows || ContentComparisonTable.defaultInfoRows;
         const infoRows = infoRowDefs.map(def => ({
             label: def.label,
             render: c => {
