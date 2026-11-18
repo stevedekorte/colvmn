@@ -475,6 +475,20 @@ p code, li code, p tt, li tt {
   font-weight: 500;
 }
 
+/* File tables (fileLayout: table): names wrap; type, size and link stay on one line */
+.file-table td:first-child {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.file-table td.listing-type, .file-table td.listing-size, .file-table td.listing-action {
+  white-space: nowrap;
+}
+
+.file-table td.listing-size {
+  text-align: right;
+}
+
 /* File cards (ContentFileCards): long file names wrap; images show a thumbnail */
 .file-card h3 {
   overflow-wrap: anywhere;

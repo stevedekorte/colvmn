@@ -133,6 +133,8 @@ export class ContentFileCards extends ContentBase {
                     title,
                     href: viewerHref || encodeURIComponent(e.name),
                     arrow: viewerHref ? "View in browser" : "Open",
+                    type,
+                    size: folderFormatSize(e.size),
                     detail: `${type} · ${folderFormatSize(e.size)}`,
                     image: FOLDER_IMAGE_EXTS.has(ext),
                     drawing: ext === "svg",
@@ -142,12 +144,29 @@ export class ContentFileCards extends ContentBase {
 
     computeHtml () {
         if (!this.files.length) return "";
+        if (this.json.layout === "table") return this.computeTableHtml();
         let html = "";
         if (this.json.title) html += `<h2>${this.json.title}</h2>`;
         const colsClass = ContentBase.listingColumns(this.files.length) === 2 ? " cols-2" : "";
         html += `<div class="card-grid file-cards listing${colsClass}">`;
         for (const f of this.files) html += this.cardHtml(f);
         html += "</div>";
+        return html;
+    }
+
+    // `layout: "table"` (fileLayout: table): one row per file, its name linked,
+    // then its type, size, and the same Open / View in browser link as a card.
+    computeTableHtml () {
+        let html = "";
+        if (this.json.title) html += `<h2>${this.json.title}</h2>`;
+        html += '<div class="section listing-table file-table"><div class="section-body"><table>';
+        html += "<thead><tr><th>File</th><th>Type</th><th>Size</th><th></th></tr></thead><tbody>";
+        for (const f of this.files) {
+            html += `<tr><td class="listing-title"><a href="${f.href}">${folderEscapeHtml(f.title)}</a></td>`;
+            html += `<td class="listing-type">${f.type}</td><td class="listing-size">${f.size}</td>`;
+            html += `<td class="listing-action"><a href="${f.href}">${f.arrow}&nbsp;&rarr;</a></td></tr>`;
+        }
+        html += "</tbody></table></div></div>";
         return html;
     }
 

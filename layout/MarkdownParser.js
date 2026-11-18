@@ -542,6 +542,8 @@ export function parseMarkdown (text) {
     } else if (meta.fileCards) {
         const entry = { type: "ContentFileCards" };
         if (meta.fileCardsTitle) entry.title = meta.fileCardsTitle;
+        // `fileLayout: table`: one table row per file instead of a card grid.
+        if (meta.fileLayout) entry.layout = String(meta.fileLayout).trim();
         listings.push(entry);
     }
     if (meta.cardsFirst === true) {
