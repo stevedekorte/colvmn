@@ -50,7 +50,7 @@ How it works:
 - `layout/MarkdownParser.js` — frontmatter + markdown to page JSON
 - `layout/ContentSlideshow.js` — the slideshow block for `_index.json` pages
 - `layout/ContentFolder.js` — folder listings (see "Folder listings"): `ContentFolderCards` and `ContentFileCards`
-- `viewers/` — standalone viewer pages that file cards open for files a browser can't show: `model.html` (OBJ, three.js) and `drawing.html` (DWG/DXF, LibreDWG as WebAssembly, rendered to SVG). Both load their libraries from jsdelivr at pinned versions and take `?src=` (the file's path relative to the viewer page); they need the site served over HTTP, not `file://`
+- `viewers/` — standalone viewer pages that file cards open for files a browser can't show: `model.html` (OBJ, three.js; concave polygons triangulated with earcut; glass materials drawn see-through, frosted ones milky; an optional `_<name>.additions.obj` beside the model, with relative face indices, is drawn as part of it) and `drawing.html` (DWG/DXF, LibreDWG as WebAssembly, rendered to SVG). Both load their libraries from jsdelivr at pinned versions and take `?src=` (the file's path relative to the viewer page); they need the site served over HTTP, not `file://`
 - `layout/Columns.js` — builds a page's columns on wide viewports (see `maxColumns` under Page Metadata)
 - `layout/Slideshow.js` — slideshow behavior (see "Slideshows")
 - `layout/Collapsible.js` — open/close behavior for collapsed sections (page-global, event delegation; see "Collapsed sections")

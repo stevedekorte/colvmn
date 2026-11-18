@@ -158,8 +158,16 @@
         return out.join("\n");
     }
 
-    new THREE.FileLoader().load(url.href, text => {
-        const obj = new OBJLoader().parse(triangulateObj(text));
+    // Optional additions beside the model, `_<name>.additions.obj` (details the
+    // model lacks, like frosted fence panes), drawn as part of it; their faces
+    // use negative (relative) vertex indices so they can follow the model's
+    // own. Download still gives the original file.
+    const additionsUrl = new URL(`_${fileName.replace(/\.obj$/i, "")}.additions.obj`, url).href;
+    const additions = fetch(additionsUrl).then(r => r.ok ? r.text() : "").catch(() => "");
+
+    new THREE.FileLoader().load(url.href, async text => {
+        const extra = await additions;
+        const obj = new OBJLoader().parse(triangulateObj(extra ? `${text}\n${extra}` : text));
         status.remove();
         const box = new THREE.Box3().setFromObject(obj);
         const size = box.getSize(new THREE.Vector3());
@@ -177,8 +185,12 @@
         // sides, and hides nothing behind it; the back-face pass skips it.
         const glass = new THREE.MeshStandardMaterial({ color: 0xcfd8dc, roughness: 0.2, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide });
         const hidden = new THREE.MeshBasicMaterial({ visible: false });
+        // Frosted glass (a material named frosted, fuzzy, obscured or etched) is milky, half see-through.
+        const frosted = new THREE.MeshStandardMaterial({ color: 0xf4f6f7, roughness: 1, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide });
+        const isFrosted = m => /frost|fuzzy|obscur|etched/i.test((m && m.name) || "");
         const isGlass = m => /glass|window|translucent/i.test((m && m.name) || "");
-        const pick = (m, solid) => isGlass(m) ? (solid === back ? hidden : glass) : solid;
+        const pick = (m, solid) => isFrosted(m) ? (solid === back ? hidden : frosted)
+            : isGlass(m) ? (solid === back ? hidden : glass) : solid;
         const assign = (m, solid) => Array.isArray(m) ? m.map(x => pick(x, solid)) : pick(m, solid);
         const meshes = [];
         obj.traverse(child => {
