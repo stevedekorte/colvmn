@@ -24,6 +24,7 @@
  * nested site built on its own produces the same output.
  */
 
+import vm from "node:vm";
 import { defaultSiteRoot } from "./update/SiteRoot.js";
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -187,6 +188,15 @@ function buildBundle () {
         bundle += `\n// ===== ${f} =====\n` + transformBundleSource(src) + "\n";
     }
     bundle += "})();\n";
+    // The layout files share one scope here, so two declaring the same
+    // top-level name make the whole bundle a syntax error and no page's
+    // runtime behavior runs. Fail the build instead of shipping that.
+    try {
+        new vm.Script(bundle, { filename: "layout/bundle.js" });
+    } catch (e) {
+        throw new Error(`layout/bundle.js would not run in a browser: ${e.message}. ` +
+            "Two layout files probably declare the same top-level name; export it from one and import it in the other.");
+    }
     return bundle;
 }
 

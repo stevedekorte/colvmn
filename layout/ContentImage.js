@@ -11,7 +11,8 @@ import { IMAGE_OPTIONS } from "./MarkdownParser.js";
 // wraps beside it). "zoomable" makes it click-to-enlarge; "width" (pixels)
 // shows it at that width at most. Styles: style.css, "Image layout options".
 
-const escapeAttr = s => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+// Shared with ContentSlideshow.js (bundle.js joins the layout files into one scope, so a name is declared once).
+export const escapeAttr = s => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
 const SIZES = ["natural", "fill", "column"];
 const ALIGNS = ["center", "left", "float-left", "float-right"];

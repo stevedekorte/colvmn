@@ -515,3 +515,12 @@ test("file cards for OBJ, DWG and DXF files open the engine's viewer pages, with
         rmSync(site, { recursive: true, force: true });
     }
 });
+
+// bundle.js joins the layout files into one scope: if two declare the same
+// top-level name, the browser rejects the whole bundle and no runtime
+// behavior (columns, lightbox, collapsibles, slideshows) runs on any page.
+test("layout/bundle.js parses as a classic script", async () => {
+    const vm = await import("node:vm");
+    const bundle = readFileSync(join(dirname(staticGen), "layout", "bundle.js"), "utf-8");
+    assert.doesNotThrow(() => new vm.Script(bundle, { filename: "layout/bundle.js" }));
+});

@@ -1074,6 +1074,7 @@ class ContentTable extends ContentBase {
 // wraps beside it). "zoomable" makes it click-to-enlarge; "width" (pixels)
 // shows it at that width at most. Styles: style.css, "Image layout options".
 
+// Shared with ContentSlideshow.js (bundle.js joins the layout files into one scope, so a name is declared once).
 const escapeAttr = s => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
 const SIZES = ["natural", "fill", "column"];
@@ -1977,14 +1978,13 @@ class ContentComparisonTable extends ContentBase {
 // ===== ContentSlideshow.js =====
 
 
+
 // A slideshow in an _index.json page, the same one markdown builds from
 // images marked {.slideshow}:
 //   { "type": "ContentSlideshow", "autoplay": true, "controls": false, "inset": true,
 //     "images": [{ "src": "images/a.jpg", "alt": "…" }, …] }
 // "autoplay" (default false) advances by itself; "controls": false hides the
 // arrows and count; "inset" sets the images in a frame pressed into the page. Behavior: layout/Slideshow.js.
-
-const escapeAttr = s => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
 class ContentSlideshow extends ContentBase {
     computeHtml () {

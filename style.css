@@ -1312,8 +1312,10 @@ p code, li code, p tt, li tt {
   .page.has-cols:not(.js-columns) > .col-group {
     margin-bottom: 30px;
   }
-  .page.has-cols:not(.js-columns) > :not(.header, .hero, .intro, .toc, .col-group) + .col-group {
-    margin-top: 60px;
+  /* The gap above the columns goes below what precedes them (it spans the
+     page), not on the first section, which would push down only the first column. */
+  .page.has-cols:not(.js-columns) > :not(.header, .hero, .intro, .toc, .col-group):has(+ .col-group) {
+    margin-bottom: 60px;
   }
   .page.has-cols:not(.js-columns) > .col-group + :not(.col-group) {
     margin-top: 60px;

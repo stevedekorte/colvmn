@@ -1,5 +1,6 @@
 import { ContentBase } from "./ContentBase.js";
 import { slideshowHtml } from "./MarkdownParser.js";
+import { escapeAttr } from "./ContentImage.js";
 
 // A slideshow in an _index.json page, the same one markdown builds from
 // images marked {.slideshow}:
@@ -7,8 +8,6 @@ import { slideshowHtml } from "./MarkdownParser.js";
 //     "images": [{ "src": "images/a.jpg", "alt": "…" }, …] }
 // "autoplay" (default false) advances by itself; "controls": false hides the
 // arrows and count; "inset" sets the images in a frame pressed into the page. Behavior: layout/Slideshow.js.
-
-const escapeAttr = s => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
 export class ContentSlideshow extends ContentBase {
     computeHtml () {
