@@ -91,7 +91,7 @@
             camera.userData.half = half;
             camera.position.set(center.x, center.y, center.z + radius);
         } else {
-            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, radius / 500, radius * 50);
+            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, radius / 200, radius * 50);
             camera.position.copy(center).add(new THREE.Vector3(1, 0.7, 1.2).normalize().multiplyScalar(radius * 2.6));
             sun.position.copy(center).add(new THREE.Vector3(1, 2, 1.5).multiplyScalar(radius));
         }
@@ -120,19 +120,28 @@
         const box = new THREE.Box3().setFromObject(obj);
         const size = box.getSize(new THREE.Vector3());
         flat = size.z < Math.max(size.x, size.y) * 1e-3;
+        // Faces are drawn front side and back side separately, the back sides
+        // pushed a little further away: models often have two faces in the same
+        // place facing opposite ways (a wall's inside and outside, SketchUp's
+        // doubled faces), and drawn double-sided the two flicker through each
+        // other (z-fighting). This way the front face always wins.
+        const front = new THREE.MeshStandardMaterial({ color: 0xe4dfd4, roughness: 0.85, side: THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+        const back = new THREE.MeshStandardMaterial({ color: 0xe4dfd4, roughness: 0.85, side: THREE.BackSide, polygonOffset: true, polygonOffsetFactor: 4, polygonOffsetUnits: 8 });
+        const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x6b665c });
+        const meshes = [];
         obj.traverse(child => {
-            if (child.isMesh) {
-                child.material = flat
-                    ? new THREE.MeshBasicMaterial({ color: 0x2a2a2a, side: THREE.DoubleSide })
-                    : new THREE.MeshStandardMaterial({ color: 0xe4dfd4, roughness: 0.85, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
-                if (!flat) {
-                    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(child.geometry, 25), new THREE.LineBasicMaterial({ color: 0x6b665c }));
-                    child.add(edges);
-                }
-            } else if (child.isLine || child.isPoints) {
-                child.material = new THREE.LineBasicMaterial({ color: 0x2a2a2a });
-            }
+            if (child.isMesh) meshes.push(child);
+            else if (child.isLine || child.isPoints) child.material = new THREE.LineBasicMaterial({ color: 0x2a2a2a });
         });
+        for (const mesh of meshes) {
+            if (flat) {
+                mesh.material = new THREE.MeshBasicMaterial({ color: 0x2a2a2a, side: THREE.DoubleSide });
+                continue;
+            }
+            mesh.material = front;
+            mesh.add(new THREE.Mesh(mesh.geometry, back));
+            mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 25), edgeMaterial));
+        }
         model = obj;
         scene.add(model);
         if (flat) document.getElementById("up").remove();
