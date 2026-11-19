@@ -378,8 +378,8 @@ test("a markdown page's frontmatter stays out of llms-full.txt, but its title an
         writePage(site, "titled", "---\ntitle: Titled Page\nsubtitle: A short summary.\n---\n\n## Part\n\nTitled text.\n");
         const { llmsFull } = build(site);
         assert.doesNotMatch(llmsFull, /maxColumns|^title:|^subtitle:/m);
-        assert.match(llmsFull, /Source: \/headed\/\n\n# Headed Page\n\nHeaded text\./);
-        assert.match(llmsFull, /Source: \/titled\/\n\n# Titled Page\n\nA short summary\.\n\n## Part\n\nTitled text\./);
+        assert.match(llmsFull, /Source: headed\/\n\n# Headed Page\n\nHeaded text\./);
+        assert.match(llmsFull, /Source: titled\/\n\n# Titled Page\n\nA short summary\.\n\n## Part\n\nTitled text\./);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }
@@ -393,7 +393,7 @@ test("ContentSlideshow builds the same slideshow in a JSON page, with its option
         const { llmsFull } = build(site);
         const html = readFileSync(join(site, "kept", "index.html"), "utf-8");
         assert.match(html, /<div class="colvmn-slideshow autoplay no-controls inset" role="region"[\s\S]*<img src="a\.jpg" alt="One" class="colvmn-zoomable-image">[\s\S]*<img loading="lazy" src="b\.jpg" alt="Two" class="colvmn-zoomable-image">/);
-        assert.match(llmsFull, /!\[One\]\(a\.jpg\)\n\n!\[Two\]\(b\.jpg\)/);
+        assert.match(llmsFull, /!\[One\]\(kept\/a\.jpg\)\n\n!\[Two\]\(kept\/b\.jpg\)/);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }
@@ -585,8 +585,8 @@ test("a markdown page's folder and file listings reach llms-full.txt; the colvmn
         writeFileSync(join(site, "colvmn", "index.html"), "");
         const { llmsFull, rootHtml } = build(site);
         const jobs = llmsFull.split("<!-- Page: jobs -->")[1].split("<!-- Page:")[0];
-        assert.match(jobs, /- \[Roof\]\(roof\/index\.html\) — New roof, 2021\./);
-        assert.match(jobs, /## Documents\n\n- \[Contract\]\(Contract\.pdf\) — PDF · 3 bytes/);
+        assert.match(jobs, /- \[Roof\]\(jobs\/roof\/index\.html\) — New roof, 2021\./);
+        assert.match(jobs, /## Documents\n\n- \[Contract\]\(jobs\/Contract\.pdf\) — PDF · 3 bytes/);
         assert.match(rootHtml, /<h3>Kept Page<\/h3>/);
         assert.doesNotMatch(rootHtml + llmsFull, /Engine Docs/);
     } finally {
@@ -601,7 +601,7 @@ test("a folder table's columns, from its pages' frontmatter, reach llms-full.txt
         writePage(site, "projects/deck", "---\ntitle: Deck\nowner: Zoe\nstatus: Done\n---\n");
         writePage(site, "projects/roof", "---\ntitle: Roof\nowner: Ann\nstatus: Planned\n---\n");
         const { llmsFull } = build(site);
-        assert.match(llmsFull, /\| Project \| Owner \| Status \|\n\| --- \| --- \| --- \|\n\| \[Roof\]\(roof\/index\.html\) \| Ann \| Planned \|\n\| \[Deck\]\(deck\/index\.html\) \| Zoe \| Done \|/);
+        assert.match(llmsFull, /\| Project \| Owner \| Status \|\n\| --- \| --- \| --- \|\n\| \[Roof\]\(projects\/roof\/index\.html\) \| Ann \| Planned \|\n\| \[Deck\]\(projects\/deck\/index\.html\) \| Zoe \| Done \|/);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }
@@ -643,6 +643,23 @@ test("a folder listing on an opted-in page may show its AI Reviews folder, but n
     }
 });
 
+test("paths in the llms files are relative to the site root, so a site served under a subfolder works; code examples and URLs are left alone", () => {
+    const site = makeSite({});
+    try {
+        writePage(site, "guide/setup", "# Setup\n\nSee [Kept](../../kept/index.html), [part](#part), [img](shot.png \"Shot\"), [ext](https://example.com/a), [abs](/x/).\n\nExample: `[a](b.html)`\n\n```\n[c](d.html)\n```\n");
+        const { llms, llmsFull } = build(site);
+        assert.match(llms, /- \[Setup\]\(guide\/setup\/\)/);
+        assert.doesNotMatch(llms + llmsFull, /\]\(\/(?!x\/)|Source: \/|See also: \//);
+        assert.match(llmsFull, /See also: llms\.txt \(curated index\) and sitemap\.xml\.\n\nPaths are relative to the site root\./);
+        assert.match(llmsFull, /Source: \.\/\n/);
+        assert.match(llmsFull, /Source: guide\/setup\/\n/);
+        assert.match(llmsFull, /See \[Kept\]\(kept\/index\.html\), \[part\]\(guide\/setup\/#part\), \[img\]\(guide\/setup\/shot\.png "Shot"\), \[ext\]\(https:\/\/example\.com\/a\), \[abs\]\(\/x\/\)\./);
+        assert.match(llmsFull, /Example: `\[a\]\(b\.html\)`\n\n```\n\[c\]\(d\.html\)\n```/);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
 test("frontmatter that isn't one-line key: value settings stops the build, naming the file and line", () => {
     const site = makeSite({});
     try {
@@ -666,7 +683,7 @@ test("a markdown page's # line inside fenced code is an example, not its title, 
     try {
         writePage(site, "kept", "---\ntitle: Real Title\n---\n\nIntro.\n\n```markdown\n# Example Title\n```\n");
         const { llmsFull } = build(site);
-        assert.match(llmsFull, /Source: \/kept\/\n\n# Real Title\n\nIntro\.\n\n```markdown\n# Example Title\n```/);
+        assert.match(llmsFull, /Source: kept\/\n\n# Real Title\n\nIntro\.\n\n```markdown\n# Example Title\n```/);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }

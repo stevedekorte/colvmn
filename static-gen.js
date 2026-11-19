@@ -1078,7 +1078,7 @@ function generateLlmsIndex (pages) {
             if (!meta) continue;
             const title = pageDisplayTitle(pageDir, meta);
             const subtitle = htmlToPlain(meta.json.subtitle || "");
-            const url = "/" + pageUrlPath(pageDir);
+            const url = pageUrlPath(pageDir) || "./";
             txt += `- [${title}](${url})`;
             if (subtitle) txt += `: ${subtitle}`;
             txt += "\n";
@@ -1101,6 +1101,27 @@ function rootFirstParagraph () {
     return "";
 }
 
+// A page's links and images, written relative to the page, rewritten relative
+// to the site root (as every path in the llms files is), since llms-full.txt
+// joins every page into one file. URLs with a scheme, server-absolute paths,
+// and links inside code (fenced or inline, where they are examples) are left alone.
+function rootRelativeLinks (markdown, urlPath) {
+    if (!urlPath) return markdown;
+    const base = "https://site.invalid/" + urlPath;
+    const rewrite = text => text.replace(/\]\(([^)\s]+)((?:\s+"[^"]*")?)\)/g, (m, href, title) => {
+        if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith("/")) return m;
+        let url;
+        try { url = new URL(href, base); } catch { return m; }
+        return `](${url.pathname.slice(1) + url.search + url.hash || "./"}${title})`;
+    });
+    let inFence = false;
+    return markdown.split("\n").map(line => {
+        if (/^\s*```/.test(line)) { inFence = !inFence; return line; }
+        if (inFence) return line;
+        return line.split(/(`[^`]*`)/).map(part => part.startsWith("`") ? part : rewrite(part)).join("");
+    }).join("\n");
+}
+
 // The site's llms-full.txt; with a scope ({ dir, title, stamp }), one
 // section's: its pages only, under its own title and build stamp.
 function generateLlmsFull (pages, scope = null) {
@@ -1121,14 +1142,15 @@ function generateLlmsFull (pages, scope = null) {
     const summary = scope ? "" : rootFirstParagraph();
     if (summary) out += `${summary}\n\n`;
     out += scope
-        ? `This is one section of the site: /${pageUrlPath(scope.dir)} and the pages under it. See also: /llms.txt (the whole site's index).\n\n`
-        : "See also: /llms.txt (curated index) and /sitemap.xml.\n\n";
+        ? `This is one section of the site: ${pageUrlPath(scope.dir)} and the pages under it. See also: llms.txt (the whole site's index).\n\n`
+        : "See also: llms.txt (curated index) and sitemap.xml.\n\n";
+    out += "Paths are relative to the site root.\n\n";
 
     for (const pageDir of sorted) {
         const meta = readPageMeta(pageDir);
         if (!meta) continue;
         const urlPath = pageUrlPath(pageDir);
-        const url = "/" + urlPath;
+        const url = urlPath || "./";
         const pathLabel = relative(siteRoot, pageDir) || "(root)";
 
         out += "\n\n---\n\n";
@@ -1136,15 +1158,17 @@ function generateLlmsFull (pages, scope = null) {
         out += `Source: ${url}\n\n`;
 
         const blocks = builtBlocks.get(pageDir) || null;
+        let md;
         if (meta.rawMarkdown) {
-            out += withoutCollapsedMarkers(llmsMarkdown(meta.rawMarkdown).trim()) + "\n";
+            md = withoutCollapsedMarkers(llmsMarkdown(meta.rawMarkdown).trim()) + "\n";
             // Folder listings come from frontmatter, not the text: add what they list.
             const listings = (blocks || []).filter(b => /^Content(Folder|File)Cards$/.test(b.json.type));
             const listed = listings.map(b => blockToMarkdown(b, 0, pageDir)).join("").trim();
-            if (listed) out += "\n" + listed + "\n";
+            if (listed) md += "\n" + listed + "\n";
         } else {
-            out += jsonPageToMarkdown(meta.json, blocks, pageDir);
+            md = jsonPageToMarkdown(meta.json, blocks, pageDir);
         }
+        out += rootRelativeLinks(md, urlPath);
     }
 
     return out;

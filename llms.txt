@@ -6,21 +6,21 @@ Site build: colvmn · 2026-11-18 · 430ae23
 
 ## AI Reviews
 
-- [AI Reviews](/ai-reviews/): Any page can have Claude, ChatGPT, Gemini and Grok review it and everything below it, from its own docs. One setting on the page and an API key; colvmn does the rest.
+- [AI Reviews](ai-reviews/): Any page can have Claude, ChatGPT, Gemini and Grok review it and everything below it, from its own docs. One setting on the page and an API key; colvmn does the rest.
 
 ## Authoring
 
-- [Authoring](/authoring/)
+- [Authoring](authoring/)
 
 ## How It Works
 
-- [How It Works](/how-it-works/)
+- [How It Works](how-it-works/)
 
 ## Quick Start
 
-- [Quick Start](/quick-start/): A two-page site in a few minutes: a home page, a child page, and a build that links them.
+- [Quick Start](quick-start/): A two-page site in a few minutes: a home page, a child page, and a build that links them.
 
 ## Scheduled Updates
 
-- [Scheduled Updates](/scheduled-updates/): Pages that refresh themselves. A folder with an update file runs a script or a prompt on a schedule, or when what it watches changes, and publishes the result.
+- [Scheduled Updates](scheduled-updates/): Pages that refresh themselves. A folder with an update file runs a script or a prompt on a schedule, or when what it watches changes, and publishes the result.
 
