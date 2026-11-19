@@ -475,6 +475,10 @@ function splitFrontmatter (text) {
     return { meta, body: rest.join("\n") };
 }
 
+// A paragraph that is just "{listing: some/folder}" embeds that subfolder's
+// folder listing (ContentFolderCards with `folder`), set up by its own page.
+const LISTING_RE = /^\{listing:\s*([^{}]+)\}$/;
+
 function parseMarkdown (text) {
     const rawLines = text.split("\n");
     const { meta, rest: lines } = parseFrontmatter(rawLines);
@@ -504,6 +508,10 @@ function parseMarkdown (text) {
             if (collapsed) currentSection.collapsed = true;
         } else if (block.type === "heading" && block.level >= 3 && currentSection) {
             currentSection.blocks.push({ type: "heading", level: block.level, text: block.text });
+        } else if (currentSection && block.type === "paragraph" && LISTING_RE.test(block.text.trim())) {
+            // "{listing: proposals}" alone in a paragraph: that subfolder's
+            // listing (as its own page sets it up) goes after this section.
+            (currentSection.listings ||= []).push(LISTING_RE.exec(block.text.trim())[1].trim());
         } else if (currentSection) {
             currentSection.blocks.push(block);
         } else {
@@ -516,13 +524,14 @@ function parseMarkdown (text) {
     if (currentSection) sections.push(currentSection);
 
     // Build content array
-    const content = sections.map(section => {
+    const content = sections.flatMap(section => {
         const entry = { type: "ContentText" };
         if (section.title) entry.title = section.title;
         if (section.collapsed) entry.collapsed = true;
         const body = blocksToHtml(section.blocks);
         if (body) entry.body = body;
-        return entry;
+        const embedded = (section.listings || []).map(folder => ({ type: "ContentFolderCards", folder }));
+        return [entry, ...embedded];
     });
 
     // Extract subtitle if first section is a single short untitled paragraph
@@ -2119,6 +2128,7 @@ class ContentSlideshow extends ContentBase {
 // ===== ContentFolder.js =====
 
 
+
 // Folder listings: cards built from what is in the page's own folder, so a
 // folder of records (one subfolder per job, say, or a folder of PDFs) stays a
 // folder on disk and its page lists whatever is in it.
@@ -2150,11 +2160,11 @@ function folderEscapeHtml (s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-async function folderListDir () {
+async function folderListDir (sub) {
     const fn = ContentBase.listDirFn;
     if (!fn) return [];
     try {
-        return await fn();
+        return await fn(sub);
     } catch {
         return [];
     }
@@ -2162,7 +2172,20 @@ async function folderListDir () {
 
 class ContentFolderCards extends ContentCards {
     async resolve () {
-        const entries = await folderListDir();
+        // `folder`: list that subfolder instead of the page's own (a "{listing:
+        // folder}" line in markdown), with the listing settings that folder's
+        // own page gives (folderLayout, folderColumns, folderSort…).
+        const folder = this.json.folder ? String(this.json.folder).replace(/^\/+|\/+$/g, "") : "";
+        if (folder) {
+            try {
+                const resp = await ContentBase.asyncFetch(`${ContentCards.encodePath(folder)}/_index.md`);
+                if (resp.ok) {
+                    const own = (parseMarkdown(await resp.text()).content || []).find(b => b.type === "ContentFolderCards" && !b.folder);
+                    if (own) this.json = { ...own, ...this.json, type: "ContentFolderCards" };
+                }
+            } catch { /* list it with defaults */ }
+        }
+        const entries = await folderListDir(folder || undefined);
         const names = [];
         for (const e of entries) {
             if (!e.isDir || !folderIsListed(e.name) || !e.isPage) continue;
@@ -2173,7 +2196,7 @@ class ContentFolderCards extends ContentCards {
         if (this.json.order === "newest-first" || this.json.order === "desc") names.reverse();
         const first = Array.isArray(this.json.first) ? this.json.first.filter(n => names.includes(n)) : [];
         if (first.length) names.splice(0, names.length, ...first, ...names.filter(n => !first.includes(n)));
-        this.json = { ...this.json, items: names, listing: true };
+        this.json = { ...this.json, items: folder ? names.map(n => `${folder}/${n}`) : names, listing: true };
         // `withFiles`: the folder's files share this grid, after the folders.
         if (this.json.withFiles) {
             const files = new ContentFileCards();
@@ -2184,7 +2207,7 @@ class ContentFolderCards extends ContentCards {
             this.extraRows = files.files.map(f => ({ title: folderEscapeHtml(f.title), href: f.href, link: true, lines: [f.detail] }));
         }
         await super.resolve();
-        this.sortItems(first);
+        this.sortItems(folder ? first.map(n => `${folder}/${n}`) : first);
     }
 
     // `sort: "Date desc"`: order the rows by a column (named by its header in

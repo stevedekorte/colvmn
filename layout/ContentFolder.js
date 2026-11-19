@@ -1,5 +1,6 @@
 import { ContentBase } from "./ContentBase.js";
 import { ContentCards } from "./ContentCards.js";
+import { parseMarkdown } from "./MarkdownParser.js";
 
 // Folder listings: cards built from what is in the page's own folder, so a
 // folder of records (one subfolder per job, say, or a folder of PDFs) stays a
@@ -32,11 +33,11 @@ function folderEscapeHtml (s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-async function folderListDir () {
+async function folderListDir (sub) {
     const fn = ContentBase.listDirFn;
     if (!fn) return [];
     try {
-        return await fn();
+        return await fn(sub);
     } catch {
         return [];
     }
@@ -44,7 +45,20 @@ async function folderListDir () {
 
 export class ContentFolderCards extends ContentCards {
     async resolve () {
-        const entries = await folderListDir();
+        // `folder`: list that subfolder instead of the page's own (a "{listing:
+        // folder}" line in markdown), with the listing settings that folder's
+        // own page gives (folderLayout, folderColumns, folderSort…).
+        const folder = this.json.folder ? String(this.json.folder).replace(/^\/+|\/+$/g, "") : "";
+        if (folder) {
+            try {
+                const resp = await ContentBase.asyncFetch(`${ContentCards.encodePath(folder)}/_index.md`);
+                if (resp.ok) {
+                    const own = (parseMarkdown(await resp.text()).content || []).find(b => b.type === "ContentFolderCards" && !b.folder);
+                    if (own) this.json = { ...own, ...this.json, type: "ContentFolderCards" };
+                }
+            } catch { /* list it with defaults */ }
+        }
+        const entries = await folderListDir(folder || undefined);
         const names = [];
         for (const e of entries) {
             if (!e.isDir || !folderIsListed(e.name) || !e.isPage) continue;
@@ -55,7 +69,7 @@ export class ContentFolderCards extends ContentCards {
         if (this.json.order === "newest-first" || this.json.order === "desc") names.reverse();
         const first = Array.isArray(this.json.first) ? this.json.first.filter(n => names.includes(n)) : [];
         if (first.length) names.splice(0, names.length, ...first, ...names.filter(n => !first.includes(n)));
-        this.json = { ...this.json, items: names, listing: true };
+        this.json = { ...this.json, items: folder ? names.map(n => `${folder}/${n}`) : names, listing: true };
         // `withFiles`: the folder's files share this grid, after the folders.
         if (this.json.withFiles) {
             const files = new ContentFileCards();
@@ -66,7 +80,7 @@ export class ContentFolderCards extends ContentCards {
             this.extraRows = files.files.map(f => ({ title: folderEscapeHtml(f.title), href: f.href, link: true, lines: [f.detail] }));
         }
         await super.resolve();
-        this.sortItems(first);
+        this.sortItems(folder ? first.map(n => `${folder}/${n}`) : first);
     }
 
     // `sort: "Date desc"`: order the rows by a column (named by its header in

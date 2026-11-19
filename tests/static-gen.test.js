@@ -718,3 +718,24 @@ test("phone numbers in table cells link to the phone app; dates, permit numbers 
         rmSync(site, { recursive: true, force: true });
     }
 });
+
+test("a {listing: folder} line embeds that subfolder's listing, set up by its own page, after its section", () => {
+    const site = makeSite({});
+    try {
+        writePage(site, "jobs", "---\ntitle: Jobs\nfolderCards: true\nfolderExclude: offers\n---\n\n## Offers\n\nNot taken.\n\n{listing: offers}\n\n## Notes\n\nMore.\n");
+        writePage(site, "jobs/2020 roof", "---\ntitle: Roof\ndate: 2020\n---\n");
+        writePage(site, "jobs/offers", "---\ntitle: Offers\nfolderCards: true\nfolderLayout: table\nfolderColumns: Date=date, Offer=title, Cost=cost\nfolderSort: Date desc\n---\n");
+        writePage(site, "jobs/offers/a", "---\ntitle: Deck\ndate: 2023 12 03\ncost: $9\n---\n");
+        writePage(site, "jobs/offers/b", "---\ntitle: Fence\ndate: 2023 12 05\ncost: $5\n---\n");
+        writePage(site, "jobs/offers/../../outside", "---\ntitle: Outside\n---\n");
+        build(site);
+        const html = readFileSync(join(site, "jobs", "index.html"), "utf-8");
+        // The section's text, then the offers table (newest first, linking into the subfolder), then the next section.
+        assert.match(html, /Not taken\.[\s\S]*<th>Date<\/th><th>Offer<\/th><th>Cost<\/th>[\s\S]*2023 12 05[\s\S]*href="offers\/b\/index\.html[^"]*">Fence<\/a>[\s\S]*\$5[\s\S]*2023 12 03[\s\S]*Deck[\s\S]*More\./);
+        // The page's own listing leaves the embedded folder out.
+        assert.match(html, />Roof</);
+        assert.doesNotMatch(html, /href="offers\/index\.html/);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});

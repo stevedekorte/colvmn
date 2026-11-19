@@ -469,6 +469,10 @@ export function splitFrontmatter (text) {
     return { meta, body: rest.join("\n") };
 }
 
+// A paragraph that is just "{listing: some/folder}" embeds that subfolder's
+// folder listing (ContentFolderCards with `folder`), set up by its own page.
+const LISTING_RE = /^\{listing:\s*([^{}]+)\}$/;
+
 export function parseMarkdown (text) {
     const rawLines = text.split("\n");
     const { meta, rest: lines } = parseFrontmatter(rawLines);
@@ -498,6 +502,10 @@ export function parseMarkdown (text) {
             if (collapsed) currentSection.collapsed = true;
         } else if (block.type === "heading" && block.level >= 3 && currentSection) {
             currentSection.blocks.push({ type: "heading", level: block.level, text: block.text });
+        } else if (currentSection && block.type === "paragraph" && LISTING_RE.test(block.text.trim())) {
+            // "{listing: proposals}" alone in a paragraph: that subfolder's
+            // listing (as its own page sets it up) goes after this section.
+            (currentSection.listings ||= []).push(LISTING_RE.exec(block.text.trim())[1].trim());
         } else if (currentSection) {
             currentSection.blocks.push(block);
         } else {
@@ -510,13 +518,14 @@ export function parseMarkdown (text) {
     if (currentSection) sections.push(currentSection);
 
     // Build content array
-    const content = sections.map(section => {
+    const content = sections.flatMap(section => {
         const entry = { type: "ContentText" };
         if (section.title) entry.title = section.title;
         if (section.collapsed) entry.collapsed = true;
         const body = blocksToHtml(section.blocks);
         if (body) entry.body = body;
-        return entry;
+        const embedded = (section.listings || []).map(folder => ({ type: "ContentFolderCards", folder }));
+        return [entry, ...embedded];
     });
 
     // Extract subtitle if first section is a single short untitled paragraph

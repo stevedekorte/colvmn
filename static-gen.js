@@ -363,7 +363,12 @@ async function generatePage (pageDir) {
 
     const fetchFn = createFetchFn(pageDir);
     ContentBase.setFetchFn(fetchFn);
-    ContentBase.listDirFn = () => listPageDir(pageDir);
+    // A listing may name a subfolder of the page ({listing: folder}); never outside it.
+    ContentBase.listDirFn = (sub) => {
+        const dir = sub ? resolve(pageDir, sub) : pageDir;
+        if (dir !== pageDir && !dir.startsWith(pageDir + sep)) return [];
+        return listPageDir(dir);
+    };
     ContentBase.viewerHrefFn = (viewer, fileName) => viewerHref(localRoot, pageDir, viewer, fileName);
 
     const context = {
