@@ -466,6 +466,12 @@ p code, li code, p tt, li tt {
   margin-bottom: 10px;
 }
 
+/* A listing table right after a section's text continues that section: no rule between them */
+.section + .section.listing-table {
+  border-top: none;
+  padding-top: 0;
+}
+
 /* Folder listings as a table (folderLayout: table): the first column stays on one line */
 .listing-table td:first-child {
   white-space: nowrap;
