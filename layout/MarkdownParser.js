@@ -472,6 +472,9 @@ export function splitFrontmatter (text) {
 // A paragraph that is just "{listing: some/folder}" embeds that subfolder's
 // folder listing (ContentFolderCards with `folder`), set up by its own page.
 const LISTING_RE = /^\{listing:\s*([^{}]+)\}$/;
+// "{listing: .}": the page's own folder and file listings go here, instead of
+// after the text (or before the first titled section with cardsFirst).
+const OWN_LISTINGS = "_ownListings";
 
 export function parseMarkdown (text) {
     const rawLines = text.split("\n");
@@ -524,7 +527,9 @@ export function parseMarkdown (text) {
         if (section.collapsed) entry.collapsed = true;
         const body = blocksToHtml(section.blocks);
         if (body) entry.body = body;
-        const embedded = (section.listings || []).map(folder => ({ type: "ContentFolderCards", folder }));
+        // "{listing: .}" marks where the page's own listings go (placed below).
+        const embedded = (section.listings || []).map(folder =>
+            folder === "." ? { type: OWN_LISTINGS } : { type: "ContentFolderCards", folder });
         return [entry, ...embedded];
     });
 
@@ -595,7 +600,11 @@ export function parseMarkdown (text) {
         if (fileTitles) entry.titles = fileTitles;
         listings.push(entry);
     }
-    if (meta.cardsFirst === true) {
+    const marked = content.findIndex(c => c.type === OWN_LISTINGS);
+    if (marked !== -1) {
+        content.splice(marked, 1, ...listings);
+        for (let i = content.length - 1; i >= 0; i--) if (content[i].type === OWN_LISTINGS) content.splice(i, 1);
+    } else if (meta.cardsFirst === true) {
         let at = content.findIndex(c => c.title && c.type === "ContentText");
         if (at === -1) at = content.length;
         content.splice(at, 0, ...listings);

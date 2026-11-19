@@ -739,3 +739,17 @@ test("a {listing: folder} line embeds that subfolder's listing, set up by its ow
         rmSync(site, { recursive: true, force: true });
     }
 });
+
+test("{listing: .} places the page's own listing there", () => {
+    const site = makeSite({});
+    try {
+        writePage(site, "jobs", "---\ntitle: Jobs\nfolderCards: true\nfolderCardsTitle: Work\ncardsFirst: true\n---\n\n## Offers\n\nNot taken.\n\n{listing: .}\n\n## Notes\n\nMore.\n");
+        writePage(site, "jobs/roof", "---\ntitle: Roof\n---\n");
+        build(site);
+        const html = readFileSync(join(site, "jobs", "index.html"), "utf-8");
+        assert.match(html, /id="offers"[\s\S]*Not taken\.[\s\S]*<h2[^>]*>Work<\/h2>[\s\S]*>Roof<[\s\S]*id="notes"/);
+        assert.doesNotMatch(html.split('id="colvmn-prefetch"')[0], /\{listing/);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
