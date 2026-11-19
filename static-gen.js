@@ -460,13 +460,15 @@ async function generatePage (pageDir) {
         html = html.replace("</head>", `  <title>${docTitle}</title>\n</head>`);
     }
 
-    // Inject a <link rel="alternate"> pointing to /llms.txt so LLM agents
-    // can discover the machine-readable index from any page. The href is
-    // server-absolute here; rewriteEngineLinks() converts it to a page-
-    // relative path below. The dedup check matches either form so repeated
-    // builds don't accumulate duplicates.
-    const llmsLinkTag = '<link rel="alternate" type="text/plain" title="llms.txt" href="/llms.txt">';
-    if (!/<link\b[^>]*href="[^"]*\/?llms\.txt"/i.test(html) && /<\/head>/i.test(html)) {
+    // Inject a <link rel="alternate"> to llms.txt so LLM agents can discover
+    // the machine-readable index from any page. It is page-relative, to this
+    // page's own site's llms.txt, so a site served under a subfolder
+    // (example.com/manual/) points at its own. Any earlier tag (an older
+    // build's "/llms.txt") is replaced, so rebuilds never add a second.
+    const llmsHref = relative(pageDir, join(localRoot, "llms.txt")).split(sep).map(encodeURIComponent).join("/");
+    const llmsLinkTag = `<link rel="alternate" type="text/plain" title="llms.txt" href="${llmsHref.startsWith(".") ? llmsHref : "./" + llmsHref}">`;
+    html = html.replace(/[ \t]*<link\b[^>]*href="[^"]*\/?llms\.txt"[^>]*>\n?/gi, "");
+    if (/<\/head>/i.test(html)) {
         html = html.replace(/<\/head>/i, `  ${llmsLinkTag}\n</head>`);
     }
 
@@ -910,6 +912,21 @@ function cardLine (row) {
     return line + "\n";
 }
 
+// A listing shown as a table (folderLayout: table): the same columns, in the
+// same (sorted) order, the title linked.
+function listingTableMarkdown (block, rows) {
+    const columns = block.tableColumns(rows);
+    const cell = v => htmlToPlain(String(v ?? "")).replace(/\|/g, "\\|");
+    let md = "| " + columns.map(c => cell(c.header)).join(" | ") + " |\n| " + columns.map(() => "---").join(" | ") + " |\n";
+    for (const row of rows) {
+        md += "| " + columns.map(c => {
+            const value = cell(ContentCards.rowValue(row, c.source));
+            return c.source.toLowerCase() === "title" && row.link && row.href ? `[${value}](${row.href})` : value;
+        }).join(" | ") + " |\n";
+    }
+    return md + "\n";
+}
+
 function blockToMarkdown (block, depth = 0) {
     const json = block.json || {};
     const heading = depth === 0 ? "##" : "###";
@@ -926,6 +943,7 @@ function blockToMarkdown (block, depth = 0) {
         case "ContentFolderCards": {
             const rows = [...(block.resolvedItems || []), ...(block.extraRows || [])];
             if (!rows.length) return "";
+            if (json.layout === "table") return head + listingTableMarkdown(block, rows);
             return head + rows.map(cardLine).join("") + "\n";
         }
         case "ContentFileCards": {
@@ -981,9 +999,14 @@ function blockToMarkdown (block, depth = 0) {
             return md + "\n";
         }
         case "ContentKeyValue":
+        case "ContentTable": {
+            // These two (and ContentText) render their nested `content` blocks too.
+            let md = contentEntryToMarkdown(json, depth);
+            for (const child of block.children || []) md += blockToMarkdown(child, depth + 1);
+            return md;
+        }
         case "ContentUnorderedList":
         case "ContentOrderedList":
-        case "ContentTable":
         case "ContentTimeline":
         case "ContentImage":
         case "ContentSlideshow":

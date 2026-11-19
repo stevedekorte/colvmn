@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="../style.css">
 <title>Quick Start – colvmn</title>
-  <link rel="alternate" type="text/plain" title="llms.txt" href="../llms.txt">
   <meta name="description" content="A two-page site in a few minutes: a home page, a child page, and a build that links them.">
   <link rel="canonical" href="https://colvmn.dev/quick-start/">
+  <link rel="alternate" type="text/plain" title="llms.txt" href="../llms.txt">
 </head>
 <body>
 <div class="page loaded has-cols has-cols-3 has-cols-4"><div class="header"><div><h1>Quick Start</h1><a class="back-link" href="../index.html">&larr; Home</a></div><a class="brand" href="../index.html">colvmn</a></div><div class="intro"><p>A two-page site in a few minutes: a home page, a child page, and a build that links them.</p></div><nav class="toc"><ul><li><a href="#1-add-colvmn">1. Add colvmn</a></li><li><a href="#2-make-the-home-page">2. Make the home page</a></li><li><a href="#3-add-a-child-page">3. Add a child page</a></li><li><a href="#4-build">4. Build</a></li><li><a href="#5-open-it">5. Open it</a></li><li><a href="#next">Next</a></li></ul></nav><div class="col-group"><div class="col-keep"><h2 id="1-add-colvmn">1. Add colvmn</h2><div class="section"><div class="section-body"><p>In your site's git repository, add colvmn as a submodule:</p><pre><code>git submodule add https://github.com/stevedekorte/colvmn.git colvmn</code></pre></div></div></div></div><div class="col-group"><div class="col-keep"><h2 id="2-make-the-home-page">2. Make the home page</h2><div class="section"><div class="section-body"><p>A page is a folder with two files: <code>_index.md</code>, which you write, and <code>index.html</code>, which the build writes. Start each <code>index.html</code> empty:</p><pre><code>touch index.html</code></pre><p>Then write <code>_index.md</code> beside it:</p><pre><code>---

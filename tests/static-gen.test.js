@@ -522,10 +522,10 @@ test("file cards for OBJ, DWG and DXF files open the engine's viewer pages, with
 const BLOCK_SAMPLES = {
     ContentText: { type: "ContentText", title: "Text Mk1", body: "<p>Text Mk2</p>", content: [{ type: "ContentUnorderedList", items: ["Text Mk3"] }] },
     ContentCards: { type: "ContentCards", title: "Cards Mk1", items: ["child", { title: "Cards Mk2", subtitle: "Cards Mk3", href: "https://example.com/" }] },
-    ContentKeyValue: { type: "ContentKeyValue", title: "KV Mk1", items: { "KV Mk2": "KV Mk3" } },
+    ContentKeyValue: { type: "ContentKeyValue", title: "KV Mk1", items: { "KV Mk2": "KV Mk3" }, content: [{ type: "ContentText", body: "<p>KV Mk4</p>" }] },
     ContentUnorderedList: { type: "ContentUnorderedList", title: "UL Mk1", items: ["UL Mk2", { text: "UL Mk3", content: [{ type: "ContentUnorderedList", items: ["UL Mk4"] }] }] },
     ContentOrderedList: { type: "ContentOrderedList", title: "OL Mk1", items: ["OL Mk2"] },
-    ContentTable: { type: "ContentTable", title: "Tbl Mk1", subtitle: "Tbl Mk2", columns: ["Tbl Mk3"], rows: [["Tbl Mk4"]], note: "Tbl Mk5" },
+    ContentTable: { type: "ContentTable", title: "Tbl Mk1", subtitle: "Tbl Mk2", columns: ["Tbl Mk3"], rows: [["Tbl Mk4"]], note: "Tbl Mk5", content: [{ type: "ContentText", body: "<p>Tbl Mk6</p>" }] },
     ContentImage: { type: "ContentImage", title: "Img Mk1", src: "img-mk2.png", alt: "Img Mk3" },
     ContentTimeline: { type: "ContentTimeline", title: "TL Mk1", items: [{ date: "2020", title: "TL Mk2", subtitle: "TL Mk3" }] },
     ContentToc: { type: "ContentToc", items: ["Text Mk1"] },
@@ -589,6 +589,36 @@ test("a markdown page's folder and file listings reach llms-full.txt; the colvmn
         assert.match(jobs, /## Documents\n\n- \[Contract\]\(Contract\.pdf\) — PDF · 3 bytes/);
         assert.match(rootHtml, /<h3>Kept Page<\/h3>/);
         assert.doesNotMatch(rootHtml + llmsFull, /Engine Docs/);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
+test("a folder table's columns, from its pages' frontmatter, reach llms-full.txt in the table's sorted order", () => {
+    const site = makeSite({});
+    try {
+        writePage(site, "projects", "---\ntitle: Projects\nfolderCards: true\nfolderLayout: table\nfolderColumns: Project=title, Owner=owner, Status=status\nfolderSort: Owner\n---\nAll projects.\n");
+        writePage(site, "projects/deck", "---\ntitle: Deck\nowner: Zoe\nstatus: Done\n---\n");
+        writePage(site, "projects/roof", "---\ntitle: Roof\nowner: Ann\nstatus: Planned\n---\n");
+        const { llmsFull } = build(site);
+        assert.match(llmsFull, /\| Project \| Owner \| Status \|\n\| --- \| --- \| --- \|\n\| \[Roof\]\(roof\/index\.html\) \| Ann \| Planned \|\n\| \[Deck\]\(deck\/index\.html\) \| Zoe \| Done \|/);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
+test("each page links its own site's llms.txt page-relatively, so a site served under a subfolder finds its own", () => {
+    const site = makeSite({});
+    try {
+        writeFileSync(join(site, "kept", "index.html"), '<!DOCTYPE html>\n<html>\n<head>\n  <link rel="alternate" type="text/plain" title="llms.txt" href="/llms.txt">\n</head>\n<body>\n  <div class="page"></div>\n  <script src="/colvmn/layout/bundle.js" defer></script>\n</body>\n</html>\n');
+        const { rootHtml } = build(site);
+        build(site);
+        const kept = readFileSync(join(site, "kept", "index.html"), "utf-8");
+        const nested = readFileSync(join(site, "private", "child", "index.html"), "utf-8");
+        const links = html => [...html.matchAll(/<link rel="alternate"[^>]*href="([^"]+)"/g)].map(m => m[1]);
+        assert.deepEqual(links(rootHtml), ["./llms.txt"]);
+        assert.deepEqual(links(kept), ["../llms.txt"], "an older /llms.txt tag is replaced, and rebuilding adds no second");
+        assert.deepEqual(links(nested), ["../../llms.txt"]);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }
