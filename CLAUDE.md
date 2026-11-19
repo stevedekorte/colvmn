@@ -37,7 +37,7 @@ How it works:
 - Markup must be emitted by the build path (`computeHtml()` / `computePageHtml()`), since that is what ships. Don't rely on browser-side DOM construction.
 - Interactivity belongs in `postRender(page)` (per-block) or, for page-global behavior not tied to a block, in `layout.js`'s `DOMContentLoaded` handler. Prefer event delegation so it works regardless of which blocks are present.
 - There is no static/dynamic markup to keep in sync: the build is the single source of the HTML; the runtime only enhances it.
-- Every block's meaningful text must also reach `llms-full.txt` (AI agents and AI reviews read only that). `static-gen.js` builds it from each page's resolved blocks (`blockToMarkdown`); a new block type gets a case there (without one, its rendered HTML is stripped to text), and a sample in the "every content block's text reaches both" test in `tests/static-gen.test.js`.
+- Every block's meaningful text must also reach `llms-full.txt` (AI agents and AI reviews read only that). `static-gen.js` builds it from each page's resolved blocks (`blockToMarkdown`); a new block type gets a case there (without one, its rendered HTML is stripped to text); cards and listing rows for a page left out of the llms files (an AI reviews folder above all: reviewers must never see reviews) are left out of it too, and a sample in the "every content block's text reaches both" test in `tests/static-gen.test.js`.
 
 ## Structure
 

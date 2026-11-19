@@ -902,6 +902,8 @@ function contentEntryToMarkdown (entry, depth = 0) {
 // must reach llms-full.txt, since AI reviewers read only that file; a block
 // type with no case below falls back to its rendered HTML as text.
 const builtBlocks = new Map();
+// Pages left out of the llms files (main); cards linking to them are left out of llms-full.txt.
+let llmsLeftOut = new Set();
 
 function cardLine (row) {
     const title = htmlToPlain(String(row.title || row.folder || ""));
@@ -927,7 +929,7 @@ function listingTableMarkdown (block, rows) {
     return md + "\n";
 }
 
-function blockToMarkdown (block, depth = 0) {
+function blockToMarkdown (block, depth = 0, pageDir = null) {
     const json = block.json || {};
     const heading = depth === 0 ? "##" : "###";
     const head = json.title ? `${heading} ${htmlToPlain(String(json.title))}\n\n` : "";
@@ -936,12 +938,15 @@ function blockToMarkdown (block, depth = 0) {
         case "ContentText": {
             let md = head;
             if (json.body) md += htmlToMarkdown(json.body) + "\n\n";
-            for (const child of block.children || []) md += blockToMarkdown(child, depth + 1);
+            for (const child of block.children || []) md += blockToMarkdown(child, depth + 1, pageDir);
             return md;
         }
         case "ContentCards":
         case "ContentFolderCards": {
-            const rows = [...(block.resolvedItems || []), ...(block.extraRows || [])];
+            // A card for a page left out of the llms files (an AI reviews
+            // folder, llms: false, llmsExclude, unlisted) is left out here too.
+            const rows = [...(block.resolvedItems || []), ...(block.extraRows || [])]
+                .filter(r => !(pageDir && r.folder && llmsLeftOut.has(resolve(pageDir, r.folder))));
             if (!rows.length) return "";
             if (json.layout === "table") return head + listingTableMarkdown(block, rows);
             return head + rows.map(cardLine).join("") + "\n";
@@ -1002,7 +1007,7 @@ function blockToMarkdown (block, depth = 0) {
         case "ContentTable": {
             // These two (and ContentText) render their nested `content` blocks too.
             let md = contentEntryToMarkdown(json, depth);
-            for (const child of block.children || []) md += blockToMarkdown(child, depth + 1);
+            for (const child of block.children || []) md += blockToMarkdown(child, depth + 1, pageDir);
             return md;
         }
         case "ContentUnorderedList":
@@ -1017,12 +1022,12 @@ function blockToMarkdown (block, depth = 0) {
     }
 }
 
-function jsonPageToMarkdown (json, blocks = null) {
+function jsonPageToMarkdown (json, blocks = null, pageDir = null) {
     let md = "";
     if (json.title) md += `# ${json.title}\n\n`;
     if (json.subtitle) md += htmlToPlain(json.subtitle) + "\n\n";
     if (blocks) {
-        for (const block of blocks) md += blockToMarkdown(block, 0);
+        for (const block of blocks) md += blockToMarkdown(block, 0, pageDir);
     } else {
         for (const entry of json.content || []) md += contentEntryToMarkdown(entry, 0);
     }
@@ -1135,10 +1140,10 @@ function generateLlmsFull (pages, scope = null) {
             out += withoutCollapsedMarkers(llmsMarkdown(meta.rawMarkdown).trim()) + "\n";
             // Folder listings come from frontmatter, not the text: add what they list.
             const listings = (blocks || []).filter(b => /^Content(Folder|File)Cards$/.test(b.json.type));
-            const listed = listings.map(b => blockToMarkdown(b, 0)).join("").trim();
+            const listed = listings.map(b => blockToMarkdown(b, 0, pageDir)).join("").trim();
             if (listed) out += "\n" + listed + "\n";
         } else {
-            out += jsonPageToMarkdown(meta.json, blocks);
+            out += jsonPageToMarkdown(meta.json, blocks, pageDir);
         }
     }
 
@@ -1281,6 +1286,7 @@ async function main () {
     const isUnlisted = p => { const rel = relative(siteRoot, p); return !!rel && matchesLlmsExclude(rel, unlisted); };
     const llmsPages = pages.filter(p => !isUnlisted(p) && !isExcludedFromLlms(p, llmsExclude));
     const excludedPages = pages.filter(p => !llmsPages.includes(p));
+    llmsLeftOut = new Set(excludedPages);
     if (excludedPages.length) {
         console.log(`  left out of llms.txt / llms-full.txt: ${excludedPages.length} pages`);
     }

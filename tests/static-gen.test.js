@@ -624,6 +624,25 @@ test("each page links its own site's llms.txt page-relatively, so a site served 
     }
 });
 
+test("a folder listing on an opted-in page may show its AI Reviews folder, but no card for it, or for any page left out, reaches the llms files", () => {
+    const site = makeSite({ aiReviews: { folder: "AI Reviews" } });
+    try {
+        writePage(site, "docs", "---\ntitle: Docs\naiReviews: true\nfolderCards: true\n---\nDocs text.\n");
+        writePage(site, "docs/guide", "# Guide\n\nGuide text.\n");
+        writePage(site, "docs/hidden", "---\nllms: false\n---\n# Hidden Page\n");
+        writePage(site, "docs/AI Reviews", "---\ntitle: Reviews Page\nsubtitle: Reviews subtitle.\n---\n");
+        writePage(site, "docs/AI Reviews/Claude", "---\ntitle: Claude\nsubtitle: The verdict.\n---\nThe review.\n");
+        const { llms, llmsFull } = build(site);
+        const docsFull = readFileSync(join(site, "docs", "llms-full.txt"), "utf-8");
+        for (const text of [llms, llmsFull, docsFull]) {
+            assert.match(text, /\[Guide\]/);
+            assert.doesNotMatch(text, /Reviews Page|Reviews subtitle|verdict|The review|Hidden Page/);
+        }
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
 test("frontmatter that isn't one-line key: value settings stops the build, naming the file and line", () => {
     const site = makeSite({});
     try {
