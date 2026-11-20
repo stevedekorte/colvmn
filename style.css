@@ -1255,8 +1255,9 @@ p code, li code, p tt, li tt {
    .max-cols-3. layout/Columns.js then splits the sections, in order, into
    .col-set columns, moving whole subsections only; without JavaScript the
    browser's own columns do it (.has-cols without .js-columns). Everything
-   else (header, intro, contents, cards, tables, untitled text, the footer)
-   spans the page. Below 1200px, and in print, the page is one column. */
+   else (header, intro, contents, cards, tables, untitled text, a section
+   holding a table, the footer) spans the page. Below 1200px, and in print,
+   the page is one column. */
 
 /* Wrapping changes which <h2> is the first of its type, so every heading but
    the page's first keeps its top margin. */

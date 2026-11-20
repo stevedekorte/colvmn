@@ -403,6 +403,7 @@ test("columns by default: each titled top-level section (text, list, key/value) 
     const site = makeSite({ maxColumns: 3 });
     try {
         writePage(site, "kept", "# Kept Page\n\nAn intro line.\n\n## One\n\nFirst.\n\n## Two\n\nSecond.\n");
+        writePage(site, "tabled", "# Tabled\n\nIntro.\n\n## Grid\n\n| A | B | C |\n| --- | --- | --- |\n| 1 | 2 | 3 |\n\n## One\n\nFirst.\n\n## Two\n\nSecond.\n");
         writePage(site, "guide", "---\nmaxColumns: 1\n---\n# Guide\n\nGuide text.\n\n## One\n\nFirst.\n\n## Two\n\nSecond.\n");
         writeFileSync(join(site, "private", "_index.json"), JSON.stringify({ title: "Private Page", llms: false, maxColumns: 2, content: [{ type: "ContentKeyValue", title: "Facts", items: { A: "1" } }, { type: "ContentText", title: "Notes", body: "<p>x</p>" }] }));
         rmSync(join(site, "private", "_index.md"));
@@ -410,6 +411,9 @@ test("columns by default: each titled top-level section (text, list, key/value) 
         const kept = readFileSync(join(site, "kept", "index.html"), "utf-8");
         assert.match(kept, /<div class="col-group"><div class="col-keep"><h2 id="one">One<\/h2><div class="section"><div class="section-body"><p>First\.<\/p><\/div><\/div><\/div><\/div><div class="col-group"><div class="col-keep"><h2 id="two">Two<\/h2>/);   // a heading is kept with its first subsection
         assert.match(kept, /<div class="page loaded has-cols max-cols-3">/);          // two sections, and the site's cap
+        const tabled = readFileSync(join(site, "tabled", "index.html"), "utf-8");
+        assert.doesNotMatch(tabled, /<div class="col-group"><div class="col-keep"><h2 id="grid">/);   // a section holding a table spans the page
+        assert.match(tabled, /<div class="col-group"><div class="col-keep"><h2 id="one">/);           // the others still flow into columns
         const guide = readFileSync(join(site, "guide", "index.html"), "utf-8");
         assert.doesNotMatch(guide, /col-group|max-cols/);                           // maxColumns: 1
         const priv = readFileSync(join(site, "private", "index.html"), "utf-8");

@@ -2597,6 +2597,15 @@ class PageIndex {
     }
 
     /**
+     * Whether a section's HTML holds something that needs the page's width:
+     * a table. Its columns would be squeezed into one page column and spill
+     * over the next, so such a section spans the page like a table block does.
+     */
+    static needsPageWidth (html) {
+        return /<table\b/i.test(html);
+    }
+
+    /**
      * A section's HTML with its leading <h2> and the first block after it
      * (any <noscript> between them included) wrapped in a .col-keep, which
      * style.css never splits: a heading always starts a column together with
@@ -2723,12 +2732,12 @@ class PageIndex {
         // Content. Each titled top-level section (its <h2> and everything
         // under it) is wrapped in a .col-group; on wide viewports style.css
         // flows those groups into columns and lets everything else (cards,
-        // tables, untitled text) span them. "maxColumns": 1 turns it off.
+        // tables, untitled text, and a section holding a table) span them. "maxColumns": 1 turns it off.
         const columns = this.maxColumns();
         this.columnUnitCount = 0;
         const contentHtml = this.children.map(c => {
             const html = c.computeHtml();
-            if (columns > 1 && PageIndex.isColumnGroup(c.json) && html) {
+            if (columns > 1 && PageIndex.isColumnGroup(c.json) && html && !PageIndex.needsPageWidth(html)) {
                 const grouped = PageIndex.keepHeadingWithFirst(html);
                 this.columnUnitCount += PageIndex.topLevelElementCount(grouped);
                 return `<div class="col-group">${grouped}</div>`;
