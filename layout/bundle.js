@@ -353,18 +353,32 @@ const SLIDESHOW_PARAGRAPH = /^(?:\s*<img\b[^>]*\bclass="(?:[^"]*\s)?slideshow(?:
  * .no-controls (hide the arrows and count) and .inset (a frame pressed into
  * the page). An image's markdown title (![Alt](a.jpg "Caption")) becomes its
  * caption, shown under it and crossfading with it; images without one have none.
+ * max-height=70vh (or 600 for pixels, or px/em/rem/vh/svh/dvh/lvh, or cqw:
+ * a percentage of the slideshow's own width) on any of its
+ * images caps how tall the images are shown, so one tall image doesn't make
+ * the frame tall for all of them (see slideshowMaxHeight).
  * Without JavaScript the noscript style shows them stacked.
  */
 const SLIDESHOW_OPTIONS = ["autoplay", "no-controls", "inset"];
+
+// A slideshow's max-height option as a CSS length: a bare number is pixels;
+// anything that isn't a plain length is ignored (returns "").
+function slideshowMaxHeight (value) {
+    const v = String(value ?? "").trim();
+    if (/^\d+(\.\d+)?$/.test(v)) return `${v}px`;
+    return /^\d+(\.\d+)?(px|em|rem|vh|svh|dvh|lvh|cqw)$/.test(v) ? v : "";
+}
 
 function slideshowHtml (imgs) {
     const n = imgs.length;
     // Options, as classes on any of its images: .autoplay advances by itself; .no-controls hides the arrows and count;
     // .inset sets the images in a frame pressed into the page.
     const options = new Set();
+    let maxHeight = "";
     const slides = imgs.map((img, k) => {
         let caption = "";
         let tag = img.replace(/\s*\btitle="([^"]*)"/, (m, t) => { caption = t; return ""; });
+        tag = tag.replace(/\s*\bmax-height="([^"]*)"/, (m, v) => { maxHeight = slideshowMaxHeight(v) || maxHeight; return ""; });
         tag = tag.replace(/\bclass="([^"]*)"/, (m, c) => {
             const classes = c.split(/\s+/).filter(x => x && x !== "slideshow");
             classes.filter(x => SLIDESHOW_OPTIONS.includes(x)).forEach(x => options.add(x));
@@ -377,7 +391,8 @@ function slideshowHtml (imgs) {
         return `<figure class="slide${active}" aria-roledescription="slide" aria-label="${k + 1} of ${n}"${hidden}>${tag}${figcaption}</figure>`;
     }).join("");
     const optionClasses = SLIDESHOW_OPTIONS.filter(o => options.has(o)).map(o => ` ${o}`).join("");
-    return `<div class="colvmn-slideshow${optionClasses}" role="region" aria-roledescription="carousel" aria-label="Images" tabindex="0">`
+    const style = maxHeight ? ` style="--slideshow-max-height: ${maxHeight}"` : "";
+    return `<div class="colvmn-slideshow${optionClasses}"${style} role="region" aria-roledescription="carousel" aria-label="Images" tabindex="0">`
         + `<div class="slideshow-frame">${slides}`
         + '<button class="slideshow-edge slideshow-edge-prev" type="button" tabindex="-1" aria-label="Previous image"><span>&lsaquo;</span></button>'
         + '<button class="slideshow-edge slideshow-edge-next" type="button" tabindex="-1" aria-label="Next image"><span>&rsaquo;</span></button></div>'
@@ -2124,14 +2139,16 @@ class ContentComparisonTable extends ContentBase {
 //     "images": [{ "src": "images/a.jpg", "alt": "…", "caption": "…" }, …] }
 // "autoplay" (default false) advances by itself; "controls": false hides the
 // arrows and count; "inset" sets the images in a frame pressed into the page.
-// An image's optional "caption" is shown under it. Behavior: layout/Slideshow.js.
+// An image's optional "caption" is shown under it. "maxHeight" ("70vh", or 600
+// for pixels) caps how tall the images are shown. Behavior: layout/Slideshow.js.
 
 class ContentSlideshow extends ContentBase {
     computeHtml () {
         const images = this.json.images || [];
         if (images.length === 0) return "";
         const options = [this.json.autoplay ? "autoplay" : "", this.json.controls === false ? "no-controls" : "", this.json.inset ? "inset" : ""].filter(Boolean);
-        const imgs = images.map((im, k) => `<img src="${escapeAttr(im.src)}" alt="${escapeAttr(im.alt)}"${im.caption ? ` title="${escapeAttr(im.caption)}"` : ""} class="${["slideshow", ...(k === 0 ? options : [])].join(" ")}">`);
+        const maxHeight = slideshowMaxHeight(this.json.maxHeight);
+        const imgs = images.map((im, k) => `<img src="${escapeAttr(im.src)}" alt="${escapeAttr(im.alt)}"${im.caption ? ` title="${escapeAttr(im.caption)}"` : ""}${k === 0 && maxHeight ? ` max-height="${maxHeight}"` : ""} class="${["slideshow", ...(k === 0 ? options : [])].join(" ")}">`);
         let html = "";
         if (this.json.title) html += `<h2>${this.json.title}</h2>`;
         return html + slideshowHtml(imgs);

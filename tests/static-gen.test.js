@@ -372,6 +372,27 @@ test("a slideshow image's markdown title becomes its caption; images without one
     }
 });
 
+test("a slideshow's max-height option caps its images: on any image in markdown, maxHeight in JSON; bad values are ignored", () => {
+    const site = makeSite({});
+    try {
+        writePage(site, "kept", "# Kept Page\n\nKept text.\n\n![One](a.jpg){.slideshow}\n![Two](b.jpg){.slideshow max-height=70vh}\n\n## More\n\n![Three](c.jpg){.slideshow max-height=600}\n![Four](d.jpg){.slideshow}\n\n## Wide\n\n![Seven](g.jpg){.slideshow max-height=56.3cqw}\n![Eight](h.jpg){.slideshow}\n\n## Bad\n\n![Five](e.jpg){.slideshow max-height=red;x}\n![Six](f.jpg){.slideshow}\n");
+        mkdirSync(join(site, "shots"), { recursive: true });
+        writeFileSync(join(site, "shots", "_index.json"), JSON.stringify({ title: "Shots", content: [{ type: "ContentSlideshow", maxHeight: "50dvh", images: [{ src: "a.jpg", alt: "A" }, { src: "b.jpg", alt: "B" }] }] }));
+        writeFileSync(join(site, "shots", "index.html"), "");
+        build(site);
+        const html = readFileSync(join(site, "kept", "index.html"), "utf-8").split("colvmn-prefetch")[0];
+        assert.match(html, /<div class="colvmn-slideshow" style="--slideshow-max-height: 70vh" role="region"/);
+        assert.match(html, /<div class="colvmn-slideshow" style="--slideshow-max-height: 600px" role="region"/);
+        assert.match(html, /<div class="colvmn-slideshow" style="--slideshow-max-height: 56\.3cqw" role="region"/);
+        assert.equal((html.match(/style="--slideshow-max-height/g) || []).length, 3);   // the bad value is ignored
+        assert.doesNotMatch(html, /<img[^>]*max-height=/);
+        const shots = readFileSync(join(site, "shots", "index.html"), "utf-8");
+        assert.match(shots, /<div class="colvmn-slideshow" style="--slideshow-max-height: 50dvh" role="region"/);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
 test("slideshow options: .autoplay and .no-controls on any image go on the slideshow, not the images", () => {
     const site = makeSite({});
     try {

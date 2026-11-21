@@ -121,6 +121,8 @@ Two options, as classes on any of the images:
 
 Captions are optional: an image's title becomes its caption, shown under it and crossfading with it, as in image rows. `![The maze](images/maze.jpg "The maze from above"){.slideshow}`. Images without a title have none.
 
+A tall image makes the frame tall for every slide. `max-height=70vh` on any of the images (or `600` for pixels; `px`, `em`, `rem`, `vh`, `svh`, `dvh` and `lvh` work too, and `cqw`, a percentage of the slideshow's width, so `56.3cqw` matches a full-width 16:9 image at any width) caps how tall they are shown, keeping each one's shape: `![Engine](engine.jpg){.slideshow max-height=70vh}`. In JSON, `"maxHeight": "70vh"`.
+
 In `_index.json`, use a `ContentSlideshow` block:
 
 ```json

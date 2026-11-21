@@ -1089,6 +1089,9 @@ p code, li code, p tt, li tt {
 .colvmn-slideshow {
   margin: 20px 0;
   outline: none;
+  /* So max-height=…cqw is a share of the slideshow's own width: a cap that
+     keeps the same shape at any width (56.3cqw = a 16:9 image's height). */
+  container-type: inline-size;
 }
 .slideshow-frame {
   position: relative;
@@ -1118,7 +1121,12 @@ p code, li code, p tt, li tt {
 .slideshow-frame .slide img {
   display: block;
   max-width: 100%;
+  /* max-height=… on the slideshow (--slideshow-max-height) caps tall images;
+     width follows, keeping each image's shape. */
+  max-height: var(--slideshow-max-height, none);
+  width: auto;
   height: auto;
+  min-height: 0;
   -webkit-user-drag: none;
 }
 /* An optional caption (the image's markdown title, or "caption" in JSON),
