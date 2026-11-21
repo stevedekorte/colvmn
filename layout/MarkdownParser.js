@@ -345,7 +345,8 @@ const SLIDESHOW_PARAGRAPH = /^(?:\s*<img\b[^>]*\bclass="(?:[^"]*\s)?slideshow(?:
  * next buttons and a counter (layout/Slideshow.js). Each image is zoomable.
  * Options, as classes on any of its images: .autoplay (advance by itself),
  * .no-controls (hide the arrows and count) and .inset (a frame pressed into
- * the page).
+ * the page). An image's markdown title (![Alt](a.jpg "Caption")) becomes its
+ * caption, shown under it and crossfading with it; images without one have none.
  * Without JavaScript the noscript style shows them stacked.
  */
 const SLIDESHOW_OPTIONS = ["autoplay", "no-controls", "inset"];
@@ -356,7 +357,9 @@ export function slideshowHtml (imgs) {
     // .inset sets the images in a frame pressed into the page.
     const options = new Set();
     const slides = imgs.map((img, k) => {
-        let tag = img.replace(/\bclass="([^"]*)"/, (m, c) => {
+        let caption = "";
+        let tag = img.replace(/\s*\btitle="([^"]*)"/, (m, t) => { caption = t; return ""; });
+        tag = tag.replace(/\bclass="([^"]*)"/, (m, c) => {
             const classes = c.split(/\s+/).filter(x => x && x !== "slideshow");
             classes.filter(x => SLIDESHOW_OPTIONS.includes(x)).forEach(x => options.add(x));
             return `class="${classes.filter(x => !SLIDESHOW_OPTIONS.includes(x)).concat("colvmn-zoomable-image").join(" ")}"`;
@@ -364,7 +367,8 @@ export function slideshowHtml (imgs) {
         if (k > 0 && !/\bloading=/.test(tag)) tag = tag.replace(/^<img\b/, '<img loading="lazy"');
         const active = k === 0 ? " is-active" : "";
         const hidden = k === 0 ? "" : ' aria-hidden="true"';
-        return `<figure class="slide${active}" aria-roledescription="slide" aria-label="${k + 1} of ${n}"${hidden}>${tag}</figure>`;
+        const figcaption = caption ? `<figcaption>${caption}</figcaption>` : "";
+        return `<figure class="slide${active}" aria-roledescription="slide" aria-label="${k + 1} of ${n}"${hidden}>${tag}${figcaption}</figure>`;
     }).join("");
     const optionClasses = SLIDESHOW_OPTIONS.filter(o => options.has(o)).map(o => ` ${o}`).join("");
     return `<div class="colvmn-slideshow${optionClasses}" role="region" aria-roledescription="carousel" aria-label="Images" tabindex="0">`

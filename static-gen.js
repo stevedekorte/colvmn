@@ -892,7 +892,7 @@ function contentEntryToMarkdown (entry, depth = 0) {
         }
         case "ContentSlideshow": {
             const images = (entry.images || []).filter(im => im.src);
-            return images.length ? (title ? `${heading} ${title}\n\n` : "") + images.map(im => `![${im.alt || ""}](${im.src})\n\n`).join("") : "";
+            return images.length ? (title ? `${heading} ${title}\n\n` : "") + images.map(im => `![${im.alt || ""}](${im.src}${im.caption ? ` "${String(im.caption).replace(/"/g, '\\"')}"` : ""})\n\n`).join("") : "";
         }
         case "ContentToc":
             return "";
@@ -1113,7 +1113,7 @@ function rootFirstParagraph () {
 function rootRelativeLinks (markdown, urlPath) {
     if (!urlPath) return markdown;
     const base = "https://site.invalid/" + urlPath;
-    const rewrite = text => text.replace(/\]\(([^)\s]+)((?:\s+"[^"]*")?)\)/g, (m, href, title) => {
+    const rewrite = text => text.replace(/\]\(([^)\s]+)((?:\s+"(?:[^"\\]|\\.)*")?)\)/g, (m, href, title) => {
         if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith("/")) return m;
         let url;
         try { url = new URL(href, base); } catch { return m; }

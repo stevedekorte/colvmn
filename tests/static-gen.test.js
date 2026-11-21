@@ -357,6 +357,21 @@ test("image layout options: classes in markdown pass through; ContentImage build
     }
 });
 
+test("a slideshow image's markdown title becomes its caption; images without one get none", () => {
+    const site = makeSite({});
+    try {
+        writePage(site, "kept", "# Kept Page\n\nKept text.\n\n![One](a.jpg \"First & one\"){.slideshow}\n![Two](b.jpg){.slideshow}\n");
+        const { llmsFull } = build(site);
+        const html = readFileSync(join(site, "kept", "index.html"), "utf-8");
+        assert.match(html, /aria-label="1 of 2"><img src="a\.jpg" alt="One" class="colvmn-zoomable-image"><figcaption>First &amp; one<\/figcaption><\/figure>/);
+        assert.match(html, /aria-label="2 of 2" aria-hidden="true"><img loading="lazy" src="b\.jpg" alt="Two" class="colvmn-zoomable-image"><\/figure>/);
+        assert.doesNotMatch(html.split("colvmn-prefetch")[0], /title="First/);
+        assert.match(llmsFull, /!\[One\]\(kept\/a\.jpg "First & one"\)/);
+    } finally {
+        rmSync(site, { recursive: true, force: true });
+    }
+});
+
 test("slideshow options: .autoplay and .no-controls on any image go on the slideshow, not the images", () => {
     const site = makeSite({});
     try {
@@ -388,12 +403,12 @@ test("a markdown page's frontmatter stays out of llms-full.txt, but its title an
 test("ContentSlideshow builds the same slideshow in a JSON page, with its options, and lists its images in llms-full.txt", () => {
     const site = makeSite({});
     try {
-        writeFileSync(join(site, "kept", "_index.json"), JSON.stringify({ title: "Kept Page", content: [{ type: "ContentSlideshow", autoplay: true, controls: false, inset: true, images: [{ src: "a.jpg", alt: "One" }, { src: "b.jpg", alt: "Two" }] }] }));
+        writeFileSync(join(site, "kept", "_index.json"), JSON.stringify({ title: "Kept Page", content: [{ type: "ContentSlideshow", autoplay: true, controls: false, inset: true, images: [{ src: "a.jpg", alt: "One" }, { src: "b.jpg", alt: "Two", caption: "The \"second\" one" }] }] }));
         rmSync(join(site, "kept", "_index.md"));
         const { llmsFull } = build(site);
         const html = readFileSync(join(site, "kept", "index.html"), "utf-8");
-        assert.match(html, /<div class="colvmn-slideshow autoplay no-controls inset" role="region"[\s\S]*<img src="a\.jpg" alt="One" class="colvmn-zoomable-image">[\s\S]*<img loading="lazy" src="b\.jpg" alt="Two" class="colvmn-zoomable-image">/);
-        assert.match(llmsFull, /!\[One\]\(kept\/a\.jpg\)\n\n!\[Two\]\(kept\/b\.jpg\)/);
+        assert.match(html, /<div class="colvmn-slideshow autoplay no-controls inset" role="region"[\s\S]*<img src="a\.jpg" alt="One" class="colvmn-zoomable-image"><\/figure>[\s\S]*<img loading="lazy" src="b\.jpg" alt="Two" class="colvmn-zoomable-image"><figcaption>The &quot;second&quot; one<\/figcaption>/);
+        assert.match(llmsFull, /!\[One\]\(kept\/a\.jpg\)\n\n!\[Two\]\(kept\/b\.jpg "The \\"second\\" one"\)/);
     } finally {
         rmSync(site, { recursive: true, force: true });
     }

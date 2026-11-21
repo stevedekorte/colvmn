@@ -351,7 +351,8 @@ const SLIDESHOW_PARAGRAPH = /^(?:\s*<img\b[^>]*\bclass="(?:[^"]*\s)?slideshow(?:
  * next buttons and a counter (layout/Slideshow.js). Each image is zoomable.
  * Options, as classes on any of its images: .autoplay (advance by itself),
  * .no-controls (hide the arrows and count) and .inset (a frame pressed into
- * the page).
+ * the page). An image's markdown title (![Alt](a.jpg "Caption")) becomes its
+ * caption, shown under it and crossfading with it; images without one have none.
  * Without JavaScript the noscript style shows them stacked.
  */
 const SLIDESHOW_OPTIONS = ["autoplay", "no-controls", "inset"];
@@ -362,7 +363,9 @@ function slideshowHtml (imgs) {
     // .inset sets the images in a frame pressed into the page.
     const options = new Set();
     const slides = imgs.map((img, k) => {
-        let tag = img.replace(/\bclass="([^"]*)"/, (m, c) => {
+        let caption = "";
+        let tag = img.replace(/\s*\btitle="([^"]*)"/, (m, t) => { caption = t; return ""; });
+        tag = tag.replace(/\bclass="([^"]*)"/, (m, c) => {
             const classes = c.split(/\s+/).filter(x => x && x !== "slideshow");
             classes.filter(x => SLIDESHOW_OPTIONS.includes(x)).forEach(x => options.add(x));
             return `class="${classes.filter(x => !SLIDESHOW_OPTIONS.includes(x)).concat("colvmn-zoomable-image").join(" ")}"`;
@@ -370,7 +373,8 @@ function slideshowHtml (imgs) {
         if (k > 0 && !/\bloading=/.test(tag)) tag = tag.replace(/^<img\b/, '<img loading="lazy"');
         const active = k === 0 ? " is-active" : "";
         const hidden = k === 0 ? "" : ' aria-hidden="true"';
-        return `<figure class="slide${active}" aria-roledescription="slide" aria-label="${k + 1} of ${n}"${hidden}>${tag}</figure>`;
+        const figcaption = caption ? `<figcaption>${caption}</figcaption>` : "";
+        return `<figure class="slide${active}" aria-roledescription="slide" aria-label="${k + 1} of ${n}"${hidden}>${tag}${figcaption}</figure>`;
     }).join("");
     const optionClasses = SLIDESHOW_OPTIONS.filter(o => options.has(o)).map(o => ` ${o}`).join("");
     return `<div class="colvmn-slideshow${optionClasses}" role="region" aria-roledescription="carousel" aria-label="Images" tabindex="0">`
@@ -2117,16 +2121,17 @@ class ContentComparisonTable extends ContentBase {
 // A slideshow in an _index.json page, the same one markdown builds from
 // images marked {.slideshow}:
 //   { "type": "ContentSlideshow", "autoplay": true, "controls": false, "inset": true,
-//     "images": [{ "src": "images/a.jpg", "alt": "…" }, …] }
+//     "images": [{ "src": "images/a.jpg", "alt": "…", "caption": "…" }, …] }
 // "autoplay" (default false) advances by itself; "controls": false hides the
-// arrows and count; "inset" sets the images in a frame pressed into the page. Behavior: layout/Slideshow.js.
+// arrows and count; "inset" sets the images in a frame pressed into the page.
+// An image's optional "caption" is shown under it. Behavior: layout/Slideshow.js.
 
 class ContentSlideshow extends ContentBase {
     computeHtml () {
         const images = this.json.images || [];
         if (images.length === 0) return "";
         const options = [this.json.autoplay ? "autoplay" : "", this.json.controls === false ? "no-controls" : "", this.json.inset ? "inset" : ""].filter(Boolean);
-        const imgs = images.map((im, k) => `<img src="${escapeAttr(im.src)}" alt="${escapeAttr(im.alt)}" class="${["slideshow", ...(k === 0 ? options : [])].join(" ")}">`);
+        const imgs = images.map((im, k) => `<img src="${escapeAttr(im.src)}" alt="${escapeAttr(im.alt)}"${im.caption ? ` title="${escapeAttr(im.caption)}"` : ""} class="${["slideshow", ...(k === 0 ? options : [])].join(" ")}">`);
         let html = "";
         if (this.json.title) html += `<h2>${this.json.title}</h2>`;
         return html + slideshowHtml(imgs);

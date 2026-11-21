@@ -1105,6 +1105,7 @@ p code, li code, p tt, li tt {
   grid-area: 1 / 1;
   margin: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   opacity: 0;
@@ -1119,6 +1120,14 @@ p code, li code, p tt, li tt {
   max-width: 100%;
   height: auto;
   -webkit-user-drag: none;
+}
+/* An optional caption (the image's markdown title, or "caption" in JSON),
+   under its image and crossfading with it; styled like an image row's. */
+.slideshow-frame .slide figcaption {
+  margin-top: 8px;
+  font-size: 0.85em;
+  opacity: 0.7;
+  text-align: center;
 }
 /* The image's sides: with a mouse, an arrow fades in at each edge while the
    pointer is over the image; on touch screens each half is a tap target. */

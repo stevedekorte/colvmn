@@ -119,11 +119,13 @@ Two options, as classes on any of the images:
 
 `![Light cycles](images/light-cycles.jpg){.slideshow .autoplay .no-controls}` makes a hands-off slideshow.
 
+Captions are optional: an image's title becomes its caption, shown under it and crossfading with it, as in image rows. `![The maze](images/maze.jpg "The maze from above"){.slideshow}`. Images without a title have none.
+
 In `_index.json`, use a `ContentSlideshow` block:
 
 ```json
 { "type": "ContentSlideshow", "autoplay": true, "controls": false, "inset": true,
-  "images": [{ "src": "images/light-cycles.jpg", "alt": "Light cycles" }, { "src": "images/maze.jpg", "alt": "The maze" }] }
+  "images": [{ "src": "images/light-cycles.jpg", "alt": "Light cycles" }, { "src": "images/maze.jpg", "alt": "The maze", "caption": "The maze from above" }] }
 ``` Without JavaScript, and in print, the images are stacked.
 
 ### Zoomable images — `colvmn-zoomable-image`
